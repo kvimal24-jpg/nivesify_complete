@@ -1,66 +1,89 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
+import { Menu, X } from "lucide-react"; // Make sure to import icons
 
 export default function Header() {
   const { user, loading } = useUser();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const NAV_LINKS = [
+    { name: "Dashboard", href: "/dashboard" },
+    { name: "Health Check", href: "/dashboard/health-check" },
+    { name: "Active Funds", href: "/dashboard/active-funds" },
+    { name: "Index Funds", href: "/dashboard/index-funds" },
+    { name: "Calculators", href: "/dashboard/calculators" },
+  ];
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-[#F6F8F7] border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         
         {/* Logo */}
-        <Link href="/" className="flex items-center">
+        <Link href="/" className="flex items-center z-50">
           <img
             src="/logo.png"
             alt="Nivesify"
-            className="h-12 w-auto object-contain"
+            className="h-10 w-auto object-contain"
           />
         </Link>
 
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-10 font-serif text-sm text-gray-700">
-          <span className="cursor-default hover:text-gray-900 transition">Philosophy</span>
-          <Link href="/dashboard" className="hover:text-gray-900 transition">Dashboard</Link>
-          <span className="cursor-default hover:text-gray-900 transition">Fund Analysis</span>
-          <span className="cursor-default hover:text-gray-900 transition">Calculators</span>
+        {/* DESKTOP Navigation (Hidden on Mobile) */}
+        <nav className="hidden lg:flex items-center gap-8 font-serif text-sm text-gray-700">
+          {NAV_LINKS.map((link) => (
+            <Link 
+              key={link.name} 
+              href={link.href} 
+              className="hover:text-emerald-700 hover:underline underline-offset-4 transition-all"
+            >
+              {link.name}
+            </Link>
+          ))}
         </nav>
 
-        {/* Authentication Buttons */}
-        <div className="flex items-center gap-4">
-          {loading ? (
-             // Loading skeleton
-             <div className="w-20 h-8 bg-gray-200 rounded animate-pulse"></div>
-          ) : user ? (
-            <>
-              {user.picture && (
-                <img
-                  src={user.picture}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full border border-gray-300"
-                />
-              )}
-              <span className="font-serif text-sm text-gray-700 hidden sm:block">
-                {user.name}
-              </span>
-              <a
-                href="/api/auth/logout"
-                className="px-6 py-2 rounded-full bg-[#1F2937] text-white font-serif text-sm hover:shadow-md transition"
-              >
-                Sign out
+        {/* Auth Buttons & Mobile Toggle */}
+        <div className="flex items-center gap-4 z-50">
+          {/* Auth State */}
+          {!loading && (
+            user ? (
+              <div className="flex items-center gap-3">
+                 <img src={user.picture} alt="Avatar" className="w-8 h-8 rounded-full border border-gray-200 hidden sm:block" />
+                 <a href="/api/auth/logout" className="text-sm font-medium text-gray-600 hover:text-black">Sign Out</a>
+              </div>
+            ) : (
+              <a href="/api/auth/google" className="px-5 py-2 rounded-full bg-[#1F2937] text-white text-xs font-bold hover:shadow-lg transition">
+                Sign In
               </a>
-            </>
-          ) : (
-            <a
-              href="/api/auth/google"
-              className="px-6 py-2 rounded-full bg-[#1F2937] text-white font-serif text-sm hover:shadow-md transition"
-            >
-              Sign in with Google
-            </a>
+            )
           )}
+
+          {/* Mobile Menu Toggle */}
+          <button 
+            className="lg:hidden p-2 text-gray-600"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X /> : <Menu />}
+          </button>
         </div>
       </div>
+
+      {/* MOBILE MENU OVERLAY */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-[#F6F8F7] z-40 flex flex-col pt-24 px-6 gap-6 lg:hidden animate-in slide-in-from-top-10">
+          {NAV_LINKS.map((link) => (
+            <Link 
+              key={link.name} 
+              href={link.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-2xl font-serif text-gray-800 py-2 border-b border-gray-200"
+            >
+              {link.name}
+            </Link>
+          ))}
+        </div>
+      )}
     </header>
   );
 }

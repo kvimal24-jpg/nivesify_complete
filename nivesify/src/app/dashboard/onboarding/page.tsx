@@ -9,7 +9,6 @@ import {
 import { useUser } from "@/hooks/useUser"; 
 import { useRouter } from "next/navigation";
 
-// --- UTILS ---
 const formatIndianCurrency = (num: number, compact = false) => {
   if (num === undefined || num === null) return "₹0";
   if (compact) {
@@ -19,7 +18,6 @@ const formatIndianCurrency = (num: number, compact = false) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
 };
 
-// --- Types ---
 export type Goal = { id: string; name: string; age: number; cost: number; icon: string };
 
 type OnboardingData = {
@@ -87,7 +85,8 @@ export default function OnboardingPage() {
         .then(res => res.json())
         .then(json => {
           if (json.data && Object.keys(json.data).length > 0) {
-            setData(json.data);
+            // Merge with defaults to prevent undefined errors
+            setData(prev => ({ ...prev, ...json.data }));
           }
         });
     }
@@ -100,30 +99,34 @@ export default function OnboardingPage() {
   const validateStep = (currentStep: number) => {
     setError(null);
     if (currentStep === 0) {
-        if (!data.age || data.age < 18) return "Please enter a valid current age (18+).";
+        // Ensure values exist (not undefined)
+        if (!data.age || data.age < 18) return "Please enter a valid age (18+).";
         if (!data.retirementAge || data.retirementAge <= data.age) return "Retirement age must be greater than current age.";
     }
     if (currentStep === 1) {
-        if (!data.monthlyIncome || data.monthlyIncome <= 0) return "Monthly Income is required.";
-        if (!data.monthlyExpenses || data.monthlyExpenses <= 0) return "Essential Expenses are required.";
+        // Explicit checks for undefined or null, allowing 0 if logical (though income 0 is odd)
+        if (data.monthlyIncome === undefined || data.monthlyIncome <= 0) return "Monthly Income is required.";
+        if (data.monthlyExpenses === undefined || data.monthlyExpenses < 0) return "Valid expenses are required.";
     }
     return null;
   };
 
   const generateDefaultGoals = () => {
     const newGoals: Goal[] = [];
-    data.childAges.forEach((age, idx) => {
-        const yearsToCollege = 18 - age;
-        if (yearsToCollege > 0) {
-            newGoals.push({
-                id: `edu_${idx}`,
-                name: `Child ${idx + 1} Education`,
-                age: data.age + yearsToCollege, 
-                cost: 2500000, 
-                icon: "education"
-            });
-        }
-    });
+    if(data.childAges && data.childAges.length > 0) {
+        data.childAges.forEach((age, idx) => {
+            const yearsToCollege = 18 - age;
+            if (yearsToCollege > 0) {
+                newGoals.push({
+                    id: `edu_${idx}`,
+                    name: `Child ${idx + 1} Education`,
+                    age: data.age + yearsToCollege, 
+                    cost: 2500000, 
+                    icon: "education"
+                });
+            }
+        });
+    }
     const existingIds = new Set(data.goals.map(g => g.id));
     const finalGoals = [...data.goals, ...newGoals.filter(g => !existingIds.has(g.id))];
     setData(prev => ({ ...prev, goals: finalGoals }));
@@ -192,7 +195,7 @@ export default function OnboardingPage() {
                     </motion.div>
                 </AnimatePresence>
             </div>
-            {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 text-red-700 text-sm"><AlertCircle className="w-4 h-4" /> {error}</div>}
+            {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 text-red-700 text-sm animate-in slide-in-from-top-2"><AlertCircle className="w-4 h-4" /> {error}</div>}
             <div className="mt-4 pt-6 border-t border-stone-100 flex justify-between items-center">
                 <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} className={`text-stone-400 font-bold text-sm hover:text-stone-800 transition-opacity ${step === 0 ? "opacity-0 pointer-events-none" : "opacity-100"}`}>Back</button>
                 {step < 5 ? (
@@ -207,8 +210,6 @@ export default function OnboardingPage() {
   );
 }
 
-// --- Steps ---
-
 const StepLife = ({ data, setData }: any) => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
         <div className="grid grid-cols-2 gap-6">
@@ -217,8 +218,8 @@ const StepLife = ({ data, setData }: any) => (
         </div>
         <div className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
             <label className="text-sm font-bold text-stone-700 flex items-center gap-2 mb-4"><Baby className="w-5 h-5 text-emerald-600" /> Do you have children?</label>
-            <div className="flex gap-3 mb-4">{[0, 1, 2, 3].map(num => (<button key={num} onClick={() => { const newAges = Array(num).fill(0).map((_, i) => data.childAges[i] || 0); setData({...data, childrenCount: num, childAges: newAges}); }} className={`w-12 h-12 rounded-xl border-2 font-bold text-lg transition-all ${data.childrenCount === num ? "bg-stone-800 text-white border-stone-800" : "bg-white text-stone-400 border-stone-200"}`}>{num}</button>))}</div>
-            {data.childrenCount > 0 && (<div className="grid grid-cols-3 gap-4">{data.childAges.map((age: number, idx: number) => (<div key={idx}><div className="text-[10px] uppercase font-bold text-stone-400 mb-1">Child {idx+1} Age</div><input type="number" value={age} onChange={(e) => { const newAges = [...data.childAges]; newAges[idx] = Number(e.target.value); setData({...data, childAges: newAges}); }} className="w-full p-3 bg-white border border-stone-200 rounded-lg text-center font-bold text-stone-800 outline-emerald-500" /></div>))}</div>)}
+            <div className="flex gap-3 mb-4">{[0, 1, 2, 3].map(num => (<button key={num} onClick={() => { const newAges = Array(num).fill(0).map((_, i) => (data.childAges && data.childAges[i]) || 0); setData({...data, childrenCount: num, childAges: newAges}); }} className={`w-12 h-12 rounded-xl border-2 font-bold text-lg transition-all ${data.childrenCount === num ? "bg-stone-800 text-white border-stone-800" : "bg-white text-stone-400 border-stone-200"}`}>{num}</button>))}</div>
+            {data.childrenCount > 0 && (<div className="grid grid-cols-3 gap-4">{data.childAges.map((age: number, idx: number) => (<div key={idx}><div className="text-[10px] uppercase font-bold text-stone-400 mb-1">Child {idx+1} Age</div><input type="number" value={age !== undefined ? age : ''} onChange={(e) => { const newAges = [...data.childAges]; newAges[idx] = Number(e.target.value); setData({...data, childAges: newAges}); }} className="w-full p-3 bg-white border border-stone-200 rounded-lg text-center font-bold text-stone-800 outline-emerald-500" /></div>))}</div>)}
         </div>
         <button onClick={() => setData({...data, parentsDependent: !data.parentsDependent})} className={`w-full p-4 rounded-xl border-2 flex items-center gap-4 transition-all ${data.parentsDependent ? "border-emerald-500 bg-emerald-50/50" : "border-stone-100 bg-stone-50"}`}><div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${data.parentsDependent ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-stone-300"}`}>{data.parentsDependent && <Check className="w-4 h-4" />}</div><div className="text-left"><div className="font-bold text-stone-700">Financial Dependents</div><div className="text-xs text-stone-500">My parents rely on me financially</div></div></button>
     </div>
@@ -304,7 +305,7 @@ const StepGoals = ({ data, setData }: any) => {
 };
 
 const StepSummary = ({ data }: any) => {
-    const totalAssets = data.assetsEquity + data.assetsDebt + data.assetsGold + data.assetsRealEstate + data.assetsCash;
+    const totalAssets = (data.assetsEquity || 0) + (data.assetsDebt || 0) + (data.assetsGold || 0) + (data.assetsRealEstate || 0) + (data.assetsCash || 0);
     const surplus = data.monthlyIncome - data.monthlyExpenses - data.monthlyEMI;
     return (
         <div className="text-center space-y-8 py-8 animate-in zoom-in-95 duration-500">
@@ -325,7 +326,16 @@ const FriendlyInput = ({ label, sub, value, onChange, isCurrency, minimal = fals
         {!minimal && sub && <span className="text-xs text-stone-400 -mt-1 ml-1">{sub}</span>}
         <div className="relative group">
             {isCurrency && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 font-medium z-10">₹</span>}
-            <input type="number" value={value || ''} onChange={(e) => onChange(Number(e.target.value))} className={`w-full ${minimal ? 'p-3 text-lg' : 'p-4 text-xl'} bg-white border-2 border-stone-200 rounded-xl focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 outline-none font-bold text-stone-900 transition-all placeholder-stone-300 ${isCurrency ? 'pl-8' : ''}`} placeholder="0" />
+            <input 
+                type="number" 
+                value={value !== undefined ? value : ''} 
+                onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : Number(e.target.value);
+                    onChange(val);
+                }} 
+                className={`w-full ${minimal ? 'p-3 text-lg' : 'p-4 text-xl'} bg-white border-2 border-stone-200 rounded-xl focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 outline-none font-bold text-stone-900 transition-all placeholder-stone-300 ${isCurrency ? 'pl-8' : ''}`} 
+                placeholder="0" 
+            />
         </div>
     </div>
 );

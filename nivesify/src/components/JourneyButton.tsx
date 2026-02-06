@@ -11,12 +11,11 @@ export default function JourneyButton() {
 
   useEffect(() => {
     if (user) {
-      // Check if user has data in the 'onboarding' table
       fetch('/api/onboarding')
         .then((res) => res.json())
         .then((json) => {
-          // If the 'data' object exists and has keys (like 'mobile'), they are onboarded
-          if (json.data && Object.keys(json.data).length > 0) {
+          // FIX: Only consider onboarded if they have vital data (e.g. Income)
+          if (json.data && json.data.monthlyIncome > 0) {
             setIsOnboarded(true);
           }
           setCheckingStatus(false);
@@ -37,7 +36,7 @@ export default function JourneyButton() {
     );
   }
 
-  // Case 1: Logged in AND Onboarded -> Go to Dashboard
+  // Case 1: Logged in AND Completed Data -> Go to Dashboard
   if (user && isOnboarded) {
     return (
       <Link href="/dashboard">
@@ -48,10 +47,10 @@ export default function JourneyButton() {
     );
   }
 
-  // Case 2: Logged in BUT NOT Onboarded -> Go to Onboarding Form
+  // Case 2: Logged in BUT Partial/No Data -> Go to Wizard
   if (user && !isOnboarded) {
     return (
-      <Link href="/dashboard">
+      <Link href="/dashboard/onboarding">
         <button className="mt-14 px-14 py-4 bg-[#1F2937] text-[#F5F6F3] rounded-full font-serif text-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
           Complete Setup
         </button>

@@ -279,6 +279,15 @@ export default function DashboardPage() {
                             <XAxis dataKey="age" tick={{fill: '#9ca3af', fontSize: 11}} tickLine={false} axisLine={false} />
                             <YAxis tickFormatter={(v) => formatIndianCurrency(v, true)} tick={{fill: '#9ca3af', fontSize: 11}} tickLine={false} axisLine={false} />
                             <Tooltip content={<CustomTooltip />} />
+                            
+                            {/* FIX: Restore Reference Lines for Goals & FIRE */}
+                            {inputs.goals.map((g, i) => (
+                                <ReferenceLine key={i} x={g.age} stroke="#9ca3af" strokeDasharray="3 3">
+                                    <ReferenceDot x={g.age} y={simData.find(d => d.age === g.age)?.corpus || 0} r={5} fill="#6366f1" stroke="white" strokeWidth={2} />
+                                </ReferenceLine>
+                            ))}
+                            {fireAge && <ReferenceLine x={fireAge} stroke="#f97316" strokeDasharray="3 3" label={{ position: 'top', value: 'FIRE', fontSize: 10, fill: '#f97316' }} />}
+                            
                             <Area type="monotone" dataKey="corpus" stroke={isSafe ? "#10b981" : "#ef4444"} strokeWidth={3} fill="url(#grad)" animationDuration={1000} />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -335,8 +344,41 @@ export default function DashboardPage() {
                         <h3 className="font-bold text-lg flex items-center gap-2"><Calculator className="w-5 h-5 text-emerald-600"/> Audit</h3>
                         <button onClick={() => setActiveMathModal(null)}><X className="w-6 h-6 text-stone-400 hover:text-stone-800 bg-stone-100 rounded-full p-1"/></button>
                     </div>
-                    {/* Simplified for brevity - add logic back if needed */}
-                    <p className="text-stone-600">Detailed breakdown logic goes here.</p>
+                    
+                    {/* FIX: Restored Full Modal Content */}
+                    {activeMathModal === 'networth' && (
+                        <div className="space-y-2 text-sm text-stone-600">
+                            <p>Sum of all assets (Equity, Debt, Real Estate, Gold, Cash).</p>
+                            <div className="bg-stone-50 p-3 rounded font-mono text-xs text-right font-bold">{formatIndianCurrency(inputs.currentCorpus)}</div>
+                        </div>
+                    )}
+
+                    {activeMathModal === 'corpus' && (
+                        <div className="space-y-3 text-sm text-stone-600">
+                            <p>Corpus projected to Age {inputs.retirementAge} using compound interest.</p>
+                            <ul className="list-disc pl-4 space-y-1 text-xs font-mono">
+                                <li>Starting: {formatIndianCurrency(inputs.currentCorpus)}</li>
+                                <li>Annual Surplus: {formatIndianCurrency(monthlySurplus * 12)}</li>
+                                <li>Rate: {getBlendedReturn(inputs.equityRatio)}%</li>
+                                <li>Result: {formatIndianCurrency(corpusAtRetire)}</li>
+                            </ul>
+                        </div>
+                    )}
+
+                    {activeMathModal === 'joy' && (
+                        <div className="space-y-3 text-sm text-stone-600">
+                            <p>The maximum "Luxury Spend" you can add monthly without running out of money before age {inputs.lifeExpectancy}.</p>
+                            <div className="bg-purple-50 text-purple-900 p-2 rounded font-bold text-center">₹ {formatIndianCurrency(joyMoney)} / month</div>
+                        </div>
+                    )}
+
+                    {activeMathModal === 'status' && (
+                        <div className="space-y-3 text-sm text-stone-600">
+                            <p><strong>Secure:</strong> Corpus &gt; 0 until Age {inputs.lifeExpectancy}.</p>
+                            <p><strong>At Risk:</strong> Corpus hits 0 before Age {inputs.lifeExpectancy}.</p>
+                            {failPoint && <p className="text-red-600 font-bold">Failure Year: Age {failPoint.age}</p>}
+                        </div>
+                    )}
                 </motion.div>
             </div>
         )}
@@ -366,7 +408,46 @@ const InputRow = ({ label, val, set }: any) => (<div className="flex justify-bet
 const CustomTooltip = ({ active, payload, label }: any) => { 
     if (active && payload && payload.length) { 
         const data = payload[0].payload; 
-        return (<div className="bg-white p-3 border border-stone-200 shadow-xl rounded-lg text-xs min-w-[200px]"><p className="font-bold text-stone-800 mb-1 border-b pb-1">Age {label}</p><div className="flex justify-between mb-1"><span className="text-stone-500">Corpus</span><span className="text-blue-600 font-bold">{formatIndianCurrency(data.corpus)}</span></div></div>); 
+        return (
+            <div className="bg-white p-4 border border-stone-200 shadow-xl rounded-xl text-xs min-w-[220px] font-sans">
+                <p className="font-bold text-stone-800 mb-2 border-b border-stone-100 pb-2 text-sm">
+                    Age {label} <span className="text-stone-400 font-normal">({data.isRetired ? 'Retired' : 'Working'})</span>
+                </p>
+                
+                {/* Core Corpus */}
+                <div className="flex justify-between mb-2">
+                    <span className="text-stone-500">Total Corpus</span>
+                    <span className="text-stone-900 font-bold text-sm">{formatIndianCurrency(data.corpus)}</span>
+                </div>
+
+                {/* Flows */}
+                <div className="space-y-1 bg-stone-50 p-2 rounded mb-2">
+                    <div className="flex justify-between">
+                        <span className="text-emerald-600 flex items-center gap-1"><span className="text-[8px]">▲</span> Added</span>
+                        <span className="text-emerald-700 font-medium">+{formatIndianCurrency(data.inflow)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-blue-600 flex items-center gap-1"><span className="text-[8px]">▲</span> Growth</span>
+                        <span className="text-blue-700 font-medium">+{formatIndianCurrency(data.growth)}</span>
+                    </div>
+                </div>
+
+                {/* Redemptions */}
+                {(data.outflow > 0 || data.goalsHit.length > 0) && (
+                    <div className="space-y-1 bg-rose-50 p-2 rounded border border-rose-100">
+                        <div className="flex justify-between text-rose-700">
+                            <span className="flex items-center gap-1"><span className="text-[8px]">▼</span> Withdrawn</span>
+                            <span className="font-medium">-{formatIndianCurrency(data.outflow)}</span>
+                        </div>
+                        {data.goalsHit.length > 0 && (
+                            <div className="pt-1 mt-1 border-t border-rose-100/50 text-rose-800 font-bold text-[10px] uppercase tracking-wide">
+                                Goal: {data.goalsHit.join(", ")}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        ); 
     } 
     return null; 
 };
