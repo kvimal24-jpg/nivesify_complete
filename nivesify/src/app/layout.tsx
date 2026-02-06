@@ -1,5 +1,6 @@
 import "./globals.css";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer"; // Import the Footer
 
 export const metadata = {
   title: "Nivesify — Thoughtful Money, Better Life",
@@ -13,12 +14,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#FCFDFD] text-[#1F2937] antialiased">
+      <body className="bg-[#FCFDFD] text-[#1F2937] antialiased flex flex-col min-h-screen">
+        {/* Global Header */}
         <Header />
-        {/* ADDED: pt-20 pushes content down so Header doesn't hide it */}
-        <div className="min-h-screen pt-20">
+
+        {/* Page Content 
+            pt-20: Adds padding so the fixed header doesn't cover content.
+            flex-grow: Pushes the footer to the bottom even on short pages.
+        */}
+        <main className="pt-20 flex-grow">
           {children}
-        </div>
+        </main>
+
+        {/* Global Footer */}
+        <Footer />
       </body>
     </html>
   );
