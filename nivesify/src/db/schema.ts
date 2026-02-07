@@ -13,3 +13,15 @@ export const onboarding = sqliteTable('onboarding', {
   data: text('data', { mode: 'json' }), // Stores your form data as JSON
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
+
+export const mutualFundHealthCheck = sqliteTable('mutual_fund_health_check', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  data: text('data', { mode: 'json' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export const mfSchemeCache = sqliteTable('mf_scheme_cache', {
+  id: text('id').primaryKey(),
+  data: text('data', { mode: 'json' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});

@@ -1,5 +1,6 @@
 import JourneyButton from '@/components/JourneyButton';
 import Header from '@/components/Header'; // We import Header here or in Layout
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -140,34 +141,49 @@ export default function Home() {
                   </svg>
                 )
               }
-            ].map((card, i) => (
-              <div
-                key={i}
-                className="relative p-12 bg-white rounded-[32px]
-                shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]
-                hover:-translate-y-1 transition-all duration-300"
-              >
-                {/* Icon */}
-                <div className="absolute top-6 right-6 w-14 h-14 rounded-full bg-[#4A5D4E]/10 flex items-center justify-center">
-                  {card.icon}
+            ].map((card, i) => {
+              const cardBody = (
+                <div
+                  className="relative p-12 bg-white rounded-[32px]
+                  shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]
+                  hover:-translate-y-1 transition-all duration-300"
+                >
+                  {/* Icon */}
+                  <div className="absolute top-6 right-6 w-14 h-14 rounded-full bg-[#4A5D4E]/10 flex items-center justify-center">
+                    {card.icon}
+                  </div>
+
+                  {/* Accent */}
+                  <div className="h-1 w-14 rounded-full bg-gradient-to-r from-[#4A5D4E] to-[#BDA06D] mb-8"></div>
+
+                  <h3 className="text-3xl font-serif mb-6 text-[#1F2937]">
+                    {card.title}
+                  </h3>
+
+                  <p className="text-[17px] font-serif leading-relaxed text-[#1F2937]/80">
+                    {card.desc}
+                  </p>
+
+                  <p className="mt-8 font-serif italic text-sm text-[#4A5D4E]">
+                    “{card.quote}”
+                  </p>
                 </div>
+              );
 
-                {/* Accent */}
-                <div className="h-1 w-14 rounded-full bg-gradient-to-r from-[#4A5D4E] to-[#BDA06D] mb-8"></div>
+              if (card.title === 'Mutual Fund Health Check') {
+                return (
+                  <Link key={i} href="/mutual-fund-health-check" className="block">
+                    {cardBody}
+                  </Link>
+                );
+              }
 
-                <h3 className="text-3xl font-serif mb-6 text-[#1F2937]">
-                  {card.title}
-                </h3>
-
-                <p className="text-[17px] font-serif leading-relaxed text-[#1F2937]/80">
-                  {card.desc}
-                </p>
-
-                <p className="mt-8 font-serif italic text-sm text-[#4A5D4E]">
-                  “{card.quote}”
-                </p>
-              </div>
-            ))}
+              return (
+                <div key={i}>
+                  {cardBody}
+                </div>
+              );
+            })}
 
           </div>
         </section>

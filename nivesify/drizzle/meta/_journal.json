@@ -8,6 +8,20 @@
       "when": 1770388131956,
       "tag": "0000_swift_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770388131956,
+      "tag": "0001_mutual_fund_health_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "8",
+      "when": 1770388131956,
+      "tag": "0002_mf_scheme_cache",
+      "breakpoints": true
     }
   ]
 }
