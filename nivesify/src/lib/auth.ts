@@ -19,6 +19,12 @@ export function getGoogleAuth() {
   
   const redirectUrl = `${baseUrl}/api/auth/callback/google`;
 
+  console.log("[AUTH] Google OAuth config:", { 
+    clientId: clientId.substring(0, 20) + "...", 
+    hasSecret: !!clientSecret,
+    redirectUrl 
+  });
+
   return new Google(clientId, clientSecret, redirectUrl);
 }
 

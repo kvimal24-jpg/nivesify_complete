@@ -6,15 +6,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
+  console.log("[CALLBACK] Received OAuth callback");
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+  const error = url.searchParams.get("error");
+
+  if (error) {
+    console.error("[CALLBACK] OAuth error:", error);
+    return new NextResponse(`OAuth request error: ${error}`, { status: 400 });
+  }
 
   const cookieStore = await cookies();
   const storedState = cookieStore.get("google_oauth_state")?.value;
   const storedVerifier = cookieStore.get("google_code_verifier")?.value;
 
+  console.log("[CALLBACK] State validation:", { hasCode: !!code, hasState: !!state, statesMatch: state === storedState });
+
   if (!code || !state || !storedState || !storedVerifier || state !== storedState) {
+    console.error("[CALLBACK] Invalid request - missing parameters");
     return new NextResponse("Invalid Request", { status: 400 });
   }
 

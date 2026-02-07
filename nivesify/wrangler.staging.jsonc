@@ -1,0 +1,38 @@
+/**
+ * Staging environment configuration for nivesify-staging
+ * Shares the same D1 database as production
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "nivesify-staging",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2025-12-01",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".open-next/assets"
+	},
+	"images": {
+		"binding": "IMAGES"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "nivesify-staging"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "nivesify_db",
+			"database_name": "nivesify-db",
+			"database_id": "bafa9d4f-99ca-450c-8723-a16d034bfe50",
+			"remote": true
+		}
+	]
+}
