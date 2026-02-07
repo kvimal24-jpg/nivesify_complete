@@ -25,6 +25,9 @@ export default function MutualFundPortfolioPage() {
   const [filter, setFilter] = useState("");
   const [showZeroUnits, setShowZeroUnits] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const disclaimerText =
+    "All financial decisions involve risk and past performance is no guarantee of future results. You should consult with a qualified advisor and review all relevant disclosure documents before acting on any information provided.";
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,6 +61,18 @@ export default function MutualFundPortfolioPage() {
     run();
   }, [data]);
 
+  useEffect(() => {
+    if (!loadingPortfolio) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - started) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [loadingPortfolio]);
+
   const filteredPortfolio = useMemo(() => {
     return portfolio
       .filter((row) => row.mfName.toLowerCase().includes(filter.toLowerCase()))
@@ -88,7 +103,17 @@ export default function MutualFundPortfolioPage() {
   }
 
   if (loadingPortfolio) {
-    return <div className="p-12 text-center">Preparing portfolio...</div>;
+    return (
+      <div className="p-12 text-center">
+        <div className="text-lg font-semibold text-[#1F2937] dark:text-[#F5F6F3]">Preparing portfolio...</div>
+        <div className="mt-2 text-sm text-[#6B7C70] dark:text-[#D5D9CF]">
+          We are downloading NAV history and rebuilding holdings. This can take a few minutes.
+        </div>
+        {elapsedSeconds >= 30 && (
+          <div className="mt-2 text-xs text-[#6B7C70] dark:text-[#D5D9CF]">Please keep this tab open while we finish.</div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -105,7 +130,7 @@ export default function MutualFundPortfolioPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter by fund name"
-            className="w-full max-w-md rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-sm"
+            className="w-full max-w-md rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-sm text-[#1F2937] dark:bg-[#1F2937] dark:text-[#F5F6F3]"
           />
           <div className="flex items-center gap-3 text-sm text-[#6B7C70]">
             <label className="flex items-center gap-2">
@@ -214,6 +239,10 @@ export default function MutualFundPortfolioPage() {
             No funds found yet.
           </div>
         )}
+
+        <div className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
+          {disclaimerText}
+        </div>
       </div>
     </div>
   );

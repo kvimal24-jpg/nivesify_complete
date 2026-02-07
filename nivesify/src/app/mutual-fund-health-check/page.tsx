@@ -36,7 +36,9 @@ export default function MutualFundHealthCheckPage() {
   const [error, setError] = useState<string | null>(null);
   const [existingData, setExistingData] = useState<any | null>(null);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [debugOpen, setDebugOpen] = useState(false);
+
+  const disclaimerText =
+    "All financial decisions involve risk and past performance is no guarantee of future results. You should consult with a qualified advisor and review all relevant disclosure documents before acting on any information provided.";
 
   const logDebug = (message: string) => {
     setDebugLogs((prev) => [`${new Date().toISOString()} ${message}`, ...prev].slice(0, 200));
@@ -171,40 +173,21 @@ export default function MutualFundHealthCheckPage() {
         .join("\n");
 
       const filteredText = getFilteredText(text);
-      logDebug("Fetching scheme list");
-      const schemeController = new AbortController();
-      const schemeTimeoutId = setTimeout(() => schemeController.abort(), 15000);
-      const schemeRes = await fetch("/api/mutual-fund-health-check/mf", {
-        signal: schemeController.signal,
-      });
-      clearTimeout(schemeTimeoutId);
-      if (!schemeRes.ok) {
-        const detail = await schemeRes.text();
-        logDebug(`Scheme list fetch failed: ${schemeRes.status} ${detail}`);
-        throw new Error("Failed to fetch scheme list.");
-      }
-      const schemeJson = await schemeRes.json();
-      const schemes = schemeJson.data || [];
-      logDebug(`Scheme list loaded: ${schemes.length}`);
-
-      const json = await getJsonFromTxt(filteredText, schemes);
+      logDebug("Parsing CAS and fetching scheme list from AMFI NAVAll.txt");
+      const json = await getJsonFromTxt(filteredText, text);
       logDebug(`Parsed transactions: ${json.transactions.length}`);
       logDebug(`CAS summary invested: ${json.summary.invested}`);
 
       const payload = json;
       logDebug(`Payload size: ${JSON.stringify(payload).length} chars`);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
       const res = await fetch("/api/mutual-fund-health-check", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
-        signal: controller.signal,
       });
-      clearTimeout(timeoutId);
       if (!res.ok) {
         const detail = await res.text();
         logDebug(`Upload failed: ${res.status} ${detail}`);
@@ -222,10 +205,6 @@ export default function MutualFundHealthCheckPage() {
       logDebug(`Processing failed: ${err?.message || "unknown"}`);
       if (err?.name === "PasswordException") {
         setError("Invalid password. Please try again.");
-      } else if (err?.name === "AbortError") {
-        setError("Upload timed out. Please try again.");
-      } else if (err?.message?.includes("scheme list")) {
-        setError("Failed to load scheme list. Please try again.");
       } else if (err?.message?.includes("Failed to fetch")) {
         setError("Upload failed. Please check your connection and try again.");
       } else {
@@ -280,36 +259,25 @@ export default function MutualFundHealthCheckPage() {
           )}
 
           <div className="mt-10 space-y-6">
-            <div className="rounded-2xl border border-[#E6E8E1] p-5">
-              <div className="text-sm font-semibold text-[#1F2937]">How to download your CAS PDF</div>
-              <ol className="mt-3 list-decimal space-y-1 pl-4 text-sm text-[#6B7C70]">
-                <li>Visit CAMS or KFintech consolidated statement page.</li>
-                <li>Select detailed statement type.</li>
-                <li>Set start date before your first investment.</li>
-                <li>Choose "With Zero Balance Folios".</li>
-                <li>Download the PDF (it may be password protected).</li>
-              </ol>
-            </div>
-
             <div className="space-y-4">
               <input
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={handleFileChange}
-                className="block w-full rounded-xl border border-[#D5D9CF] bg-white px-4 py-3 text-sm"
+                className="block w-full rounded-xl border border-[#D5D9CF] bg-white px-4 py-3 text-sm text-[#1F2937] dark:bg-[#1F2937] dark:text-[#F5F6F3] file:mr-4 file:rounded-lg file:border-0 file:bg-[#F5F6F3] file:px-3 file:py-1 file:text-sm file:text-[#1F2937] dark:file:bg-[#2B2F2C] dark:file:text-[#F5F6F3]"
                 disabled={isProcessing}
               />
 
               {selectedFile && (
                 <div>
-                  <label className="block text-sm font-medium text-[#1F2937]">
+                  <label className="block text-sm font-medium text-[#1F2937] dark:text-[#F5F6F3]">
                     PDF Password {isPasswordProtected ? "(required)" : "(optional)"}
                   </label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="mt-2 block w-full rounded-xl border border-[#D5D9CF] bg-white px-4 py-3 text-sm"
+                    className="mt-2 block w-full rounded-xl border border-[#D5D9CF] bg-white px-4 py-3 text-sm text-[#1F2937] dark:bg-[#1F2937] dark:text-[#F5F6F3]"
                     disabled={isProcessing}
                   />
                 </div>
@@ -324,24 +292,83 @@ export default function MutualFundHealthCheckPage() {
               >
                 {isProcessing ? "Processing..." : "Upload & Analyze"}
               </button>
-
-              <button
-                type="button"
-                onClick={() => setDebugOpen((prev) => !prev)}
-                className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]"
-              >
-                {debugOpen ? "Hide" : "Show"} debug log
-              </button>
             </div>
 
-            {debugOpen && (
-              <div className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#1F2937]">
-                <div className="font-semibold text-[#1F2937]">Debug log</div>
-                <div className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-[#6B7C70]">
-                  {debugLogs.length ? debugLogs.join("\n") : "No debug events yet."}
+            <div className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-5">
+              <div className="text-sm font-semibold text-[#1F2937]">How to download your correct CAS (Consolidated Account Statement)</div>
+              <p className="mt-2 text-sm text-[#6B7C70]">
+                This report contains <span className="font-semibold text-[#1F2937]">all your mutual fund investments in one file</span>. Please follow these steps carefully so we can analyze your complete portfolio.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-[#E6E8E1] bg-white p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Step 1</div>
+                  <div className="mt-2 text-sm font-semibold text-[#1F2937]">Open the CAS download website</div>
+                  <p className="mt-2 text-sm text-[#6B7C70]">
+                    Go to CAMS – <a className="underline" href="https://www.camsonline.com/Investors/Statements/Consolidated-Account-Statement" target="_blank" rel="noopener noreferrer">camsonline.com</a>
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#E6E8E1] bg-white p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Step 2</div>
+                  <div className="mt-2 text-sm font-semibold text-[#1F2937]">Select the correct statement type</div>
+                  <p className="mt-2 text-sm text-[#6B7C70]">This is very important.</p>
+                  <ul className="mt-2 list-disc pl-4 text-sm text-[#6B7C70]">
+                    <li>Choose <span className="font-semibold text-[#1F2937]">DETAILED</span> statement (not Summary)</li>
+                    <li>Includes transactions, SIP dates, units, and amounts</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl border border-[#E6E8E1] bg-white p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Step 3</div>
+                  <div className="mt-2 text-sm font-semibold text-[#1F2937]">Select the correct date range</div>
+                  <ul className="mt-2 list-disc pl-4 text-sm text-[#6B7C70]">
+                    <li><span className="font-semibold text-[#1F2937]">Start date</span>: before your first investment (e.g., 01-01-2000)</li>
+                    <li><span className="font-semibold text-[#1F2937]">End date</span>: today or latest available</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl border border-[#E6E8E1] bg-white p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Step 4</div>
+                  <div className="mt-2 text-sm font-semibold text-[#1F2937]">Include closed and zero-balance funds</div>
+                  <p className="mt-2 text-sm text-[#6B7C70]">Make sure this option is selected:</p>
+                  <p className="mt-2 text-sm font-semibold text-[#1F2937]">Include Zero Balance / Closed Folios</p>
+                  <p className="mt-2 text-sm text-[#6B7C70]">So we can analyze old funds and stopped SIPs correctly.</p>
+                </div>
+                <div className="rounded-2xl border border-[#E6E8E1] bg-white p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Step 5</div>
+                  <div className="mt-2 text-sm font-semibold text-[#1F2937]">Enter PAN/email and submit</div>
+                  <ul className="mt-2 list-disc pl-4 text-sm text-[#6B7C70]">
+                    <li>Enter your <span className="font-semibold text-[#1F2937]">PAN</span> and registered email</li>
+                    <li>Submit and wait for the CAS PDF email (usually minutes)</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl border border-[#E6E8E1] bg-white p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Step 6</div>
+                  <div className="mt-2 text-sm font-semibold text-[#1F2937]">Download and upload the PDF</div>
+                  <ul className="mt-2 list-disc pl-4 text-sm text-[#6B7C70]">
+                    <li>Download the PDF from the email</li>
+                    <li>The PDF may be password protected</li>
+                    <li><span className="font-semibold text-[#1F2937]">Do not unlock or modify the file.</span> Upload as received.</li>
+                  </ul>
                 </div>
               </div>
-            )}
+
+              <div className="mt-6 rounded-2xl border border-[#F2D7D7] bg-white p-4">
+                <div className="text-sm font-semibold text-[#B35A5A]">Common mistakes to avoid</div>
+                <ul className="mt-2 list-disc pl-4 text-sm text-[#6B7C70]">
+                  <li>Uploading Summary instead of Detailed statement</li>
+                  <li>Selecting a short date range</li>
+                  <li>Not including zero-balance folios</li>
+                  <li>Uploading multiple PDFs instead of one CAS</li>
+                </ul>
+              </div>
+
+              <div className="mt-4 text-xs text-[#6B7C70]">
+                Your data remains private and is used only for analysis.
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
+              {disclaimerText}
+            </div>
           </div>
         </div>
       </div>

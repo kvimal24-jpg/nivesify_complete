@@ -4,6 +4,7 @@ export interface InvestmentsData {
   summary: Summary;
   transactions?: Transaction[];
   transactionsCount?: number;
+  nominees?: Record<string, boolean>;
 }
 
 export interface Meta {
@@ -17,6 +18,7 @@ export interface Holder {
   email: string;
   mobile: string;
   address: string;
+  pan?: string;
 }
 
 export interface Summary {
@@ -45,4 +47,7 @@ export interface MatchingScheme {
   schemeName: string;
   isinGrowth: string;
   isinDivReinvestment: unknown;
+  schemeType?: string;
+  schemeCategory?: string;
+  amc?: string;
 }

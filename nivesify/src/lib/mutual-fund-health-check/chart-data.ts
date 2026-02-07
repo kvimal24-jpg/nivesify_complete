@@ -230,3 +230,23 @@ export const getOneMonthPerformance = async (transactions: Transaction[]): Promi
   lastMonth.setMonth(lastMonth.getMonth() - 1);
   return allTimePerformance.filter((item) => item.dateObj >= lastMonth);
 };
+
+export const getPerformanceByYears = async (
+  transactions: Transaction[],
+  years: number | "max"
+): Promise<LineChartData[]> => {
+  const allTimePerformance = await getAllTimePerformance(transactions);
+  if (years === "max") return allTimePerformance;
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - years);
+  return allTimePerformance.filter((item) => item.dateObj >= cutoff);
+};
+
+export const getCumulativeCashflowData = (transactions: Transaction[]): { name: string; value: number }[] => {
+  const monthly = getAllMonthsData(transactions);
+  let runningTotal = 0;
+  return monthly.map((item) => {
+    runningTotal += item.value;
+    return { name: item.name, value: runningTotal };
+  });
+};

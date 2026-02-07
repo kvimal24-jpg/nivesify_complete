@@ -14,6 +14,8 @@ export default function MutualFundTransactionsPage() {
   const router = useRouter();
   const [data, setData] = useState<InvestmentsData | null>(null);
   const [filter, setFilter] = useState("");
+  const disclaimerText =
+    "All financial decisions involve risk and past performance is no guarantee of future results. You should consult with a qualified advisor and review all relevant disclosure documents before acting on any information provided.";
 
   useEffect(() => {
     if (!loading && !user) {
@@ -43,7 +45,7 @@ export default function MutualFundTransactionsPage() {
   }, [data, filter]);
 
   if (loading || !user) {
-    return <div className="p-12 text-center">Loading...</div>;
+    return <div className="p-12 text-center text-[#1F2937] dark:text-[#F5F6F3]">Loading...</div>;
   }
 
   return (
@@ -60,7 +62,7 @@ export default function MutualFundTransactionsPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter by fund name"
-            className="w-full max-w-md rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-sm"
+            className="w-full max-w-md rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-sm text-[#1F2937] dark:bg-[#1F2937] dark:text-[#F5F6F3]"
           />
           <button
             onClick={() => router.push("/mutual-fund-health-check/dashboard")}
@@ -110,6 +112,10 @@ export default function MutualFundTransactionsPage() {
             No transactions found yet.
           </div>
         )}
+
+        <div className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
+          {disclaimerText}
+        </div>
       </div>
     </div>
   );

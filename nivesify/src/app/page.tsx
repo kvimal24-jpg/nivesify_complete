@@ -172,7 +172,15 @@ export default function Home() {
 
               if (card.title === 'Mutual Fund Health Check') {
                 return (
-                  <Link key={i} href="/mutual-fund-health-check" className="block">
+                  <Link key={i} href="/mutual-fund-health-check/dashboard" className="block">
+                    {cardBody}
+                  </Link>
+                );
+              }
+
+              if (card.title === 'Life Calculators') {
+                return (
+                  <Link key={i} href="/dashboard/calculators" className="block">
                     {cardBody}
                   </Link>
                 );

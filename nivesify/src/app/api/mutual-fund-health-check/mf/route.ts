@@ -1,54 +1,95 @@
-import { getDb } from "@/lib/db";
-import { mfSchemeCache } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-const CACHE_ID = "scheme_list";
-const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const AMFI_NAV_URL = "https://portal.amfiindia.com/spages/NAVAll.txt";
+
+type AmfiScheme = {
+  schemeCode: number;
+  schemeName: string;
+  isinGrowth: string;
+  isinDivReinvestment: string | null;
+  schemeType?: string;
+  schemeCategory?: string;
+  amc?: string;
+};
+
+const parseAmfiNav = (content: string): AmfiScheme[] => {
+  const lines = content.split(/\r?\n/);
+  const schemes: AmfiScheme[] = [];
+  let currentSchemeType: string | undefined;
+  let currentSchemeCategory: string | undefined;
+  let currentAmc: string | undefined;
+
+  const parseSchemeHeader = (line: string) => {
+    const match = line.match(/^(.*)Schemes\((.*)\)$/i);
+    if (!match) return null;
+    return {
+      schemeType: match[1].trim() + "Schemes",
+      schemeCategory: match[2].trim(),
+    };
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    if (trimmed.startsWith("Scheme Code")) return;
+
+    if (!trimmed.includes(";")) {
+      const schemeHeader = parseSchemeHeader(trimmed);
+      if (schemeHeader) {
+        currentSchemeType = schemeHeader.schemeType;
+        currentSchemeCategory = schemeHeader.schemeCategory;
+        return;
+      }
+      if (!trimmed.toLowerCase().includes("schemes")) {
+        currentAmc = trimmed;
+      }
+      return;
+    }
+
+    const parts = trimmed.split(";");
+    if (parts.length < 4) return;
+
+    const schemeCode = Number(parts[0]);
+    const isinGrowth = (parts[1] || "").trim();
+    const isinDivReinvestment = (parts[2] || "").trim();
+    const schemeName = (parts[3] || "").trim();
+
+    if (!Number.isFinite(schemeCode) || !schemeName) return;
+
+    schemes.push({
+      schemeCode,
+      schemeName,
+      isinGrowth,
+      isinDivReinvestment: isinDivReinvestment || null,
+      schemeType: currentSchemeType,
+      schemeCategory: currentSchemeCategory,
+      amc: currentAmc,
+    });
+  });
+
+  return schemes;
+};
 
 export async function GET() {
-  const db = getDb();
-  const cached = await db.select().from(mfSchemeCache).where(eq(mfSchemeCache.id, CACHE_ID)).get();
-
-  if (cached?.data && cached.updatedAt) {
-    const age = Date.now() - new Date(cached.updatedAt).getTime();
-    if (age < MAX_AGE_MS) {
-      return NextResponse.json({ data: cached.data, cached: true });
-    }
-  }
-
   try {
-    const res = await fetch("https://api.mfapi.in/mf", {
+    const res = await fetch(AMFI_NAV_URL, {
       headers: {
-        Accept: "application/json",
+        Accept: "text/plain",
       },
     });
 
     if (!res.ok) {
       const text = await res.text();
-      if (cached?.data) {
-        return NextResponse.json({ data: cached.data, cached: true, warning: text });
-      }
       return NextResponse.json(
         { error: "Failed to fetch scheme list", detail: text },
         { status: 502 }
       );
     }
 
-    const data = await res.json();
-    await db
-      .insert(mfSchemeCache)
-      .values({ id: CACHE_ID, data, updatedAt: new Date() })
-      .onConflictDoUpdate({
-        target: mfSchemeCache.id,
-        set: { data, updatedAt: new Date() },
-      });
-
+    const text = await res.text();
+    const data = parseAmfiNav(text);
     return NextResponse.json({ data, cached: false });
   } catch (error: any) {
-    if (cached?.data) {
-      return NextResponse.json({ data: cached.data, cached: true, warning: error?.message || "unknown" });
-    }
     return NextResponse.json(
       { error: "Failed to fetch scheme list", detail: error?.message || "unknown" },
       { status: 502 }

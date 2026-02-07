@@ -5,6 +5,9 @@ type CasScheme = {
   schemeName: string;
   isinGrowth: string;
   isinDivReinvestment: string | null;
+  schemeType?: string;
+  schemeCategory?: string;
+  amc?: string;
 };
 
 export const textUtils = {
@@ -153,22 +156,29 @@ export const getFilteredText = (text: string) => {
   return newFilteredLines.join("\n");
 };
 
-export const getJsonFromTxt = async (t: string, mfData?: CasScheme[]): Promise<InvestmentsData> => {
-  const lines = t.split("\n");
+export const getJsonFromTxt = async (
+  filteredText: string,
+  rawText?: string,
+  mfData?: CasScheme[]
+): Promise<InvestmentsData> => {
+  const lines = filteredText.split("\n");
+  const rawLines = rawText ? rawText.split("\n") : lines;
   const transactions = await getTransactions(lines, mfData);
   return {
     meta: getMeta(lines),
-    holder: getHolder(lines),
+    holder: getHolder(rawLines),
     summary: getSummary(lines),
     transactions,
+    nominees: getNomineeMap(rawLines),
   };
 };
 
-export const getSummaryFromTxt = (t: string) => {
+export const getSummaryFromTxt = (t: string, rawText?: string) => {
   const lines = t.split("\n");
+  const rawLines = rawText ? rawText.split("\n") : lines;
   return {
     meta: getMeta(lines),
-    holder: getHolder(lines),
+    holder: getHolder(rawLines),
     summary: getSummary(lines),
   };
 };
@@ -186,9 +196,19 @@ export const getIndexByStartingText = (lines: string[], text: string) =>
 export const getTransactions = async (lines: string[], mfDataInput?: CasScheme[]): Promise<Transaction[]> => {
   let mfData = mfDataInput;
   if (!mfData) {
-    const response = await fetch("https://api.mfapi.in/mf");
-    mfData = await response.json();
+    const response = await fetch("/api/mutual-fund-health-check/mf");
+    if (!response.ok) {
+      throw new Error("Failed to fetch scheme list.");
+    }
+    const json = await response.json();
+    mfData = json.data || [];
   }
+
+  const schemeByIsin = new Map<string, CasScheme>();
+  mfData.forEach((scheme) => {
+    if (scheme.isinGrowth) schemeByIsin.set(scheme.isinGrowth, scheme);
+    if (scheme.isinDivReinvestment) schemeByIsin.set(scheme.isinDivReinvestment, scheme);
+  });
 
   const portfolioSummaryTotalRowIndex = getIndexByStartingText(lines, "Total");
 
@@ -230,9 +250,7 @@ export const getTransactions = async (lines: string[], mfDataInput?: CasScheme[]
         throw new Error(`No ISIN found for line: ${line}`);
       }
 
-      matchingScheme = mfData.find(
-        (scheme) => scheme.isinGrowth === isin || scheme.isinDivReinvestment === isin
-      );
+      matchingScheme = schemeByIsin.get(isin);
 
       if (!matchingScheme) {
         throw new Error(`No matching scheme found for ISIN: ${isin}`);
@@ -327,15 +345,54 @@ export const getSummary = (lines: string[]) => {
   };
 };
 
+const getPan = (lines: string[]) => {
+  for (const line of lines) {
+    const match = line.match(/PAN\s*[:\-]\s*([A-Z0-9]{10})/i);
+    if (match?.[1]) return match[1].toUpperCase();
+  }
+  return undefined;
+};
+
+const getNomineeMap = (lines: string[]) => {
+  const map: Record<string, boolean> = {};
+  let currentFolio: string | null = null;
+  lines.forEach((line) => {
+    if (line.includes("Folio No:")) {
+      const after = line.split("Folio No:")[1] || "";
+      const folio = after.split(" ")[0].split("/")[0].trim();
+      if (folio) currentFolio = folio;
+    }
+    const nomineeMatch = line.match(/Nominee\s*1\s*:\s*(.*)$/i);
+    if (nomineeMatch && currentFolio) {
+      const value = nomineeMatch[1]?.trim() || "";
+      const normalized = value.toLowerCase();
+      const hasNominee = ![
+        "",
+        "-",
+        "na",
+        "not available",
+        "not registered",
+        "not provided",
+        "none",
+      ].some((token) => normalized === token || normalized.includes(token));
+      map[currentFolio] = hasNominee;
+    }
+  });
+  return map;
+};
+
 export const getHolder = (lines: string[]): Holder => {
   const mobileNumberRowIndex = getIndexByStartingText(lines, "Mobile");
   const emailIdRowIndex = getIndexByStartingText(lines, "Email Id");
+  const name = lines[4] || lines.find((line) => line.trim().length > 0) || "-";
+  const pan = getPan(lines);
 
   return {
-    name: lines[4],
+    name,
     email: lines[emailIdRowIndex].split(" ")[2],
     mobile: lines[mobileNumberRowIndex].split(" ")[1],
     address: lines.slice(emailIdRowIndex + 2, mobileNumberRowIndex).join("\n"),
+    pan,
   };
 };
 
