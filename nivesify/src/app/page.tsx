@@ -181,6 +181,14 @@ export default function Home() {
                 );
               }
 
+              if (card.title === 'My Money Dashboard') {
+                return (
+                  <Link key={i} href="/dashboard" className="block">
+                    {cardBody}
+                  </Link>
+                );
+              }
+
               if (card.title === 'Life Calculators') {
                 return (
                   <Link key={i} href="/dashboard/calculators" className="block">
