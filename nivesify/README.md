@@ -1,53 +1,55 @@
-# OpenNext Starter
+# Nivesify
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Nivesify is a Next.js app deployed on Cloudflare. It includes a full onboarding journey, a personal dashboard, a mutual fund health check, and life calculators for long-term planning.
 
-## Getting Started
+## Features
+- Onboarding journey to capture life context, cashflow, assets, and goals.
+- My Money Dashboard with simulations, runway analysis, and goal tracking.
+- Mutual Fund Health Check (MFHC) with CAS parsing and portfolio analytics.
+- Life Calculators for SIPs, lumpsums, withdrawals, and retirement readiness.
 
-Read the documentation at https://opennext.js.org/cloudflare.
+## Project structure
+- src/app - Next.js App Router pages
+- src/app/dashboard - onboarding and dashboard experiences
+- src/app/mutual-fund-health-check - MFHC upload and analytics pages
+- src/app/dashboard/calculators - Life Calculators page
+- src/app/api - API routes for onboarding and MFHC
+- src/lib - shared logic, calculators, MFHC utilities
+- docs - product and math documentation
 
-## Develop
-
-Run the Next.js development server:
-
+## Local development
 ```bash
+npm install
 npm run dev
-# or similar package manager command
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Preview
-
-Preview the application locally on the Cloudflare runtime:
-
+## Build and preview
 ```bash
+npm run build
 npm run preview
-# or similar package manager command
 ```
 
 ## Deploy
-
-Deploy the application to Cloudflare:
-
+Production deploy:
 ```bash
 npm run deploy
-# or similar package manager command
 ```
 
-## Learn More
+Staging deploy:
+```bash
+export CLOUDFLARE_API_TOKEN=your-token
+npm run deploy:staging
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Mutual Fund Health Check
-
-Detailed MFHC architecture and data flow documentation:
-
+## Documentation
 - docs/mutual-fund-health-check.md
+- docs/life-calculators.md
+- docs/onboarding.md
+- docs/dashboard.md
+
+## Notes
+- Uses Cloudflare D1 for onboarding data and MFHC storage.
+- Uses Cloudflare R2 for large data artifacts when applicable.
+- This repository contains the app at /nivesify within the root workspace.
