@@ -1,10 +1,32 @@
 import "./globals.css";
+import type { Metadata } from "next";
 import Header from "@/components/Header";
-import Footer from "@/components/Footer"; // Import the Footer
+import Footer from "@/components/Footer";
 
-export const metadata = {
-  title: "Nivesify — Thoughtful Money, Better Life",
-  description: "A calm financial sanctuary for Indian investors",
+export const metadata: Metadata = {
+  metadataBase: new URL("https://nivesify.com"),
+  title: {
+    template: "%s | Nivesify",
+    default: "Nivesify — Thoughtful Money, Better Life",
+  },
+  description: "A calm financial sanctuary for Indian investors. Analyze mutual funds, track XIRR, and plan your next move with clarity.",
+  keywords: ["mutual fund", "portfolio analysis", "XIRR", "investment tracking", "India", "retirement planning"],
+  alternates: {
+    canonical: "https://nivesify.com",
+  },
+  openGraph: {
+    title: "Nivesify — Thoughtful Money, Better Life",
+    description: "Analyze mutual funds, track XIRR, and plan your next move with clarity.",
+    url: "https://nivesify.com",
+    siteName: "Nivesify",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nivesify — Thoughtful Money, Better Life",
+    description: "Analyze mutual funds, track XIRR, and plan your next move with clarity.",
+  },
 };
 
 export default function RootLayout({

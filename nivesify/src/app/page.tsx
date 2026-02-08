@@ -1,6 +1,9 @@
 import JourneyButton from '@/components/JourneyButton';
 import Header from '@/components/Header'; // We import Header here or in Layout
 import Link from 'next/link';
+import { homeMetadata } from "./page.metadata";
+
+export const metadata = homeMetadata;
 
 export default function Home() {
   return (
