@@ -52,5 +52,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.6,
     },
+    {
+      url: `${baseUrl}/mutual-fund-analysis`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/active-funds`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/index-funds`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
   ];
 }

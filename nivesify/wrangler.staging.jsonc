@@ -34,5 +34,11 @@
 			"database_id": "bafa9d4f-99ca-450c-8723-a16d034bfe50",
 			"remote": true
 		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "MF_DATA_BUCKET",
+			"bucket_name": "mf-data-bucket"
+		}
 	]
 }

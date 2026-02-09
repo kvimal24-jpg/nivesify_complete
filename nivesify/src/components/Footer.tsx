@@ -28,8 +28,7 @@ export default function Footer() {
             {[
               { name: 'Wealth Dashboard', href: '/dashboard' },
               { name: 'Mutual Fund Portfolio Analysis', href: '/mutual-fund-health-check' },
-              { name: 'Active Funds', href: '/dashboard/active-funds' },
-              { name: 'Index Funds', href: '/dashboard/index-funds' },
+              { name: 'Mutual Fund Analysis', href: '/mutual-fund-analysis' },
               { name: 'Life Calculators', href: '/dashboard/calculators' }
             ].map((item) => (
               <Link

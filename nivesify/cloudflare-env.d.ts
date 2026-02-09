@@ -3,6 +3,7 @@
 
 interface CloudflareEnv {
 	nivesify_db: D1Database;
+	MF_DATA_BUCKET: R2Bucket;
 	GOOGLE_CLIENT_ID: string;
 	GOOGLE_CLIENT_SECRET: string;
 	JWT_SECRET: string;

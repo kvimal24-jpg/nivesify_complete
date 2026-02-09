@@ -113,23 +113,12 @@ export default function Home() {
                 )
               },
               {
-                title: 'Active Fund Selector',
-                desc: 'For investors who believe skill exists. Funds ranked by alpha consistency and information ratio — not last year’s hype.',
-                quote: 'Skill must repeat.',
+                title: 'Mutual Fund Analysis',
+                desc: 'Industry-wide insights, category strength, and plain-language methodology before you pick active or index funds.',
+                quote: 'Start with the industry map.',
                 icon: (
                   <svg width="40" height="40" fill="none" stroke="#4A5D4E" strokeWidth="1.5">
-                    <path d="M6 30L18 14l8 8 8-12" />
-                  </svg>
-                )
-              },
-              {
-                title: 'Index Fund Guide',
-                desc: 'Not all index funds are equal. Understand which index to choose, which fund tracks it best, and why costs matter.',
-                quote: 'Low cost, long peace.',
-                icon: (
-                  <svg width="40" height="40" fill="none" stroke="#4A5D4E" strokeWidth="1.5">
-                    <circle cx="20" cy="20" r="14" />
-                    <path d="M20 6v28M6 20h28" />
+                    <path d="M6 10h28M6 20h20M6 30h24" />
                   </svg>
                 )
               },
@@ -192,6 +181,14 @@ export default function Home() {
               if (card.title === 'Life Calculators') {
                 return (
                   <Link key={i} href="/dashboard/calculators" className="block">
+                    {cardBody}
+                  </Link>
+                );
+              }
+
+              if (card.title === 'Mutual Fund Analysis') {
+                return (
+                  <Link key={i} href="/mutual-fund-analysis" className="block">
                     {cardBody}
                   </Link>
                 );
