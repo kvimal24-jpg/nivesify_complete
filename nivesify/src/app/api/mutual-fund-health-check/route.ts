@@ -60,6 +60,22 @@ export async function GET() {
       }));
     }
 
+    if (data?.manualInvestments?.length) {
+      data.manualInvestments = data.manualInvestments.map((item: any) => ({
+        ...item,
+        schemeCode: toNumber(item.schemeCode),
+        amount: toNumber(item.amount),
+      }));
+    }
+
+    if (data?.sipPlans?.length) {
+      data.sipPlans = data.sipPlans.map((plan: any) => ({
+        ...plan,
+        schemeCode: toNumber(plan.schemeCode),
+        monthlyAmount: toNumber(plan.monthlyAmount),
+      }));
+    }
+
     return NextResponse.json({ data });
   } catch (error: any) {
     return NextResponse.json(

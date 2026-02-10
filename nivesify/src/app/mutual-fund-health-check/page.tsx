@@ -221,19 +221,19 @@ export default function MutualFundHealthCheckPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F6F3] px-6 py-12">
+    <div className="min-h-screen bg-[#F5F8FF] px-4 sm:px-6 py-10">
       <div className="mx-auto max-w-4xl">
-        <div className="rounded-3xl bg-white shadow-[0_30px_80px_-40px_rgba(0,0,0,0.35)] p-8 md:p-12">
+        <div className="rounded-3xl bg-white shadow-[0_24px_52px_-42px_rgba(31,41,55,0.25)] p-6 md:p-10">
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">mutual fund health check</p>
             <h1 className="text-3xl md:text-5xl font-serif text-[#1F2937]">Upload your CAS statement</h1>
-            <p className="text-base md:text-lg font-serif text-[#6B7C70]">
+            <p className="text-sm md:text-base font-serif text-[#6B7C70]">
               Your CAS is processed entirely in your browser. We store the parsed data securely with your account so you can return anytime.
             </p>
           </div>
 
           {summary && (
-            <div className="mt-8 rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-5 text-sm text-[#1F2937]">
+            <div className="mt-6 rounded-2xl border border-[#DDE6F3] bg-[#FBFCFA] p-4 text-sm text-[#1F2937]">
               <div className="font-semibold">Existing data on file</div>
               <div className="mt-2 grid gap-1 text-[#6B7C70]">
                 <span>Period: {summary.from} to {summary.to}</span>
@@ -242,7 +242,7 @@ export default function MutualFundHealthCheckPage() {
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
-                  className="inline-flex items-center rounded-full bg-[#1F2937] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="inline-flex items-center rounded-full bg-[#2F5D7C] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={() => router.push("/mutual-fund-health-check/dashboard")}
                 >
                   Go to Dashboard

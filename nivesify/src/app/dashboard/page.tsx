@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  ReferenceLine, ReferenceDot 
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+    ReferenceLine, ReferenceDot 
 } from "recharts";
 import { 
   ShieldAlert, Edit, Wallet, Leaf, Heart, 
   Flame, Stethoscope, Umbrella, PiggyBank, Info, 
-  Calculator, AlertTriangle, CheckCircle2, X
+    Calculator, AlertTriangle, CheckCircle2, X,
+    Home, Car, Plane, GraduationCap, Target, Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/hooks/useUser"; // UPDATED: Using our custom hook
@@ -178,7 +179,7 @@ export default function DashboardPage() {
   const failPoint = simData.find(d => d.corpus < 0);
   const isSafe = !failPoint;
   const corpusAtRetire = simData.find(d => d.age === inputs.retirementAge)?.corpus || 0;
-  const joyMoney = useMemo(() => isSafe ? calculateMaxJoyMoney(inputs) : 0, [inputs, isSafe]);
+    const joyMoney = useMemo(() => isSafe ? calculateMaxJoyMoney(inputs) : 0, [inputs, isSafe]);
   
   const fireAge = useMemo(() => {
       const fireYear = simData.find(d => {
@@ -194,7 +195,7 @@ export default function DashboardPage() {
       return calculateRunway(totalAvailable, annualNeed, inputs.inflation, 7); 
   }, [inputs]);
 
-  const goalAnalysis = useMemo(() => {
+    const goalAnalysis = useMemo(() => {
       const totalGoalCostPV = inputs.goals.reduce((sum, g) => sum + g.cost, 0); 
       const retirePV = inputs.monthlyExpenses * 12 * 25; 
       const totalLiability = totalGoalCostPV + retirePV;
@@ -211,10 +212,41 @@ export default function DashboardPage() {
       }).sort((a,b) => a.age - b.age);
   }, [inputs, blendedReturn]);
 
+  const totalGoalSipNeeded = useMemo(
+      () => goalAnalysis.reduce((sum, g) => sum + (g.sipNeeded || 0), 0),
+      [goalAnalysis]
+  );
+
+  const summary = useMemo(() => buildDashboardSummary({
+      isSafe,
+      failPointAge: failPoint?.age,
+      fireAge,
+      monthlySurplus,
+      joyMoney,
+      corpusAtRetire,
+      retirementAge: inputs.retirementAge,
+      goalGaps: goalAnalysis.filter(g => g.sipNeeded > 0).length,
+      goalSipNeeded: totalGoalSipNeeded,
+      existingSIP: inputs.existingSIP,
+      familyRunway,
+  }), [
+      isSafe,
+      failPoint?.age,
+      fireAge,
+      monthlySurplus,
+      joyMoney,
+      corpusAtRetire,
+      inputs.retirementAge,
+      goalAnalysis,
+      totalGoalSipNeeded,
+      inputs.existingSIP,
+      familyRunway,
+  ]);
+
   if (loading || !user) return <div className="min-h-screen pt-24 flex items-center justify-center bg-[#F9FAFB]">Loading Dashboard...</div>;
 
-  return (
-    <div className="min-h-screen pb-12 bg-[#F9FAFB] font-sans text-stone-900 flex flex-col xl:flex-row box-border relative">
+    return (
+        <div className="min-h-screen pb-12 bg-[#F5F8FF] font-sans text-stone-900 flex flex-col xl:flex-row box-border relative">
       
       {/* LEFT SIDEBAR (Inputs) */}
       <div className="order-last xl:order-first w-full xl:w-[320px] bg-white border-r border-stone-200 flex flex-col h-auto xl:h-[calc(100vh-80px)] xl:sticky xl:top-20 z-10 shadow-sm shrink-0">
@@ -252,71 +284,112 @@ export default function DashboardPage() {
       </div>
 
       {/* CENTER MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA] h-full overflow-y-auto">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#F5F8FF] h-full overflow-y-auto">
+
+        <div className="px-4 sm:px-6 pt-6">
+            <div className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                    <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${summary.tone === "good" ? "bg-emerald-50 text-emerald-700" : summary.tone === "warn" ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>
+                            {summary.icon}
+                        </div>
+                        <div>
+                            <div className="text-xs uppercase tracking-widest text-stone-400 font-bold">Key Takeaway</div>
+                            <div className="text-lg sm:text-xl font-bold text-stone-900 mt-1">{summary.title}</div>
+                            <p className="text-sm text-stone-600 mt-1 max-w-2xl">{summary.subtitle}</p>
+                            <p className="text-xs text-stone-500 mt-2">{summary.detail}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
-        <div className="px-6 py-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 gap-4">
+        <div className="px-4 sm:px-6 py-4 grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <MetricCard label="Net Worth" value={formatIndianCurrency(inputs.currentCorpus, true)} sub="Your Starting Point" icon={<Wallet className="w-5 h-5 text-stone-400"/>} onClick={() => setActiveMathModal('networth')}/>
             <MetricCard label="Retirement Corpus" value={formatIndianCurrency(corpusAtRetire, true)} sub={`Projected at Age ${inputs.retirementAge}`} icon={<Leaf className="w-5 h-5 text-emerald-500"/>} onClick={() => setActiveMathModal('corpus')}/>
             <MetricCard label="Joy Money" value={joyMoney > 0 ? formatIndianCurrency(joyMoney) + "/mo" : "₹0"} sub="Safe Monthly Spend" color="text-purple-700" icon={<Heart className="w-5 h-5 text-purple-400"/>} onClick={() => setActiveMathModal('joy')}/>
             <MetricCard label="Status" value={isSafe ? "Secure" : "At Risk"} sub={isSafe ? "Plan Succeeds" : `Fails at Age ${failPoint?.age}`} color={isSafe ? "text-emerald-700" : "text-red-600"} icon={<ShieldAlert className={`w-5 h-5 ${isSafe ? "text-emerald-500" : "text-red-500"}`}/>} onClick={() => setActiveMathModal('status')}/>
         </div>
 
-        <div className="px-6 pb-8">
-            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6 relative">
-                <div className="flex justify-between items-center mb-6">
+        <div className="px-4 sm:px-6 pb-6">
+            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-3 sm:p-5 relative">
+                <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-stone-800 text-lg">Wealth Forecast</h3>
+                    <div className="text-[11px] text-stone-500">Corpus over time</div>
                 </div>
-                <div className="w-full h-[400px]">
+                <div className="w-full h-[260px] sm:h-[320px] lg:h-[420px] touch-none select-none">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={simData} margin={{ top: 20, right: 10, left: -10, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor={isSafe ? "#10b981" : "#ef4444"} stopOpacity={0.1}/>
-                                    <stop offset="95%" stopColor={isSafe ? "#10b981" : "#ef4444"} stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                            <XAxis dataKey="age" tick={{fill: '#9ca3af', fontSize: 11}} tickLine={false} axisLine={false} />
-                            <YAxis tickFormatter={(v) => formatIndianCurrency(v, true)} tick={{fill: '#9ca3af', fontSize: 11}} tickLine={false} axisLine={false} />
-                            <Tooltip content={<CustomTooltip />} />
-                            
-                            {/* FIX: Restore Reference Lines for Goals & FIRE */}
+                        <LineChart data={simData} margin={{ top: 10, right: 8, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
+                            <XAxis dataKey="age" tick={{fill: '#9ca3af', fontSize: 9}} tickLine={false} axisLine={false} minTickGap={18} />
+                            <YAxis tickFormatter={(v) => formatIndianCurrency(v, true)} tick={{fill: '#9ca3af', fontSize: 9}} tickLine={false} axisLine={false} width={44} tickMargin={4} />
+                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "transparent" }} />
+
                             {inputs.goals.map((g, i) => (
                                 <ReferenceLine key={i} x={g.age} stroke="#9ca3af" strokeDasharray="3 3">
-                                    <ReferenceDot x={g.age} y={simData.find(d => d.age === g.age)?.corpus || 0} r={5} fill="#6366f1" stroke="white" strokeWidth={2} />
+                                    <ReferenceDot x={g.age} y={simData.find(d => d.age === g.age)?.corpus || 0} r={4} fill="#6366f1" stroke="white" strokeWidth={2} />
                                 </ReferenceLine>
                             ))}
-                            {fireAge && <ReferenceLine x={fireAge} stroke="#f97316" strokeDasharray="3 3" label={{ position: 'top', value: 'FIRE', fontSize: 10, fill: '#f97316' }} />}
-                            
-                            <Area type="monotone" dataKey="corpus" stroke={isSafe ? "#10b981" : "#ef4444"} strokeWidth={3} fill="url(#grad)" animationDuration={1000} />
-                        </AreaChart>
+                            {fireAge && <ReferenceLine x={fireAge} stroke="#f97316" strokeDasharray="3 3" />}
+
+                            <Line type="monotone" dataKey="corpus" stroke={isSafe ? "#10b981" : "#ef4444"} strokeWidth={3} dot={false} activeDot={{ r: 4 }} />
+                        </LineChart>
                     </ResponsiveContainer>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-stone-500">
+                    <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-2">
+                            <span className="inline-block w-6 border-t border-dashed border-stone-300" />
+                            Goal marker
+                        </span>
+                        <span className="inline-flex items-center gap-2">
+                            <span className="inline-block w-6 border-t border-dashed border-orange-400" />
+                            FIRE line
+                        </span>
+                    </div>
+                    <div className="text-[11px] text-stone-400">X-axis: Age (years)</div>
                 </div>
             </div>
         </div>
 
         {/* Goal Planning */}
-        <div className="px-6 pb-12">
-            <h3 className="font-bold text-stone-800 text-lg mb-2">Goal Planning</h3>
-            <div className="grid grid-cols-1 gap-4">
+        <div className="px-4 sm:px-6 pb-10">
+            <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                    <h3 className="font-bold text-stone-800 text-lg">Goal Planning</h3>
+                    <p className="text-xs text-stone-500">Turn milestones into monthly plans.</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-stone-500">
+                    <Target className="w-4 h-4 text-emerald-600" />
+                    Prioritize what matters most.
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {goalAnalysis.map((g, i) => (
-                    <div key={i} className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm flex flex-col md:flex-row items-center gap-6">
-                        <div className="flex-1 w-full flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center font-bold text-stone-600 text-lg">{i+1}</div>
+                    <div key={i} className="bg-white border border-stone-200 rounded-xl p-3 shadow-sm flex flex-col md:flex-row items-center gap-3">
+                        <div className="flex-1 w-full flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                                {getGoalIcon(g.name)}
+                            </div>
                             <div>
-                                <div className="font-bold text-stone-900 text-lg">{g.name}</div>
-                                <div className="text-xs text-stone-500">Due Age {g.age}</div>
+                                <div className="font-bold text-stone-900 text-sm">{g.name}</div>
+                                <div className="text-xs text-stone-500">Due Age {g.age} · {Math.max(0, g.age - inputs.currentAge)} years left</div>
                             </div>
                         </div>
                         <div className="flex-1 w-full md:border-l md:pl-6 border-stone-100">
                             <div className="text-xs text-stone-400 font-bold uppercase">Target Value</div>
-                            <div className="text-xl font-bold text-stone-800">{formatIndianCurrency(g.fvCost, true)}</div>
+                            <div className="text-base font-bold text-stone-800">{formatIndianCurrency(g.fvCost, true)}</div>
                         </div>
                         <div className="flex-1 w-full md:text-right">
                             <div className="text-xs text-stone-400 font-bold uppercase">SIP Required</div>
-                            <div className={`text-xl font-bold ${g.sipNeeded === 0 ? "text-emerald-600" : "text-stone-800"}`}>
+                            <div className={`text-base font-bold ${g.sipNeeded === 0 ? "text-emerald-600" : "text-stone-800"}`}>
                                 {g.sipNeeded === 0 ? "Funded" : formatIndianCurrency(g.sipNeeded)}
                             </div>
+                            {(g.sipNeeded === 0 || inputs.existingSIP >= totalGoalSipNeeded) && (
+                                <div className="mt-1 inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
+                                    <CheckCircle2 className="w-3 h-3" /> Covered by SIP
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -389,12 +462,12 @@ export default function DashboardPage() {
 
 // --- SUB-COMPONENTS ---
 const MetricCard = ({ label, value, sub, color="text-stone-800", icon, onClick }: any) => (
-    <div onClick={onClick} className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm min-h-[160px] flex flex-col justify-between cursor-pointer hover:shadow-md transition-all group relative overflow-hidden">
-        <div className="flex justify-between items-start gap-3">
-            <div className="flex flex-col"><div className={`text-2xl lg:text-3xl font-bold ${color} break-words leading-tight`}>{value}</div><div className="text-sm font-medium text-stone-500 mt-2">{label}</div></div>
-            <div className="p-2 bg-stone-50 rounded-lg text-stone-400 group-hover:bg-stone-100 group-hover:text-stone-600 transition-colors shrink-0">{icon}</div>
+    <div onClick={onClick} className="bg-white p-3 rounded-2xl border border-stone-200 shadow-sm min-h-[96px] flex flex-col justify-between cursor-pointer hover:shadow-md transition-all group relative overflow-hidden">
+        <div className="flex justify-between items-start gap-2">
+            <div className="flex flex-col"><div className={`text-base lg:text-lg font-bold ${color} break-words leading-tight`}>{value}</div><div className="text-[10px] font-medium text-stone-500 mt-1">{label}</div></div>
+            <div className="w-8 h-8 flex items-center justify-center bg-stone-50 rounded-lg text-stone-400 group-hover:bg-stone-100 group-hover:text-stone-600 transition-colors shrink-0 overflow-hidden">{icon}</div>
         </div>
-        <div className="flex justify-between items-center mt-4 pt-3 border-t border-stone-50"><div className="text-xs text-stone-400 truncate max-w-[75%]">{sub}</div></div>
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-stone-50"><div className="text-[9px] text-stone-400 truncate max-w-[75%]">{sub}</div></div>
     </div>
 );
 
@@ -405,6 +478,78 @@ const DiagnosisCard = ({ title, status, color, icon, text }: any) => {
 
 const InputSection = ({ title, children }: any) => (<div className="border-b border-stone-100 pb-4"><div className="font-bold text-xs uppercase text-stone-400 mb-3 tracking-wider">{title}</div><div className="space-y-3">{children}</div></div>);
 const InputRow = ({ label, val, set }: any) => (<div className="flex justify-between items-center"><label className="text-xs font-medium text-stone-600">{label}</label><input type="number" className="w-24 p-1.5 bg-stone-50 border border-stone-200 rounded text-xs text-right font-bold text-stone-800 outline-none focus:border-stone-800 focus:ring-1 focus:ring-stone-200 transition-all" value={val} onChange={(e)=>set(Number(e.target.value))}/></div>);
+const getGoalIcon = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes("home") || n.includes("house")) return <Home className="w-5 h-5" />;
+    if (n.includes("car")) return <Car className="w-5 h-5" />;
+    if (n.includes("travel") || n.includes("tour") || n.includes("trip")) return <Plane className="w-5 h-5" />;
+    if (n.includes("education") || n.includes("college") || n.includes("school")) return <GraduationCap className="w-5 h-5" />;
+    if (n.includes("wedding")) return <Heart className="w-5 h-5" />;
+    return <Target className="w-5 h-5" />;
+};
+
+const buildDashboardSummary = ({
+    isSafe,
+    failPointAge,
+    fireAge,
+    monthlySurplus,
+    joyMoney,
+    corpusAtRetire,
+    retirementAge,
+    goalGaps,
+    goalSipNeeded,
+    existingSIP,
+    familyRunway,
+}: {
+    isSafe: boolean;
+    failPointAge?: number;
+    fireAge: number | null;
+    monthlySurplus: number;
+    joyMoney: number;
+    corpusAtRetire: number;
+    retirementAge: number;
+    goalGaps: number;
+    goalSipNeeded: number;
+    existingSIP: number;
+    familyRunway: number;
+}) => {
+    let tone: "good" | "warn" | "risk" = "good";
+    let title = "Plan looks strong";
+    let subtitle = "Your current inputs keep the plan positive through your timeline.";
+    let detail = `Surplus ${formatIndianCurrency(Math.max(0, monthlySurplus))}/mo · Retire @ ${retirementAge}: ${formatIndianCurrency(corpusAtRetire, true)}`;
+    let icon = <Sparkles className="w-6 h-6" />;
+
+    const sipGap = Math.max(0, goalSipNeeded - existingSIP);
+    const sipCoverage = goalSipNeeded > 0 ? Math.min(100, Math.round((existingSIP / goalSipNeeded) * 100)) : 100;
+
+    if (!isSafe) {
+        tone = "risk";
+        title = "Plan needs attention";
+        subtitle = `The corpus runs out around age ${failPointAge}. Tighten expenses or boost savings.`;
+        detail = `Surplus ${formatIndianCurrency(Math.max(0, monthlySurplus))}/mo · Runway ${familyRunway.toFixed(1)} yrs with insurance.`;
+        icon = <AlertTriangle className="w-6 h-6" />;
+    } else if (monthlySurplus <= 0) {
+        tone = "warn";
+        title = "Cashflow is tight";
+        subtitle = "Your monthly surplus is negative. Reduce expenses or increase income to stabilize.";
+        detail = `Surplus ${formatIndianCurrency(monthlySurplus)}/mo · Retire @ ${retirementAge}: ${formatIndianCurrency(corpusAtRetire, true)}`;
+        icon = <ShieldAlert className="w-6 h-6" />;
+    } else if (goalSipNeeded > 0 && sipGap > 0) {
+        tone = "warn";
+        title = "Goals need a SIP top-up";
+        subtitle = `Existing SIPs cover about ${sipCoverage}% of goal funding. Add ${formatIndianCurrency(sipGap)}/mo to fully fund goals.`;
+        detail = `Existing SIP ${formatIndianCurrency(existingSIP)}/mo · Goal SIP need ${formatIndianCurrency(goalSipNeeded)}/mo`;
+        icon = <Target className="w-6 h-6" />;
+    }
+
+    if (fireAge) {
+        detail += ` · FIRE by ${fireAge}`;
+    } else if (joyMoney > 0) {
+        detail += ` · Joy ${formatIndianCurrency(joyMoney)}/mo`;
+    }
+
+    return { tone, title, subtitle, detail, icon };
+};
 const CustomTooltip = ({ active, payload, label }: any) => { 
     if (active && payload && payload.length) { 
         const data = payload[0].payload; 

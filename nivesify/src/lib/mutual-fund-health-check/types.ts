@@ -5,6 +5,8 @@ export interface InvestmentsData {
   transactions?: Transaction[];
   transactionsCount?: number;
   nominees?: Record<string, boolean>;
+  manualInvestments?: ManualInvestment[];
+  sipPlans?: SipPlan[];
 }
 
 export interface Meta {
@@ -50,4 +52,21 @@ export interface MatchingScheme {
   schemeType?: string;
   schemeCategory?: string;
   amc?: string;
+}
+
+export interface ManualInvestment {
+  id: string;
+  schemeCode: number;
+  schemeName: string;
+  date: string;
+  amount: number;
+}
+
+export interface SipPlan {
+  id: string;
+  schemeCode: number;
+  schemeName: string;
+  startDate: string;
+  endDate?: string;
+  monthlyAmount: number;
 }

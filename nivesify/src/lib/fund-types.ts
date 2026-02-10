@@ -9,9 +9,11 @@ export interface FundAnalytics {
   Fund_Return_1Y: number | null;
   Fund_Return_3Y: number | null;
   Fund_Return_5Y: number | null;
+  Fund_Return_10Y?: number | null;
   Benchmark_Return_1Y: number | null;
   Benchmark_Return_3Y: number | null;
   Benchmark_Return_5Y: number | null;
+  Benchmark_Return_10Y?: number | null;
   Alpha_1Y: number | null;
   Alpha_3Y: number | null;
   Alpha_5Y: number | null;

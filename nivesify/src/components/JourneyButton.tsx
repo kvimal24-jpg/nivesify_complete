@@ -36,12 +36,12 @@ export default function JourneyButton() {
     );
   }
 
-  // Case 1: Logged in AND Completed Data -> Go to Dashboard
+  // Case 1: Logged in AND Completed Data -> Continue
   if (user && isOnboarded) {
     return (
       <Link href="/dashboard">
-        <button className="mt-14 px-14 py-4 bg-[#1F2937] text-[#F5F6F3] rounded-full font-serif text-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
-          Go to Dashboard
+        <button className="mt-10 px-12 py-3 bg-[#2F5D7C] text-[#F5F6F3] rounded-full font-serif text-base hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
+          Continue
         </button>
       </Link>
     );
@@ -51,7 +51,7 @@ export default function JourneyButton() {
   if (user && !isOnboarded) {
     return (
       <Link href="/dashboard/onboarding">
-        <button className="mt-14 px-14 py-4 bg-[#1F2937] text-[#F5F6F3] rounded-full font-serif text-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
+        <button className="mt-10 px-12 py-3 bg-[#2F5D7C] text-[#F5F6F3] rounded-full font-serif text-base hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
           Complete Setup
         </button>
       </Link>
@@ -61,7 +61,7 @@ export default function JourneyButton() {
   // Case 3: Not Logged in -> Sign In
   return (
     <a href="/api/auth/google">
-      <button className="mt-14 px-14 py-4 bg-[#1F2937] text-[#F5F6F3] rounded-full font-serif text-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
+      <button className="mt-10 px-12 py-3 bg-[#2F5D7C] text-[#F5F6F3] rounded-full font-serif text-base hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
         Begin the Journey
       </button>
     </a>

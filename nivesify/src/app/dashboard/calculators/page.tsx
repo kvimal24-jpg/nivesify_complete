@@ -2,11 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -48,8 +45,15 @@ const formatIndicatorLabel = (value: number, kind?: "amount" | "years" | "percen
   return `${value.toFixed(1)}%`;
 };
 
-const chartMargin = { top: 8, right: 16, left: 20, bottom: 24 };
-const axisDefaults = { tickLine: false, axisLine: false, width: 88, tickMargin: 10 };
+const chartMargin = { top: 10, right: 8, left: -10, bottom: 0 };
+const axisDefaults = {
+  tickLine: false,
+  axisLine: false,
+  width: 44,
+  tickMargin: 4,
+  tick: { fill: "#9AA3AF", fontSize: 9 },
+};
+const xAxisDefaults = { tickLine: false, axisLine: false, tickMargin: 8, tick: { fill: "#9AA3AF", fontSize: 9 }, minTickGap: 18 };
 
 const parseNumber = (value: string) => {
   const parsed = Number(value);
@@ -259,8 +263,8 @@ const ChapterHeader = ({
       <span className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">{title}</span>
       <span className="h-px flex-1 bg-[#E6E8E1]" />
     </div>
-    <h2 className="text-2xl md:text-3xl font-serif text-[#1F2937]">{headline}</h2>
-    <p className="text-sm md:text-base font-serif italic text-[#6B7C70]">{reflection}</p>
+    <h2 className="text-xl md:text-2xl font-serif text-[#1F2937]">{headline}</h2>
+    <p className="text-xs md:text-sm font-serif italic text-[#6B7C70]">{reflection}</p>
   </div>
 );
 
@@ -287,7 +291,7 @@ const InputField = ({
   };
 }) => (
   <label className="grid gap-2 text-sm text-[#1F2937]">
-    <span className="min-h-[32px] font-serif text-xs uppercase tracking-[0.2em] text-[#6B7C70]">{label}</span>
+    <span className="min-h-[28px] font-serif text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">{label}</span>
     <div className="space-y-2">
       <div className="relative">
         <input
@@ -295,7 +299,7 @@ const InputField = ({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           inputMode="decimal"
-          className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-4 py-3 text-sm text-[#1F2937]"
+          className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2.5 text-sm text-[#1F2937]"
         />
         {suffix ? (
           <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#6B7C70]">
@@ -312,11 +316,11 @@ const InputField = ({
             step={range.step}
             value={Number.isFinite(parseNumber(value)) ? parseNumber(value) : range.min}
             onChange={(event) => onChange(event.target.value)}
-            className="w-full accent-[#4A5D4E]"
+            className="w-full accent-[#2F5D7C]"
           />
           <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-[#8A958C]">
             <span>{range.formatLabel ? range.formatLabel(range.min) : range.min}</span>
-            <span className="text-[#4A5D4E]">
+            <span className="text-[#2F5D7C]">
               {formatIndicatorLabel(parseNumber(value), indicator)}
             </span>
             <span>{range.formatLabel ? range.formatLabel(range.max) : range.max}</span>
@@ -380,7 +384,7 @@ const CalculatorCardInner = ({
   return (
     <div
       ref={cardRef}
-      className="rounded-3xl border border-[#E6E8E1] bg-white p-6 shadow-[0_22px_48px_-36px_rgba(33,45,31,0.35)] scroll-mt-28"
+      className="rounded-3xl border border-[#E6E8E1] bg-white p-4 shadow-[0_18px_40px_-32px_rgba(33,45,31,0.28)] scroll-mt-28"
     >
       <button
         type="button"
@@ -388,15 +392,15 @@ const CalculatorCardInner = ({
         className="flex w-full items-start justify-between gap-4 text-left"
         aria-expanded={isOpen}
       >
-        <div className="space-y-2">
-          <h3 className="text-xl font-serif text-[#1F2937]">{title}</h3>
-          <p className="text-sm font-serif text-[#6B7C70]">{description}</p>
+        <div className="space-y-1">
+          <h3 className="text-lg font-serif text-[#1F2937]">{title}</h3>
+          <p className="text-xs font-serif text-[#6B7C70]">{description}</p>
         </div>
         <span className="mt-1 whitespace-nowrap rounded-full border border-[#E6E8E1] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#6B7C70]">
           {isOpen ? "Collapse" : "Expand"}
         </span>
       </button>
-      {isOpen ? <div className="mt-6 space-y-6">{children}</div> : null}
+      {isOpen ? <div className="mt-5 space-y-5">{children}</div> : null}
     </div>
   );
 };
@@ -415,15 +419,15 @@ const ResultCard = ({
   emoji?: string;
 }) => {
   const toneClass =
-    tone === "positive" ? "text-[#4A5D4E]" : tone === "negative" ? "text-[#B35A5A]" : "text-[#1F2937]";
+    tone === "positive" ? "text-[#2F5D7C]" : tone === "negative" ? "text-[#B35A5A]" : "text-[#1F2937]";
   return (
-    <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
+    <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-3">
       <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">
         {emoji ? `${emoji} ` : ""}
         {title}
       </div>
-      <div className={`mt-2 text-2xl font-semibold ${toneClass}`}>{value}</div>
-      <p className="mt-2 text-xs text-[#6B7C70]">{message}</p>
+      <div className={`mt-2 text-xl font-semibold ${toneClass}`}>{value}</div>
+      <p className="mt-1 text-[11px] text-[#6B7C70]">{message}</p>
     </div>
   );
 };
@@ -457,7 +461,7 @@ const RetirementTooltip = ({ active, payload, label }: TooltipProps<number, stri
       <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Year {label}</div>
       <div className="mt-2 space-y-1 text-xs text-[#1F2937]">
         <div className="flex items-center justify-between gap-4">
-          <span className="font-serif" style={{ color: "#4A5D4E" }}>Money left after withdrawals</span>
+          <span className="font-serif" style={{ color: "#2F5D7C" }}>Money left after withdrawals</span>
           <span className="font-semibold">INR {formatIndianCurrency(data.corpus)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
@@ -475,20 +479,27 @@ const RetirementTooltip = ({ active, payload, label }: TooltipProps<number, stri
   );
 };
 
+const InfoToggle = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <details className="group">
+    <summary className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#D5D9CF] bg-white px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#2F5D7C]">
+      {label}
+    </summary>
+    <div className="mt-2 text-[11px] font-serif text-[#6B7C70]">{children}</div>
+  </details>
+);
+
 const NextStep = ({ label, note, onSelect }: { label: string; note?: string; onSelect: () => void }) => (
   <div className="rounded-2xl border border-dashed border-[#D5D9CF] bg-[#FBFCFA] px-4 py-3 shadow-[0_10px_22px_-18px_rgba(31,41,55,0.35)]">
-    {note ? <p className="text-xs font-serif text-[#6B7C70]">{note}</p> : null}
-    <button type="button" onClick={onSelect} className="mt-2 text-xs uppercase tracking-[0.2em] text-[#4A5D4E]">
+    {note ? <InfoToggle label="Why next?">{note}</InfoToggle> : null}
+    <button type="button" onClick={onSelect} className="mt-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]">
       Next: {label}
     </button>
   </div>
 );
 
 const ExampleNote = ({ text }: { text: string }) => (
-  <p className="text-xs font-serif text-[#6B7C70]">Example: {text}</p>
+  <InfoToggle label="Example">{text}</InfoToggle>
 );
-
-const renderLegendText = (value: string) => <span className="text-xs font-serif text-[#6B7C70]">{value}</span>;
 
 const SECTION_TABS = [
   {
@@ -550,7 +561,7 @@ const SubTabNav = ({
         onClick={() => onSelect(tab.id)}
         className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition ${
           activeId === tab.id
-            ? "border-[#4A5D4E] bg-[#F1F4EC] text-[#4A5D4E] shadow-[0_8px_16px_-12px_rgba(31,41,55,0.5)]"
+            ? "border-[#2F5D7C] bg-[#EAF1FB] text-[#2F5D7C] shadow-[0_8px_16px_-12px_rgba(31,41,55,0.3)]"
             : "border-[#D5D9CF] bg-white text-[#6B7C70]"
         }`}
       >
@@ -1201,35 +1212,38 @@ export default function LifeCalculatorsPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#F5F6F3] via-[#EFF2EA] to-[#F7F1E6] px-6 py-12">
-      <div className="pointer-events-none absolute -left-24 top-10 h-64 w-64 rounded-full bg-[#E6E8E1]/70 blur-3xl" />
-      <div className="pointer-events-none absolute right-10 top-28 h-52 w-52 rounded-full bg-[#E2C77A]/15 blur-2xl" />
-      <div className="pointer-events-none absolute bottom-10 left-1/3 h-72 w-72 rounded-full bg-[#4A5D4E]/10 blur-3xl" />
+    <div className="relative min-h-screen overflow-hidden bg-[#F5F8FF] px-4 sm:px-6 py-10">
+      <div className="pointer-events-none absolute -left-24 top-10 h-64 w-64 rounded-full bg-[#DDE6F3]/70 blur-3xl" />
+      <div className="pointer-events-none absolute right-10 top-28 h-52 w-52 rounded-full bg-[#B7CCE6]/20 blur-2xl" />
+      <div className="pointer-events-none absolute bottom-10 left-1/3 h-72 w-72 rounded-full bg-[#2F5D7C]/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl space-y-12">
-        <div className="grid gap-8 rounded-[36px] border border-[#E6E8E1] bg-white p-8 shadow-[0_28px_60px_-50px_rgba(33,45,31,0.45)] md:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-6 rounded-[32px] border border-[#DDE6F3] bg-white p-6 shadow-[0_24px_52px_-46px_rgba(31,41,55,0.25)] md:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-5">
             <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">Life calculators</p>
-            <h1 className="text-3xl md:text-5xl font-serif text-[#1F2937]">Life Calculators</h1>
-            <p className="text-base md:text-lg font-serif text-[#6B7C70]">
+            <h1 className="text-3xl md:text-4xl font-serif text-[#1F2937]">Life Calculators</h1>
+            <p className="text-sm md:text-base font-serif text-[#6B7C70]">
               Move through your money story at your own pace, from naming direction to living well on what you have built.
             </p>
             <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.2em] text-[#6B7C70]">
-              <span className="rounded-full border border-[#E6E8E1] bg-white px-4 py-2">Clarity first</span>
-              <span className="rounded-full border border-[#E6E8E1] bg-white px-4 py-2">Long-term calm</span>
-              <span className="rounded-full border border-[#E6E8E1] bg-white px-4 py-2">Enough over excess</span>
+              <span className="rounded-full border border-[#DDE6F3] bg-white px-3 py-1.5">Clarity first</span>
+              <span className="rounded-full border border-[#DDE6F3] bg-white px-3 py-1.5">Long-term calm</span>
+              <span className="rounded-full border border-[#DDE6F3] bg-white px-3 py-1.5">Enough over excess</span>
             </div>
           </div>
-          <div className="rounded-3xl border border-[#E6E8E1] bg-white p-6 shadow-[0_18px_40px_-30px_rgba(33,45,31,0.5)]">
-            <div className="rounded-2xl border border-[#E6E8E1] bg-[#F7F1E6] p-4 shadow-[0_16px_30px_-28px_rgba(33,45,31,0.45)]">
+          <div className="rounded-3xl border border-[#DDE6F3] bg-white p-5 shadow-[0_16px_36px_-28px_rgba(31,41,55,0.3)]">
+            <div className="rounded-2xl border border-[#DDE6F3] bg-[#EEF4FF] p-4 shadow-[0_14px_28px_-24px_rgba(31,41,55,0.3)]">
               <p className="text-xs uppercase tracking-[0.25em] text-[#6B7C70]">Retirement spotlight</p>
-              <p className="mt-2 text-sm font-serif text-[#1F2937]">
-                The retirement analysis is the heart of this page. It models income, inflation, and lump sum needs
-                with a year-by-year cashflow view.
-              </p>
+              <p className="mt-2 text-sm font-serif text-[#1F2937]">A single view that combines income, inflation, and lump sums.</p>
+              <div className="mt-3">
+                <InfoToggle label="Why it matters">
+                  The retirement analysis is the heart of this page. It models income, inflation, and lump sum needs with a
+                  year-by-year cashflow view.
+                </InfoToggle>
+              </div>
               <button
                 onClick={() => scrollToId("retirement-analysis")}
-                className="mt-3 text-xs uppercase tracking-[0.2em] text-[#4A5D4E]"
+                className="mt-3 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
               >
                 Go to retirement analysis
               </button>
@@ -1242,7 +1256,7 @@ export default function LifeCalculatorsPage() {
                   onClick={() => handleTabSelect(tab.id)}
                   className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
                     activeTab === tab.id
-                      ? "border-[#4A5D4E] bg-[#F1F4EC] text-[#1F2937] shadow-[0_10px_18px_-14px_rgba(33,45,31,0.55)]"
+                      ? "border-[#2F5D7C] bg-[#EAF1FB] text-[#1F2937] shadow-[0_10px_18px_-14px_rgba(31,41,55,0.3)]"
                       : "border-[#E6E8E1] bg-white text-[#1F2937]"
                   }`}
                 >
@@ -1254,7 +1268,7 @@ export default function LifeCalculatorsPage() {
           </div>
         </div>
 
-        <div className="sticky top-24 z-20 rounded-3xl border border-[#E6E8E1] bg-white p-3 shadow-[0_18px_40px_-28px_rgba(33,45,31,0.45)]">
+        <div className="sticky top-24 z-20 rounded-3xl border border-[#DDE6F3] bg-white p-3 shadow-[0_16px_36px_-26px_rgba(31,41,55,0.3)]">
           <div className="flex flex-wrap gap-2">
             {SECTION_TABS.map((tab) => (
               <button
@@ -1262,7 +1276,7 @@ export default function LifeCalculatorsPage() {
                 onClick={() => handleTabSelect(tab.id)}
                 className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition ${
                   activeTab === tab.id
-                    ? "border-[#4A5D4E] bg-[#F1F4EC] text-[#4A5D4E] shadow-[0_10px_18px_-14px_rgba(33,45,31,0.6)]"
+                    ? "border-[#2F5D7C] bg-[#EAF1FB] text-[#2F5D7C] shadow-[0_10px_18px_-14px_rgba(31,41,55,0.3)]"
                     : "border-[#D5D9CF] bg-white text-[#6B7C70]"
                 }`}
               >
@@ -1272,7 +1286,7 @@ export default function LifeCalculatorsPage() {
           </div>
         </div>
 
-        <section id="direction" className="scroll-mt-28 space-y-8 rounded-[36px] border border-[#E6E8E1] bg-white p-6 shadow-[0_26px_50px_-44px_rgba(33,45,31,0.45)] md:p-10">
+        <section id="direction" className="scroll-mt-28 space-y-6 rounded-[32px] border border-[#DDE6F3] bg-white p-5 shadow-[0_22px_44px_-40px_rgba(31,41,55,0.25)] md:p-8">
           <ChapterHeader
             title="Direction"
             headline="Name the dream"
@@ -1319,7 +1333,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleSipGoal}
                 >
                   Calculate SIP
@@ -1334,16 +1348,15 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(sipGoalResult.sip)}`}
                         message={sipGoalMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={sipGoalResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} name="Your Investment" />
-                            <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Total Corpus" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Total Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -1392,7 +1405,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleLumpsumGoal}
                 >
                   Calculate lumpsum
@@ -1407,16 +1420,15 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(lumpsumGoalResult.corpus)}`}
                         message={lumpsumGoalMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={lumpsumGoalResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} name="Your Investment" />
-                            <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Total Corpus" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Total Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -1433,7 +1445,7 @@ export default function LifeCalculatorsPage() {
           </div>
         </section>
 
-        <section id="building" className="scroll-mt-28 space-y-8 rounded-[36px] border border-[#E6E8E1] bg-white p-6 shadow-[0_26px_50px_-44px_rgba(33,45,31,0.45)] md:p-10">
+        <section id="building" className="scroll-mt-28 space-y-6 rounded-[32px] border border-[#DDE6F3] bg-white p-5 shadow-[0_22px_44px_-40px_rgba(31,41,55,0.25)] md:p-8">
           <ChapterHeader
             title="Building"
             headline="Let compounding breathe"
@@ -1480,7 +1492,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleSipFV}
                 >
                   Calculate future value
@@ -1495,17 +1507,16 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(sipFVResult.corpus)}`}
                         message={sipFVMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={sipFVResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                          <LineChart data={sipFVResult.chart} margin={chartMargin}>
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
-                            <Area type="monotone" dataKey="invested" stroke="#BDA06D" fill="#BDA06D" fillOpacity={0.2} name="Your Investment" />
-                            <Area type="monotone" dataKey="corpus" stroke="#4A5D4E" fill="#4A5D4E" fillOpacity={0.25} name="Total Corpus" />
-                          </AreaChart>
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
+                            <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} dot={false} name="Your Investment" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} dot={false} name="Total Corpus" />
+                          </LineChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
@@ -1553,7 +1564,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleLumpsumFV}
                 >
                   Calculate future value
@@ -1568,17 +1579,16 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(lumpsumFVResult.corpus)}`}
                         message={lumpsumFVMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={lumpsumFVResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                          <LineChart data={lumpsumFVResult.chart} margin={chartMargin}>
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
-                            <Area type="monotone" dataKey="invested" stroke="#BDA06D" fill="#BDA06D" fillOpacity={0.2} name="Your Investment" />
-                            <Area type="monotone" dataKey="corpus" stroke="#4A5D4E" fill="#4A5D4E" fillOpacity={0.25} name="Total Corpus" />
-                          </AreaChart>
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
+                            <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} dot={false} name="Your Investment" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} dot={false} name="Total Corpus" />
+                          </LineChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
@@ -1634,7 +1644,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleSipPlusLumpsum}
                 >
                   Calculate combined corpus
@@ -1649,17 +1659,16 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(sipPlusLumpsumResult.corpus)}`}
                         message={sipPlusLumpsumMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={sipPlusLumpsumResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                          <LineChart data={sipPlusLumpsumResult.chart} margin={chartMargin}>
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
-                            <Area type="monotone" dataKey="invested" stroke="#BDA06D" fill="#BDA06D" fillOpacity={0.2} name="Total Investment" />
-                            <Area type="monotone" dataKey="corpus" stroke="#4A5D4E" fill="#4A5D4E" fillOpacity={0.25} name="Total Corpus" />
-                          </AreaChart>
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
+                            <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} dot={false} name="Total Investment" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} dot={false} name="Total Corpus" />
+                          </LineChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
@@ -1675,7 +1684,7 @@ export default function LifeCalculatorsPage() {
           </div>
         </section>
 
-        <section id="optimising" className="scroll-mt-28 space-y-8 rounded-[36px] border border-[#E6E8E1] bg-white p-6 shadow-[0_26px_50px_-44px_rgba(33,45,31,0.45)] md:p-10">
+        <section id="optimising" className="scroll-mt-28 space-y-6 rounded-[32px] border border-[#DDE6F3] bg-white p-5 shadow-[0_22px_44px_-40px_rgba(31,41,55,0.25)] md:p-8">
           <ChapterHeader
             title="Optimising"
             headline="Refine the mix"
@@ -1730,7 +1739,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleLimitedSipFV}
                 >
                   Calculate future value
@@ -1745,16 +1754,15 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(limitedSipFVResult.corpus)}`}
                         message={limitedSipFVMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={limitedSipFVResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} name="Your Investment" />
-                            <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Total Corpus" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Total Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -1811,7 +1819,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleLimitedSipGoal}
                 >
                   Calculate SIP
@@ -1826,16 +1834,15 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(limitedSipGoalResult.sip)}`}
                         message={limitedSipGoalMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={limitedSipGoalResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeWidth={2} name="Your Investment" />
-                            <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Total Corpus" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Total Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -1892,7 +1899,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleOneTimeIfSip}
                 >
                   Calculate one-time
@@ -1907,17 +1914,16 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(oneTimeIfSipResult.oneTime)}`}
                         message={oneTimeIfSipMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={oneTimeIfSipResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="sip" stroke="#BDA06D" strokeWidth={2} name="SIP Invested" />
                             <Line type="monotone" dataKey="lumpsum" stroke="#E2C77A" strokeWidth={2} name="Lumpsum Invested" />
-                            <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Total Corpus" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Total Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -1974,7 +1980,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleSipIfOneTime}
                 >
                   Calculate SIP
@@ -1989,17 +1995,16 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(sipIfOneTimeResult.sip)}`}
                         message={sipIfOneTimeMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={sipIfOneTimeResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="lumpsum" stroke="#E2C77A" strokeWidth={2} name="Lumpsum Invested" />
                             <Line type="monotone" dataKey="sip" stroke="#BDA06D" strokeWidth={2} name="SIP Invested" />
-                            <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Total Corpus" />
+                            <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Total Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -2016,7 +2021,7 @@ export default function LifeCalculatorsPage() {
           </div>
         </section>
 
-        <section id="living-off-money" className="scroll-mt-28 space-y-8 rounded-[36px] border border-[#E6E8E1] bg-white p-6 shadow-[0_26px_50px_-44px_rgba(33,45,31,0.45)] md:p-10">
+        <section id="living-off-money" className="scroll-mt-28 space-y-6 rounded-[32px] border border-[#DDE6F3] bg-white p-5 shadow-[0_22px_44px_-40px_rgba(31,41,55,0.25)] md:p-8">
           <ChapterHeader
             title="Living Off Money"
             headline="Make the drawdown steady"
@@ -2063,7 +2068,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleSwp}
                 >
                   Calculate SWP
@@ -2078,15 +2083,14 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(swpResult.monthly)}`}
                         message={swpMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={swpResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
-                            <Line type="monotone" dataKey="remaining" stroke="#B35A5A" strokeWidth={2} name="Remaining Corpus" />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
+                            <Line type="monotone" dataKey="remaining" stroke="#2F5D7C" strokeWidth={3} name="Remaining Corpus" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -2135,7 +2139,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleSwpCorpus}
                 >
                   Calculate corpus
@@ -2150,14 +2154,13 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(swpCorpusResult.corpus)}`}
                         message={swpCorpusMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={swpCorpusResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" iconType="circle" formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="remaining" stroke="#BDA06D" strokeWidth={2} name="Corpus Value" />
                           </LineChart>
                         </ResponsiveContainer>
@@ -2216,7 +2219,7 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleInflationSwp}
                 >
                   Calculate inflation-adjusted SWP
@@ -2231,16 +2234,15 @@ export default function LifeCalculatorsPage() {
                         value={`INR ${formatIndianCurrency(inflationSwpResult.monthly)}`}
                         message={inflationSwpMessage}
                       />
-                      <div className="h-64 rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="h-56 sm:h-64 rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={inflationSwpResult.chart} margin={chartMargin}>
-                            <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                            <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                            <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                            <XAxis dataKey="year" {...xAxisDefaults} />
                             <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend formatter={renderLegendText} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "transparent" }} />
                             <Line type="monotone" dataKey="remaining" stroke="#B35A5A" strokeWidth={2} name="Remaining Corpus" />
-                            <Line type="monotone" dataKey="withdrawal" stroke="#4A5D4E" strokeWidth={2} name="Annual Withdrawal" />
+                            <Line type="monotone" dataKey="withdrawal" stroke="#2F5D7C" strokeWidth={2} name="Annual Withdrawal" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -2257,7 +2259,7 @@ export default function LifeCalculatorsPage() {
           </div>
         </section>
 
-        <section id="readiness" className="scroll-mt-28 space-y-8 rounded-[36px] border border-[#E6E8E1] bg-white p-6 shadow-[0_26px_50px_-44px_rgba(33,45,31,0.45)] md:p-10">
+        <section id="readiness" className="scroll-mt-28 space-y-6 rounded-[32px] border border-[#DDE6F3] bg-white p-5 shadow-[0_22px_44px_-40px_rgba(31,41,55,0.25)] md:p-8">
           <ChapterHeader
             title="Readiness"
             headline="Check the runway"
@@ -2354,7 +2356,7 @@ export default function LifeCalculatorsPage() {
                       <button
                         type="button"
                         onClick={addRetirementWithdrawal}
-                        className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#4A5D4E]"
+                        className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
                       >
                         Add withdrawal
                       </button>
@@ -2401,18 +2403,19 @@ export default function LifeCalculatorsPage() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[#4A5D4E] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  className="rounded-full bg-[#2F5D7C] px-5 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   onClick={handleRetirement}
                 >
                   Run retirement analysis
                 </button>
                 <ExampleNote text="Corpus 12,00,000, SIP 20,000 for 20 years, income 75,000 for 25 years at 11%/7% with 6% inflation. Add lump sums as years from today." />
-                <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] px-4 py-3 text-xs font-serif text-[#6B7C70]">
-                  Assumptions: SIPs are modeled at the beginning of each month. Withdrawals are modeled at the end of each month. All retirement calculations are inflation-adjusted to reflect real purchasing power.
-                </div>
+                <InfoToggle label="Assumptions">
+                  SIPs are modeled at the beginning of each month. Withdrawals are modeled at the end of each month.
+                  All retirement calculations are inflation-adjusted to reflect real purchasing power.
+                </InfoToggle>
                 {retirementResult ? (
                   <div id="retirement-result" className="space-y-6 scroll-mt-28">
-                    <p className="text-sm font-serif text-[#4A5D4E]">
+                    <p className="text-sm font-serif text-[#2F5D7C]">
                       {(() => {
                         const cashflow = retirementResult.cashflow;
                         if (cashflow.length === 0) return "";
@@ -2437,21 +2440,24 @@ export default function LifeCalculatorsPage() {
                           emoji={retirementResult.shortfall >= 0 ? "✅" : "⚠️"}
                         />
                       </div>
-                      <div className="rounded-2xl border border-[#EEF0E8] bg-white p-4">
+                      <div className="rounded-2xl border border-[#EEF0E8] bg-white p-3">
                         <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Lifetime cashflow</div>
-                        <p className="mt-1 text-xs font-serif text-[#6B7C70]">
-                          Timeline runs from today through retirement. Green line shows money left after withdrawals, red line shows money withdrawn that year. Vertical markers show retirement start and goal withdrawals.
-                        </p>
-                        <div className="mt-2 h-[260px]">
+                        <div className="mt-2">
+                          <InfoToggle label="How to read">
+                            Timeline runs from today through retirement. Blue line shows money left after withdrawals, red line
+                            shows money withdrawn that year. Vertical markers show retirement start and goal withdrawals.
+                          </InfoToggle>
+                        </div>
+                        <div className="mt-3 h-[240px] sm:h-[280px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={retirementResult.cashflow} margin={chartMargin}>
-                              <CartesianGrid stroke="#ECEFE7" vertical={false} />
-                              <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={10} />
+                              <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                              <XAxis dataKey="year" {...xAxisDefaults} />
                               <YAxis {...axisDefaults} tickFormatter={(value) => formatCompactCurrency(value as number)} />
-                              <Tooltip content={<RetirementTooltip />} />
+                              <Tooltip content={<RetirementTooltip />} cursor={{ stroke: "transparent" }} />
                               <ReferenceLine
                                 x={parseNumber(retirementInputs.yearsToRetirement)}
-                                stroke="#4A5D4E"
+                                stroke="#2F5D7C"
                                 strokeDasharray="4 4"
                               />
                               {Array.from(
@@ -2470,14 +2476,14 @@ export default function LifeCalculatorsPage() {
                                   strokeDasharray="2 6"
                                 />
                               ))}
-                              <Line type="monotone" dataKey="corpus" stroke="#4A5D4E" strokeWidth={2} name="Money left after withdrawals" />
+                              <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} name="Money left after withdrawals" />
                               <Line type="monotone" dataKey="totalOutflow" stroke="#B35A5A" strokeWidth={2} name="Money you withdraw each year" />
                             </ComposedChart>
                           </ResponsiveContainer>
                         </div>
                         <div className="mt-3 grid gap-2 text-[11px] uppercase tracking-[0.2em] text-[#6B7C70] sm:grid-cols-2">
                           <span className="flex items-center gap-2">
-                            <span className="h-0.5 w-6 rounded-full bg-[#4A5D4E]" />
+                            <span className="h-0.5 w-6 rounded-full bg-[#2F5D7C]" />
                             Money left after withdrawals
                           </span>
                           <span className="flex items-center gap-2">
@@ -2485,7 +2491,7 @@ export default function LifeCalculatorsPage() {
                             Money you withdraw each year
                           </span>
                           <span className="flex items-center gap-2">
-                            <span className="h-0.5 w-6 border-t-2 border-dashed border-[#4A5D4E]" />
+                            <span className="h-0.5 w-6 border-t-2 border-dashed border-[#2F5D7C]" />
                             Retirement marker
                           </span>
                           <span className="flex items-center gap-2">
@@ -2495,15 +2501,15 @@ export default function LifeCalculatorsPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                      <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">How this result is built</div>
-                      <div className="mt-2 space-y-2 text-xs font-serif text-[#6B7C70]">
-                        {retirementExplanation.steps.map((step, index) => (
-                          <p key={`${index}-${step.slice(0, 12)}`}>{step}</p>
-                        ))}
-                      </div>
-                      <div className="mt-4 text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Example using your inputs</div>
-                      <p className="mt-2 text-xs font-serif text-[#6B7C70]">{retirementExplanation.example}</p>
+                    <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4 space-y-3">
+                      <InfoToggle label="How this result is built">
+                        <div className="space-y-2">
+                          {retirementExplanation.steps.map((step, index) => (
+                            <p key={`${index}-${step.slice(0, 12)}`}>{step}</p>
+                          ))}
+                        </div>
+                      </InfoToggle>
+                      <InfoToggle label="Example using your inputs">{retirementExplanation.example}</InfoToggle>
                     </div>
                     <NextStep
                       label="Set a new goal"

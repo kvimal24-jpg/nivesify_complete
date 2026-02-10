@@ -17,15 +17,15 @@ export default function Header() {
   ];
 
   return (
-    <header className="fixed top-0 left-0 w-full z-50 bg-[#F6F8F7] border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <header className="fixed top-0 left-0 w-full bg-[#F5F8FF] border-b border-[#DDE6F3] z-50">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         
         {/* Logo */}
         <Link href="/" className="flex items-center z-50">
           <img
             src="/logo.png"
             alt="Nivesify"
-            className="h-10 w-auto object-contain"
+            className="site-logo object-contain"
           />
         </Link>
 
@@ -49,10 +49,10 @@ export default function Header() {
             user ? (
               <div className="flex items-center gap-3">
                  <img src={user.picture} alt="Avatar" className="w-8 h-8 rounded-full border border-gray-200 hidden sm:block" />
-                 <a href="/api/auth/logout" className="text-sm font-medium text-gray-600 hover:text-black">Sign Out</a>
+                 <a href="/api/auth/logout" className="text-sm font-medium text-gray-700 hover:text-gray-900">Sign Out</a>
               </div>
             ) : (
-              <a href="/api/auth/google" className="px-5 py-2 rounded-full bg-[#1F2937] text-white text-xs font-bold hover:shadow-lg transition">
+              <a href="/api/auth/google" className="px-5 py-2 rounded-full border border-[#C9D2C6] bg-white text-gray-800 text-xs font-bold hover:shadow-lg transition">
                 Sign In
               </a>
             )
@@ -70,7 +70,7 @@ export default function Header() {
 
       {/* MOBILE MENU OVERLAY */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-[#F6F8F7] z-40 flex flex-col pt-24 px-6 gap-6 lg:hidden animate-in slide-in-from-top-10">
+        <div className="fixed inset-0 bg-[#F6F8F7] text-[#1F2937] z-40 flex flex-col pt-24 px-6 gap-6 lg:hidden animate-in slide-in-from-top-10">
           {NAV_LINKS.map((link) => (
             <Link 
               key={link.name} 

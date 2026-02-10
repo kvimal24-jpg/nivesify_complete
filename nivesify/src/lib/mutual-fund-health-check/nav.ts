@@ -64,6 +64,32 @@ export const fetchNavHistory = async (
   return { missing };
 };
 
+export const fetchNavHistoryForSchemes = async (
+  schemeCodes: number[],
+  options: { force?: boolean; concurrency?: number } = {}
+) => {
+  const force = options.force ?? false;
+  const concurrency = options.concurrency ?? 4;
+  const queue = [...new Set(schemeCodes.filter((code) => Number.isFinite(code)))];
+  const missing: number[] = [];
+
+  const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (queue.length) {
+      const schemeCode = queue.shift();
+      if (schemeCode === undefined) break;
+      const cached = await navHistoryDB.get(schemeCode);
+      const shouldUpdate = force || !cached?.timestamp || shouldRefetch(cached.timestamp);
+      if (!shouldUpdate) continue;
+
+      const navData = await fetchNavForScheme(schemeCode);
+      if (!navData) missing.push(schemeCode);
+    }
+  });
+
+  await Promise.all(workers);
+  return { missing };
+};
+
 export const getNavHistoryMap = async (schemeCodes: number[]) => {
   const map: Record<number, Record<string, string>> = {};
   const cachedList = await navHistoryDB.getAll();

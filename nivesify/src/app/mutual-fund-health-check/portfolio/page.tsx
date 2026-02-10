@@ -4,11 +4,12 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
 import { InvestmentsData } from "@/lib/mutual-fund-health-check/types";
-import { fetchNavHistory } from "@/lib/mutual-fund-health-check/nav";
+import { fetchNavHistoryForSchemes, fetchNavHistory, getNavHistoryMap } from "@/lib/mutual-fund-health-check/nav";
 import { getPortfolio, Portfolio } from "@/lib/mutual-fund-health-check/portfolio";
 import { buildCashflows } from "@/lib/mutual-fund-health-check/cashflows";
 import { xirr } from "@/lib/mutual-fund-health-check/xirr";
 import { formatCurrency } from "@/lib/mutual-fund-health-check/format";
+import { buildManualTransactions } from "@/lib/mutual-fund-health-check/manual";
 
 const formatUnits = (units: number) =>
   new Intl.NumberFormat("en-IN", { maximumFractionDigits: 3 }).format(units);
@@ -16,16 +17,24 @@ const formatUnits = (units: number) =>
 const formatDate = (date: Date) =>
   date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
 
+const formatPct = (value: number | null | undefined, digits = 1) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return `${value.toFixed(digits)}%`;
+};
+
 export default function MutualFundPortfolioPage() {
   const { user, loading } = useUser();
   const router = useRouter();
   const [data, setData] = useState<InvestmentsData | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio>([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
+  const [combinedTransactions, setCombinedTransactions] = useState<InvestmentsData["transactions"]>([]);
   const [filter, setFilter] = useState("");
   const [showZeroUnits, setShowZeroUnits] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [schemeLookup, setSchemeLookup] = useState<Map<number, any>>(new Map());
+  const [showAllColumns, setShowAllColumns] = useState(false);
   const disclaimerText =
     "All financial decisions involve risk and past performance is no guarantee of future results. You should consult with a qualified advisor and review all relevant disclosure documents before acting on any information provided.";
 
@@ -53,12 +62,60 @@ export default function MutualFundPortfolioPage() {
     if (!data?.transactions?.length) return;
     const run = async () => {
       setLoadingPortfolio(true);
+      const manualInvestments = data.manualInvestments || [];
+      const sipPlans = data.sipPlans || [];
+      const schemeCodes = new Set<number>();
+      data.transactions?.forEach((txn) => {
+        const code = txn.matchingScheme?.schemeCode;
+        if (Number.isFinite(code)) schemeCodes.add(code as number);
+      });
+      manualInvestments.forEach((item) => schemeCodes.add(item.schemeCode));
+      sipPlans.forEach((plan) => schemeCodes.add(plan.schemeCode));
+
+      await fetchNavHistoryForSchemes(Array.from(schemeCodes));
       await fetchNavHistory(data.transactions);
-      const portfolioData = await getPortfolio(data.transactions);
+      const navMap = await getNavHistoryMap(Array.from(schemeCodes));
+      const manualTransactions = buildManualTransactions(manualInvestments, sipPlans, navMap, schemeLookup);
+      const combined = [...(data.transactions || []), ...manualTransactions];
+      setCombinedTransactions(combined);
+
+      const portfolioData = await getPortfolio(combined);
       setPortfolio(portfolioData);
       setLoadingPortfolio(false);
     };
     run();
+  }, [data, schemeLookup]);
+
+  useEffect(() => {
+    if (!data?.transactions?.length) return;
+    let cancelled = false;
+    const loadSchemeLookup = async () => {
+      try {
+        const res = await fetch("/api/mutual-fund-health-check/mf");
+        if (!res.ok) return;
+        const json = await res.json();
+        const schemeCodes = new Set(
+          data.transactions
+            ?.map((txn) => txn.matchingScheme?.schemeCode)
+            .filter((code): code is number => Number.isFinite(code))
+        );
+        (data.manualInvestments || []).forEach((item) => schemeCodes.add(item.schemeCode));
+        (data.sipPlans || []).forEach((plan) => schemeCodes.add(plan.schemeCode));
+        const map = new Map<number, any>();
+        (json.data || []).forEach((scheme: any) => {
+          if (schemeCodes.has(scheme.schemeCode)) {
+            map.set(scheme.schemeCode, scheme);
+          }
+        });
+        if (!cancelled) setSchemeLookup(map);
+      } catch {
+        // ignore
+      }
+    };
+    loadSchemeLookup();
+    return () => {
+      cancelled = true;
+    };
   }, [data]);
 
   useEffect(() => {
@@ -95,7 +152,7 @@ export default function MutualFundPortfolioPage() {
     const days = (cashflows[cashflows.length - 1].date.getTime() - cashflows[0].date.getTime()) / (1000 * 3600 * 24);
     if (days < 365) return "Unavailable";
     const value = xirr(cashflows);
-    return value !== null ? `${(value * 100).toFixed(2)}%` : "Unavailable";
+    return value !== null ? formatPct(value * 100, 1) : "Unavailable";
   };
 
   if (loading || !user) {
@@ -117,7 +174,7 @@ export default function MutualFundPortfolioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F6F3] px-6 py-12">
+    <div className="min-h-screen bg-[#F5F8FF] px-4 sm:px-6 py-10">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">mutual fund health check</p>
@@ -130,9 +187,9 @@ export default function MutualFundPortfolioPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter by fund name"
-            className="w-full max-w-md rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-sm text-[#1F2937] dark:bg-[#1F2937] dark:text-[#F5F6F3]"
+            className="w-full max-w-md rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-sm text-[#1F2937]"
           />
-          <div className="flex items-center gap-3 text-sm text-[#6B7C70]">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-[#6B7C70]">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -143,24 +200,31 @@ export default function MutualFundPortfolioPage() {
               Show redeemed funds
             </label>
             <button
+              onClick={() => setShowAllColumns((prev) => !prev)}
+              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
+            >
+              {showAllColumns ? "Compact columns" : "Expand columns"}
+            </button>
+            <button
               onClick={() => router.push("/mutual-fund-health-check/dashboard")}
-              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#4A5D4E]"
+              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
             >
               Back to dashboard
             </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-3xl border border-[#E6E8E1] bg-white shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
+        <div className="overflow-x-auto rounded-3xl border border-[#DDE6F3] bg-white shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
           <table className="min-w-full text-sm">
             <thead className="bg-[#FBFCFA] text-[#6B7C70]">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold">Fund Name</th>
-                <th className="px-4 py-3 text-right font-semibold">Units</th>
-                <th className="px-4 py-3 text-right font-semibold">Invested</th>
+                <th className={`px-4 py-3 text-right font-semibold ${showAllColumns ? "" : "hidden md:table-cell"}`}>Units</th>
+                <th className="px-4 py-3 text-right font-semibold">NAV</th>
+                <th className={`px-4 py-3 text-right font-semibold ${showAllColumns ? "" : "hidden md:table-cell"}`}>Invested</th>
                 <th className="px-4 py-3 text-right font-semibold">Current Returns</th>
-                <th className="px-4 py-3 text-right font-semibold">XIRR</th>
-                <th className="px-4 py-3 text-right font-semibold">Realised Returns</th>
+                <th className={`px-4 py-3 text-right font-semibold ${showAllColumns ? "" : "hidden md:table-cell"}`}>XIRR</th>
+                <th className={`px-4 py-3 text-right font-semibold ${showAllColumns ? "" : "hidden md:table-cell"}`}>Realised Returns</th>
                 <th className="px-4 py-3 text-right font-semibold">Current Value</th>
                 <th className="px-4 py-3 text-right font-semibold"></th>
               </tr>
@@ -170,16 +234,17 @@ export default function MutualFundPortfolioPage() {
                 <Fragment key={row.mfName}>
                   <tr className="border-t border-[#EEF0E8]">
                     <td className="px-4 py-3 text-left text-[#1F2937]">{row.mfName}</td>
-                    <td className="px-4 py-3 text-right text-[#1F2937]">{formatUnits(row.currentUnits)}</td>
-                    <td className="px-4 py-3 text-right text-[#1F2937]">{formatCurrency(row.currentInvested)}</td>
+                    <td className={`px-4 py-3 text-right text-[#1F2937] ${showAllColumns ? "" : "hidden md:table-cell"}`}>{formatUnits(row.currentUnits)}</td>
+                    <td className="px-4 py-3 text-right text-[#1F2937]">{row.latestPrice ? row.latestPrice.toFixed(2) : "-"}</td>
+                    <td className={`px-4 py-3 text-right text-[#1F2937] ${showAllColumns ? "" : "hidden md:table-cell"}`}>{formatCurrency(row.currentInvested)}</td>
                     <td className="px-4 py-3 text-right">{renderProfit(row.profit)}</td>
-                    <td className="px-4 py-3 text-right text-[#1F2937]">{renderXirr(row)}</td>
-                    <td className="px-4 py-3 text-right">{renderProfit(row.realisedProfit)}</td>
+                    <td className={`px-4 py-3 text-right text-[#1F2937] ${showAllColumns ? "" : "hidden md:table-cell"}`}>{renderXirr(row)}</td>
+                    <td className={`px-4 py-3 text-right ${showAllColumns ? "" : "hidden md:table-cell"}`}>{renderProfit(row.realisedProfit)}</td>
                     <td className="px-4 py-3 text-right text-[#1F2937]">{formatCurrency(row.currentValue)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setExpanded((prev) => ({ ...prev, [row.mfName]: !prev[row.mfName] }))}
-                        className="text-xs uppercase tracking-[0.2em] text-[#4A5D4E]"
+                        className="text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
                       >
                         {expanded[row.mfName] ? "Hide" : "Details"}
                       </button>
@@ -187,7 +252,7 @@ export default function MutualFundPortfolioPage() {
                   </tr>
                   {expanded[row.mfName] && (
                     <tr className="border-t border-[#EEF0E8] bg-[#FBFCFA]">
-                      <td colSpan={8} className="px-4 py-4">
+                      <td colSpan={9} className="px-4 py-4">
                         <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Current Holdings</div>
                         <div className="mt-3 overflow-x-auto">
                           <table className="min-w-full text-xs">
@@ -215,7 +280,7 @@ export default function MutualFundPortfolioPage() {
                                   </td>
                                   <td className="px-2 py-2 text-right">{renderProfit(transaction.profit)}</td>
                                   <td className="px-2 py-2 text-right text-[#1F2937]">
-                                    {transaction.gain.toFixed(2)}%
+                                    {formatPct(transaction.gain, 1)}
                                   </td>
                                   <td className="px-2 py-2 text-right text-[#1F2937]">
                                     {formatCurrency(transaction.invested + transaction.profit)}

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowRight, Check, Shield, Baby, Briefcase, Users, TrendingUp, Landmark, 
-  Stethoscope, Umbrella, AlertCircle, Map, Sparkles, Clock, PieChart, Banknote, Coins, Building2, LineChart, Plus, Wallet
+    Stethoscope, Umbrella, AlertCircle, Map, Sparkles, Clock, PieChart, Banknote, Coins, Building2, LineChart, Plus, Wallet,
+    Home, Car, Plane, GraduationCap, Target
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser"; 
 import { useRouter } from "next/navigation";
@@ -16,6 +17,56 @@ const formatIndianCurrency = (num: number, compact = false) => {
     if (num >= 100000) return `₹${(num / 100000).toFixed(1)} L`;
   }
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
+};
+
+const numberToWordsIndian = (num: number) => {
+    if (!num || num === 0) return "zero";
+    const ones = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    const teens = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+    const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+
+    const twoDigits = (n: number) => {
+        if (n < 10) return ones[n];
+        if (n < 20) return teens[n - 10];
+        const t = Math.floor(n / 10);
+        const o = n % 10;
+        return o ? `${tens[t]} ${ones[o]}` : tens[t];
+    };
+
+    const parts: string[] = [];
+    let n = Math.floor(Math.abs(num));
+
+    if (n >= 10000000) {
+        const crore = Math.floor(n / 10000000);
+        parts.push(`${numberToWordsIndian(crore)} crore`);
+        n %= 10000000;
+    }
+    if (n >= 100000) {
+        const lakh = Math.floor(n / 100000);
+        parts.push(`${numberToWordsIndian(lakh)} lakh`);
+        n %= 100000;
+    }
+    if (n >= 1000) {
+        const thousand = Math.floor(n / 1000);
+        parts.push(`${numberToWordsIndian(thousand)} thousand`);
+        n %= 1000;
+    }
+    if (n >= 100) {
+        const hundred = Math.floor(n / 100);
+        parts.push(`${ones[hundred]} hundred`);
+        n %= 100;
+    }
+    if (n > 0) {
+        parts.push(twoDigits(n));
+    }
+
+    return parts.join(" ").trim();
+};
+
+const formatAmountInWords = (value?: number) => {
+    if (!value || value <= 0) return "Rupees zero";
+    const words = numberToWordsIndian(value);
+    return `Rupees ${words}`;
 };
 
 export type Goal = { id: string; name: string; age: number; cost: number; icon: string };
@@ -152,8 +203,8 @@ export default function OnboardingPage() {
 
   if (loading || !user) return <div className="p-20 text-center">Loading Wizard...</div>;
 
-  return (
-    <div className="min-h-screen bg-[#FDFBF7] pt-10 px-4 pb-12 font-sans flex items-center justify-center">
+    return (
+        <div className="min-h-screen bg-[#F5F8FF] pt-10 px-4 pb-12 font-sans flex items-center justify-center">
       <div className="w-full max-w-6xl bg-white rounded-[2rem] shadow-2xl shadow-stone-200/50 overflow-hidden flex flex-col lg:flex-row min-h-[650px] border border-stone-100">
         
         {/* LEFT PANEL */}
@@ -213,11 +264,12 @@ export default function OnboardingPage() {
 const StepLife = ({ data, setData }: any) => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
         <div className="grid grid-cols-2 gap-6">
-            <FriendlyInput label="Current Age" icon={<Clock className="w-4 h-4"/>} value={data.age} onChange={(v:number) => setData({...data, age: v})} />
-            <FriendlyInput label="Retirement Age" icon={<Briefcase className="w-4 h-4"/>} value={data.retirementAge} onChange={(v:number) => setData({...data, retirementAge: v})} />
+            <FriendlyInput label="Current Age" sub="Your starting point for all timelines" icon={<Clock className="w-4 h-4"/>} value={data.age} onChange={(v:number) => setData({...data, age: v})} />
+            <FriendlyInput label="Retirement Age" sub="Target age to stop active work" icon={<Briefcase className="w-4 h-4"/>} value={data.retirementAge} onChange={(v:number) => setData({...data, retirementAge: v})} />
         </div>
         <div className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
             <label className="text-sm font-bold text-stone-700 flex items-center gap-2 mb-4"><Baby className="w-5 h-5 text-emerald-600" /> Do you have children?</label>
+            <p className="text-xs text-stone-500 mb-4">This helps us auto-create education milestones for you.</p>
             <div className="flex gap-3 mb-4">{[0, 1, 2, 3].map(num => (<button key={num} onClick={() => { const newAges = Array(num).fill(0).map((_, i) => (data.childAges && data.childAges[i]) || 0); setData({...data, childrenCount: num, childAges: newAges}); }} className={`w-12 h-12 rounded-xl border-2 font-bold text-lg transition-all ${data.childrenCount === num ? "bg-stone-800 text-white border-stone-800" : "bg-white text-stone-400 border-stone-200"}`}>{num}</button>))}</div>
             {data.childrenCount > 0 && (<div className="grid grid-cols-3 gap-4">{data.childAges.map((age: number, idx: number) => (<div key={idx}><div className="text-[10px] uppercase font-bold text-stone-400 mb-1">Child {idx+1} Age</div><input type="number" value={age !== undefined ? age : ''} onChange={(e) => { const newAges = [...data.childAges]; newAges[idx] = Number(e.target.value); setData({...data, childAges: newAges}); }} className="w-full p-3 bg-white border border-stone-200 rounded-lg text-center font-bold text-stone-800 outline-emerald-500" /></div>))}</div>)}
         </div>
@@ -227,13 +279,13 @@ const StepLife = ({ data, setData }: any) => (
 
 const StepCashflow = ({ data, setData }: any) => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-        <FriendlyInput label="Monthly Take Home" icon={<Wallet className="w-4 h-4"/>} value={data.monthlyIncome} onChange={(v:number) => setData({...data, monthlyIncome: v})} isCurrency />
+        <FriendlyInput label="Monthly Take Home" sub="After-tax salary credited to your bank" icon={<Wallet className="w-4 h-4"/>} value={data.monthlyIncome} onChange={(v:number) => setData({...data, monthlyIncome: v})} isCurrency />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FriendlyInput label="Essential Expenses" icon={<PieChart className="w-4 h-4"/>} sub="(Groceries, Bills, Rent)" value={data.monthlyExpenses} onChange={(v:number) => setData({...data, monthlyExpenses: v})} isCurrency />
-            <FriendlyInput label="Total EMIs" icon={<Banknote className="w-4 h-4"/>} sub="(Home, Car, Personal)" value={data.monthlyEMI} onChange={(v:number) => setData({...data, monthlyEMI: v})} isCurrency />
+            <FriendlyInput label="Essential Expenses" icon={<PieChart className="w-4 h-4"/>} sub="Monthly essentials: groceries, bills, rent" value={data.monthlyExpenses} onChange={(v:number) => setData({...data, monthlyExpenses: v})} isCurrency />
+            <FriendlyInput label="Total EMIs" icon={<Banknote className="w-4 h-4"/>} sub="All loan payments combined" value={data.monthlyEMI} onChange={(v:number) => setData({...data, monthlyEMI: v})} isCurrency />
         </div>
         <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100">
-            <FriendlyInput label="Existing SIPs" icon={<LineChart className="w-4 h-4 text-emerald-700"/>} sub="(Total Monthly Investment)" value={data.existingSIP} onChange={(v:number) => setData({...data, existingSIP: v})} isCurrency />
+            <FriendlyInput label="Existing SIPs" icon={<LineChart className="w-4 h-4 text-emerald-700"/>} sub="Total monthly investment across funds" value={data.existingSIP} onChange={(v:number) => setData({...data, existingSIP: v})} isCurrency />
         </div>
     </div>
 );
@@ -241,11 +293,12 @@ const StepCashflow = ({ data, setData }: any) => (
 const StepSafety = ({ data, setData }: any) => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <FriendlyInput label="Emergency Fund" icon={<Shield className="w-4 h-4"/>} sub="(Cash in Bank/FD)" value={data.emergencyFund} onChange={(v:number) => setData({...data, emergencyFund: v})} isCurrency />
-             <FriendlyInput label="Term Insurance" icon={<Umbrella className="w-4 h-4"/>} sub="(Death Benefit Amount)" value={data.insuranceTerm} onChange={(v:number) => setData({...data, insuranceTerm: v})} isCurrency />
+             <FriendlyInput label="Emergency Fund" icon={<Shield className="w-4 h-4"/>} sub="Cash or FD kept aside for 3-6 months" value={data.emergencyFund} onChange={(v:number) => setData({...data, emergencyFund: v})} isCurrency />
+             <FriendlyInput label="Term Insurance" icon={<Umbrella className="w-4 h-4"/>} sub="Coverage amount your family gets" value={data.insuranceTerm} onChange={(v:number) => setData({...data, insuranceTerm: v})} isCurrency />
         </div>
         <div className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
             <label className="text-sm font-bold text-stone-700 flex items-center gap-2 mb-4"><Stethoscope className="w-5 h-5 text-rose-500" /> Health Insurance</label>
+            <p className="text-xs text-stone-500 mb-4">Select the best description for your current cover.</p>
             <div className="grid grid-cols-3 gap-3">{['corporate', 'personal', 'none'].map((opt) => (<button key={opt} onClick={() => setData({...data, insuranceHealth: opt})} className={`p-3 rounded-xl border-2 text-sm font-bold capitalize transition-all ${data.insuranceHealth === opt ? "border-stone-800 bg-stone-800 text-white" : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50"}`}>{opt}</button>))}</div>
         </div>
     </div>
@@ -253,34 +306,61 @@ const StepSafety = ({ data, setData }: any) => (
 
 const StepAssets = ({ data, setData }: any) => (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+        <p className="text-xs text-stone-500">Add your current market value across asset classes. Use today’s resale value, not purchase price.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-5 bg-emerald-50/50 border border-emerald-100 rounded-2xl"><div className="flex items-center gap-2 mb-3"><TrendingUp className="w-5 h-5 text-emerald-700" /><span className="font-bold text-stone-800">Equity</span></div><FriendlyInput label="Value" icon={<TrendingUp className="w-4 h-4 hidden"/>} sub="(MFs, Stocks, PMS)" value={data.assetsEquity} onChange={(v:number) => setData({...data, assetsEquity: v})} isCurrency minimal /></div>
-            <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl"><div className="flex items-center gap-2 mb-3"><Landmark className="w-5 h-5 text-blue-700" /><span className="font-bold text-stone-800">Fixed Income</span></div><FriendlyInput label="Value" icon={<Landmark className="w-4 h-4 hidden"/>} sub="(EPF, PPF, FD)" value={data.assetsDebt} onChange={(v:number) => setData({...data, assetsDebt: v})} isCurrency minimal /></div>
+            <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-5 h-5 text-emerald-700" /><span className="font-bold text-stone-800">Equity</span></div>
+                <p className="text-xs text-stone-500 mb-3">Mutual funds, stocks, PMS, ESOPs.</p>
+                <FriendlyInput label="Value" icon={<TrendingUp className="w-4 h-4 hidden"/>} sub="(MFs, Stocks, PMS)" value={data.assetsEquity} onChange={(v:number) => setData({...data, assetsEquity: v})} isCurrency minimal />
+            </div>
+            <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                <div className="flex items-center gap-2 mb-2"><Landmark className="w-5 h-5 text-blue-700" /><span className="font-bold text-stone-800">Fixed Income</span></div>
+                <p className="text-xs text-stone-500 mb-3">EPF, PPF, FD, bonds, debt funds.</p>
+                <FriendlyInput label="Value" icon={<Landmark className="w-4 h-4 hidden"/>} sub="(EPF, PPF, FD)" value={data.assetsDebt} onChange={(v:number) => setData({...data, assetsDebt: v})} isCurrency minimal />
+            </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-5 bg-yellow-50/50 border border-yellow-100 rounded-2xl"><div className="flex items-center gap-2 mb-3"><Coins className="w-5 h-5 text-yellow-700" /><span className="font-bold text-stone-800">Gold</span></div><FriendlyInput label="Value" icon={<Coins className="w-4 h-4 hidden"/>} sub="(SGB, Physical)" value={data.assetsGold} onChange={(v:number) => setData({...data, assetsGold: v})} isCurrency minimal /></div>
-            <div className="p-5 bg-stone-100/50 border border-stone-200 rounded-2xl"><div className="flex items-center gap-2 mb-3"><Building2 className="w-5 h-5 text-stone-600" /><span className="font-bold text-stone-800">Real Estate</span></div><FriendlyInput label="Value" icon={<Building2 className="w-4 h-4 hidden"/>} sub="(Commercial/Plots)" value={data.assetsRealEstate} onChange={(v:number) => setData({...data, assetsRealEstate: v})} isCurrency minimal /></div>
+            <div className="p-4 bg-yellow-50/50 border border-yellow-100 rounded-2xl">
+                <div className="flex items-center gap-2 mb-2"><Coins className="w-5 h-5 text-yellow-700" /><span className="font-bold text-stone-800">Gold</span></div>
+                <p className="text-xs text-stone-500 mb-3">SGB, physical gold, gold ETFs.</p>
+                <FriendlyInput label="Value" icon={<Coins className="w-4 h-4 hidden"/>} sub="(SGB, Physical)" value={data.assetsGold} onChange={(v:number) => setData({...data, assetsGold: v})} isCurrency minimal />
+            </div>
+            <div className="p-4 bg-stone-100/50 border border-stone-200 rounded-2xl">
+                <div className="flex items-center gap-2 mb-2"><Building2 className="w-5 h-5 text-stone-600" /><span className="font-bold text-stone-800">Real Estate</span></div>
+                <p className="text-xs text-stone-500 mb-3">Current resale value of property/land.</p>
+                <FriendlyInput label="Value" icon={<Building2 className="w-4 h-4 hidden"/>} sub="(Commercial/Plots)" value={data.assetsRealEstate} onChange={(v:number) => setData({...data, assetsRealEstate: v})} isCurrency minimal />
+            </div>
         </div>
-        <div className="p-5 bg-stone-50 border border-stone-200 rounded-2xl"><div className="flex items-center gap-2 mb-3"><Banknote className="w-5 h-5 text-stone-600" /><span className="font-bold text-stone-800">Cash / Bank</span></div><FriendlyInput label="Value" icon={<Banknote className="w-4 h-4 hidden"/>} sub="(Savings Account)" value={data.assetsCash} onChange={(v:number) => setData({...data, assetsCash: v})} isCurrency minimal /></div>
+        <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl">
+            <div className="flex items-center gap-2 mb-2"><Banknote className="w-5 h-5 text-stone-600" /><span className="font-bold text-stone-800">Cash / Bank</span></div>
+            <p className="text-xs text-stone-500 mb-3">Savings account balance or short-term cash.</p>
+            <FriendlyInput label="Value" icon={<Banknote className="w-4 h-4 hidden"/>} sub="(Savings Account)" value={data.assetsCash} onChange={(v:number) => setData({...data, assetsCash: v})} isCurrency minimal />
+        </div>
     </div>
 );
 
 const StepGoals = ({ data, setData }: any) => {
     const QUICK_GOALS = [
-        { name: "Home Purchase", cost: 8000000, ageOffset: 5, icon: "home" },
-        { name: "New Car", cost: 1500000, ageOffset: 3, icon: "car" },
-        { name: "World Tour", cost: 500000, ageOffset: 2, icon: "plane" },
-        { name: "Wedding", cost: 2500000, ageOffset: 7, icon: "heart" },
+        { name: "Home Purchase", cost: 8000000, ageOffset: 5, iconKey: "home", icon: <Home className="w-5 h-5" /> },
+        { name: "New Car", cost: 1500000, ageOffset: 3, iconKey: "car", icon: <Car className="w-5 h-5" /> },
+        { name: "World Tour", cost: 500000, ageOffset: 2, iconKey: "plane", icon: <Plane className="w-5 h-5" /> },
+        { name: "Wedding", cost: 2500000, ageOffset: 7, iconKey: "heart", icon: <Sparkles className="w-5 h-5" /> },
+        { name: "Child Education", cost: 3500000, ageOffset: 8, iconKey: "education", icon: <GraduationCap className="w-5 h-5" /> },
     ];
     const addGoal = (template: any) => {
-        const newGoal: Goal = { id: Math.random().toString(), name: template.name, cost: template.cost, age: data.age + template.ageOffset, icon: template.icon };
+        const newGoal: Goal = { id: Math.random().toString(), name: template.name, cost: template.cost, age: data.age + template.ageOffset, icon: template.iconKey };
         setData({...data, goals: [...data.goals, newGoal]});
     };
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="flex items-center gap-2 text-xs text-stone-500">
+                <Target className="w-4 h-4 text-emerald-600" />
+                Start with common goals, then customize values.
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {QUICK_GOALS.map((t, i) => (
-                    <button key={i} onClick={() => addGoal(t)} className="flex flex-col items-center justify-center p-4 bg-stone-50 hover:bg-white hover:shadow-md border border-stone-100 rounded-xl transition-all group">
+                    <button key={i} onClick={() => addGoal(t)} className="flex flex-col items-center justify-center p-3 bg-stone-50 hover:bg-white hover:shadow-md border border-stone-100 rounded-xl transition-all group">
+                        <span className="w-10 h-10 rounded-full bg-white border border-stone-100 flex items-center justify-center text-emerald-700 group-hover:scale-105 transition-transform">{t.icon}</span>
                         <span className="text-xs font-bold text-stone-600 mt-2">{t.name}</span>
                     </button>
                 ))}
@@ -294,6 +374,7 @@ const StepGoals = ({ data, setData }: any) => {
                                 <label className="flex items-center gap-2">At Age: <input type="number" value={goal.age} onChange={(e) => { const n = [...data.goals]; n[idx].age = Number(e.target.value); setData({...data, goals: n}); }} className="w-12 bg-stone-50 border border-stone-200 rounded px-1 font-bold text-stone-800"/></label>
                                 <label className="flex items-center gap-2">Cost: <input type="number" value={goal.cost} onChange={(e) => { const n = [...data.goals]; n[idx].cost = Number(e.target.value); setData({...data, goals: n}); }} className="w-24 bg-stone-50 border border-stone-200 rounded px-1 font-bold text-stone-800"/></label>
                             </div>
+                            <div className="text-[11px] text-stone-400 mt-1">{formatAmountInWords(goal.cost)}</div>
                         </div>
                         <button onClick={() => setData({...data, goals: data.goals.filter((_:any, i:number) => i !== idx)})} className="w-8 h-8 flex items-center justify-center text-stone-300 hover:text-red-500 rounded-full">×</button>
                     </div>
@@ -337,5 +418,6 @@ const FriendlyInput = ({ label, sub, value, onChange, isCurrency, minimal = fals
                 placeholder="0" 
             />
         </div>
+        {isCurrency && <div className="text-[11px] text-stone-400 ml-1">{formatAmountInWords(value)}</div>}
     </div>
 );
