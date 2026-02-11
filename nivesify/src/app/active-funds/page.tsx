@@ -67,17 +67,23 @@ export default async function ActiveFundsPage() {
   ];
 
   return (
-    <div className="bg-[#F5F6F3] text-[#1F2937] min-h-screen">
-      <section className="max-w-6xl mx-auto px-6 pt-16 pb-10">
+    <div className="bg-gradient-to-br from-[#F4F7F2] via-[#F7F2E7] to-[#EDF1F6] text-[#1F2937] min-h-screen">
+      <section className="max-w-6xl mx-auto px-5 pt-14 pb-10">
         <div className="mb-8">
           <AnalysisTabs />
         </div>
         <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">Active Fund Selector</p>
-        <h1 className="mt-4 text-4xl md:text-5xl font-serif tracking-tight">Find durable skill, not noise.</h1>
-        <p className="mt-4 max-w-2xl text-base font-serif text-[#4A5D4E] leading-relaxed">
-          This view ranks active funds by repeatable alpha, risk-adjusted efficiency, and category strength.
-          Use it to shortlist managers worth deeper due diligence.
+        <h1 className="mt-3 text-3xl md:text-5xl font-serif tracking-tight">Find durable skill, not noise.</h1>
+        <p className="mt-3 max-w-2xl text-sm font-serif text-[#4A5D4E] leading-relaxed">
+          Rank active funds by repeatable alpha and risk-adjusted skill.
         </p>
+        <details className="mt-3 max-w-2xl text-sm font-serif text-[#4A5D4E]">
+          <summary className="cursor-pointer text-xs uppercase tracking-[0.3em] text-[#6B7C70]">How to use</summary>
+          <p className="mt-2">
+            Start with Insights, then Shortlisted for quick picks. Use Screener only when you need
+            deeper filtering.
+          </p>
+        </details>
 
         <ActiveFundsExplorer
           funds={funds}

@@ -33,7 +33,7 @@ import {
   generatePdfReport,
   tooltips,
 } from "@/lib/mutual-fund-health-check/report";
-import type { FundAnalytics } from "@/lib/fund-types";
+import type { FundAnalytics, ETFAnalytics, CategoryInsights } from "@/lib/fund-types";
 
 const performanceOptions = [
   { label: "1 Year", value: "1" },
@@ -41,15 +41,14 @@ const performanceOptions = [
   { label: "10 Year", value: "10" },
   { label: "Max", value: "max" },
 ];
-
 const lineChartDataMap: Record<
   string,
   (transactions: InvestmentsData["transactions"]) => Promise<{ name: string; valueOne: number; valueTwo: number }[]>
 > = {
-  "1": (transactions) => getPerformanceByYears(transactions, 1),
-  "5": (transactions) => getPerformanceByYears(transactions, 5),
-  "10": (transactions) => getPerformanceByYears(transactions, 10),
-  max: (transactions) => getPerformanceByYears(transactions, "max"),
+  "1": (transactions) => getPerformanceByYears(transactions ?? [], 1),
+  "5": (transactions) => getPerformanceByYears(transactions ?? [], 5),
+  "10": (transactions) => getPerformanceByYears(transactions ?? [], 10),
+  max: (transactions) => getPerformanceByYears(transactions ?? [], "max"),
 };
 
 function ChartCard({
@@ -104,6 +103,11 @@ const formatPct = (value: number | null | undefined, digits = 1) => {
   return `${value.toFixed(digits)}%`;
 };
 
+const formatPct2 = (value: number | null | undefined) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return `${value.toFixed(2)}%`;
+};
+
 const amcColors = [
   "#2F5D7C",
   "#BDA06D",
@@ -124,8 +128,13 @@ const axisDefaults = {
   tickMargin: 4,
   tick: { fill: "#9AA3AF", fontSize: 9 },
 };
-const xAxisDefaults = { tickLine: false, axisLine: false, tickMargin: 8, tick: { fill: "#9AA3AF", fontSize: 9 }, minTickGap: 18 };
-
+const xAxisDefaults = {
+  tickLine: false,
+  axisLine: false,
+  tickMargin: 8,
+  tick: { fill: "#9AA3AF", fontSize: 9 },
+  minTickGap: 18,
+};
 const normalizeFundName = (value: string) =>
   value
     .toLowerCase()
@@ -134,7 +143,6 @@ const normalizeFundName = (value: string) =>
     .trim();
 
 const splitTokens = (value: string) => normalizeFundName(value).split(" ").filter(Boolean);
-
 const matchesTokens = (name: string, tokens: string[]) =>
   tokens.length > 0 && tokens.every((token) => name.includes(token));
 
@@ -163,6 +171,37 @@ const buildFutureGrowth = (
     data.push({ year, corpus, invested });
   }
   return data;
+};
+
+const riskScoreForSubCategory = (subCategory: string, category: string) => {
+  const sub = subCategory.toLowerCase();
+  const cat = category.toLowerCase();
+  if (cat.includes("equity")) {
+    if (sub.includes("small")) return 9.5;
+    if (sub.includes("mid")) return 8.5;
+    if (sub.includes("large")) return 6.5;
+    if (sub.includes("sector") || sub.includes("thematic")) return 9;
+    if (sub.includes("index") || sub.includes("etf")) return 6.5;
+    return 7.5;
+  }
+  if (cat.includes("hybrid")) {
+    if (sub.includes("aggressive")) return 6.5;
+    if (sub.includes("conservative")) return 4.5;
+    return 5.5;
+  }
+  if (cat.includes("debt")) {
+    if (sub.includes("credit")) return 4.5;
+    if (sub.includes("gilt") || sub.includes("duration")) return 4;
+    return 3.5;
+  }
+  if (cat.includes("commodity") || sub.includes("gold")) return 6.5;
+  return 5;
+};
+
+const classifyFundType = (name: string, analytics?: FundAnalytics, subCategory?: string | null) => {
+  const combined = `${name} ${analytics?.Sub_Category ?? ""} ${subCategory ?? ""}`.toLowerCase();
+  if (combined.includes("index") || combined.includes("etf") || combined.includes("passive")) return "passive";
+  return "active";
 };
 
 const InfoTip = ({ text }: { text: string }) => {
@@ -194,7 +233,7 @@ export default function MutualFundHealthCheckDashboard() {
   const [processing, setProcessing] = useState(true);
   const [navReady, setNavReady] = useState(false);
   const [combinedTransactions, setCombinedTransactions] = useState<InvestmentsData["transactions"]>([]);
-  const [performanceChart, setPerformanceChart] = useState(performanceOptions[0].value);
+  const [performanceChart, setPerformanceChart] = useState("max");
   const [lineData, setLineData] = useState<{ name: string; valueOne: number; valueTwo: number }[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [schemePath, setSchemePath] = useState<string[]>([]);
@@ -202,11 +241,12 @@ export default function MutualFundHealthCheckDashboard() {
   const [schemeList, setSchemeList] = useState<any[]>([]);
   const [selectedAmc, setSelectedAmc] = useState<string | null>(null);
   const [fundAnalytics, setFundAnalytics] = useState<FundAnalytics[]>([]);
+  const [etfAnalytics, setEtfAnalytics] = useState<ETFAnalytics[]>([]);
+  const [categoryInsights, setCategoryInsights] = useState<CategoryInsights[]>([]);
   const [manualDraft, setManualDraft] = useState({ schemeCode: "", schemeName: "", amount: "", date: "" });
   const [sipDraft, setSipDraft] = useState({ schemeCode: "", schemeName: "", monthlyAmount: "", startDate: "", endDate: "" });
   const [showManualList, setShowManualList] = useState(false);
   const [showManualSection, setShowManualSection] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "benchmark">("overview");
   const [benchmarkMap, setBenchmarkMap] = useState<
     Map<string, { return1Y?: number; return3Y?: number; return5Y?: number; return10Y?: number }>
   >(new Map());
@@ -222,24 +262,12 @@ export default function MutualFundHealthCheckDashboard() {
       }
     >
   >(new Map());
+  const [amfiSchemeMap, setAmfiSchemeMap] = useState<
+    Map<string, { category: string; subCategory: string; benchmark: string | null; return10Y?: number; return3Y?: number; aum?: number }>
+  >(new Map());
+  const [niftyHurdle, setNiftyHurdle] = useState<number | null>(null);
   const disclaimerText =
     "All financial decisions involve risk and past performance is no guarantee of future results. You should consult with a qualified advisor and review all relevant disclosure documents before acting on any information provided.";
-  const signalClass = (signal: string) => {
-    switch (signal) {
-      case "Normal":
-        return "border-[#C7D6EA] bg-[#EAF1FB] text-[#2F5D7C]";
-      case "Elevated":
-        return "border-[#E7D7B5] bg-[#FFF7E6] text-[#8A6D3B]";
-      case "Watch-worthy":
-        return "border-[#F2D3B7] bg-[#FFF0E5] text-[#9A5A2C]";
-      case "Strong":
-        return "border-[#E4B6B6] bg-[#FCECEC] text-[#B35A5A]";
-      case "Aggressive":
-        return "border-[#D5A0A0] bg-[#F8E0E0] text-[#9C3F3F]";
-      default:
-        return "border-[#D5D9CF] bg-white text-[#6B7C70]";
-    }
-  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -276,7 +304,7 @@ export default function MutualFundHealthCheckDashboard() {
       sipPlans.forEach((plan) => schemeCodes.add(plan.schemeCode));
 
       await fetchNavHistoryForSchemes(Array.from(schemeCodes));
-      const navResult = await fetchNavHistory(data.transactions);
+      const navResult = await fetchNavHistory(data.transactions ?? []);
       setNavReady(navResult.missing.length === 0);
 
       const navMap = await getNavHistoryMap(Array.from(schemeCodes));
@@ -339,6 +367,34 @@ export default function MutualFundHealthCheckDashboard() {
   }, []);
 
   useEffect(() => {
+    const loadEtfAnalytics = async () => {
+      try {
+        const res = await fetch("/api/etfs");
+        if (!res.ok) return;
+        const json = await res.json();
+        setEtfAnalytics(json || []);
+      } catch {
+        setEtfAnalytics([]);
+      }
+    };
+    loadEtfAnalytics();
+  }, []);
+
+  useEffect(() => {
+    const loadInsights = async () => {
+      try {
+        const res = await fetch("/api/insights");
+        if (!res.ok) return;
+        const json = await res.json();
+        setCategoryInsights(json || []);
+      } catch {
+        setCategoryInsights([]);
+      }
+    };
+    loadInsights();
+  }, []);
+
+  useEffect(() => {
     const loadAmfiRaw = async () => {
       try {
         const res = await fetch("/api/amfi-raw");
@@ -369,6 +425,11 @@ export default function MutualFundHealthCheckDashboard() {
             aum?: number;
           }
         >();
+        const schemeMapNext = new Map<
+          string,
+          { category: string; subCategory: string; benchmark: string | null; return10Y?: number; return3Y?: number; aum?: number }
+        >();
+        let niftyReturnCandidate: { return10Y: number; aum: number } | null = null;
 
         json.forEach((record: any) => {
           const benchmarkName = record?.benchmark ? String(record.benchmark) : "";
@@ -396,6 +457,13 @@ export default function MutualFundHealthCheckDashboard() {
             benchmarkMapNext.set(benchmarkKey, existing);
           }
 
+          if (benchmarkKey === normalizeBenchmark("nifty 50 tri") && Number.isFinite(record?.return10YearRegular)) {
+            const return10Y = Number(record.return10YearRegular);
+            if (!niftyReturnCandidate || aum > niftyReturnCandidate.aum) {
+              niftyReturnCandidate = { return10Y, aum };
+            }
+          }
+
           const schemeName = record?.schemeName ? String(record.schemeName) : "";
           const schemeKey = schemeName ? normalizeFundName(schemeName) : "";
           if (schemeKey) {
@@ -407,6 +475,17 @@ export default function MutualFundHealthCheckDashboard() {
                 return3Y: Number.isFinite(record?.return3YearDirect) ? Number(record.return3YearDirect) : existingFund?.return3Y,
                 return5Y: Number.isFinite(record?.return5YearDirect) ? Number(record.return5YearDirect) : existingFund?.return5Y,
                 return10Y: Number.isFinite(record?.return10YearDirect) ? Number(record.return10YearDirect) : existingFund?.return10Y,
+                aum,
+              });
+            }
+            const existingScheme = schemeMapNext.get(schemeKey);
+            if (!existingScheme || aum > (existingScheme.aum ?? -1)) {
+              schemeMapNext.set(schemeKey, {
+                category: record?.Category || "",
+                subCategory: record?.Sub_Category || "",
+                benchmark: record?.benchmark ? String(record.benchmark) : null,
+                return10Y: Number.isFinite(record?.return10YearRegular) ? Number(record.return10YearRegular) : undefined,
+                return3Y: Number.isFinite(record?.return3YearRegular) ? Number(record.return3YearRegular) : undefined,
                 aum,
               });
             }
@@ -439,6 +518,9 @@ export default function MutualFundHealthCheckDashboard() {
 
         setBenchmarkMap(compactBenchmarks);
         setFundReturnMap(compactFunds);
+        setAmfiSchemeMap(schemeMapNext);
+        const niftyHurdleValue = (niftyReturnCandidate as { return10Y: number; aum: number } | null)?.return10Y ?? null;
+        setNiftyHurdle(niftyHurdleValue);
       } catch {
         // ignore
       }
@@ -540,7 +622,18 @@ export default function MutualFundHealthCheckDashboard() {
     return map;
   }, [fundAnalytics]);
 
+  const analyticsByIsin = useMemo(() => {
+    const map = new Map<string, FundAnalytics>();
+    fundAnalytics.forEach((fund) => {
+      const isin = fund.ISIN || fund.ISIN_Code;
+      if (isin) map.set(isin, fund);
+    });
+    return map;
+  }, [fundAnalytics]);
+
   const getFundAnalytics = (name: string) => analyticsMap.get(normalizeFundName(name));
+  const getFundAnalyticsForHolding = (name: string, isin?: string) =>
+    (isin ? analyticsByIsin.get(isin) : undefined) || getFundAnalytics(name);
 
   const fundNameOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -598,6 +691,106 @@ export default function MutualFundHealthCheckDashboard() {
     return Array.from(map.values());
   }, [portfolio]);
 
+  const holdings = useMemo(() => {
+    return uniquePortfolioFunds.map((row) => {
+      const isin = row.allTransactions?.[0]?.isin || "";
+      const analytics = getFundAnalyticsForHolding(row.mfName, isin);
+      const normalized = normalizeFundName(row.mfName);
+      const amfi = amfiSchemeMap.get(normalized);
+      const benchmarkName = analytics?.Benchmark_Name || amfi?.benchmark || fundReturnMap.get(normalized)?.benchmarkName || "-";
+      return {
+        name: row.mfName,
+        value: row.currentValue || 0,
+        analytics,
+        amfi,
+        benchmarkName,
+        isin,
+      };
+    });
+  }, [uniquePortfolioFunds, analyticsByIsin, amfiSchemeMap, fundReturnMap]);
+
+  const subCategoryInsightsMap = useMemo(() => {
+    const map = new Map<string, CategoryInsights>();
+    categoryInsights
+      .filter((row) => row.Level === "Sub-Category" && row.Sub_Category_Name)
+      .forEach((row) => map.set(row.Sub_Category_Name || "", row));
+    return map;
+  }, [categoryInsights]);
+
+  const categoryInsightsMap = useMemo(() => {
+    const map = new Map<string, CategoryInsights>();
+    categoryInsights
+      .filter((row) => row.Level === "Category" && row.Category_Name)
+      .forEach((row) => map.set(row.Category_Name || "", row));
+    return map;
+  }, [categoryInsights]);
+
+  const activeHoldings = useMemo(
+    () => holdings.filter((row) => classifyFundType(row.name, row.analytics, row.amfi?.subCategory) === "active"),
+    [holdings]
+  );
+
+  const passiveHoldings = useMemo(
+    () => holdings.filter((row) => classifyFundType(row.name, row.analytics, row.amfi?.subCategory) === "passive"),
+    [holdings]
+  );
+
+  const alphaHurdle = useMemo(() => niftyHurdle, [niftyHurdle]);
+
+  const activeHitRate = useMemo(() => {
+    const total = activeHoldings.reduce((sum, row) => sum + row.value, 0);
+    const winners = activeHoldings
+      .filter((row) => (row.analytics?.Alpha_3Y ?? 0) > 0)
+      .reduce((sum, row) => sum + row.value, 0);
+    return total > 0 ? winners / total : null;
+  }, [activeHoldings]);
+
+  const consistencyScore = useMemo(() => {
+    let total = 0;
+    let winners = 0;
+    holdings.forEach((row) => {
+      const ir3y = row.analytics?.IR_3Y;
+      const sub = row.analytics?.Sub_Category || row.amfi?.subCategory || "";
+      const benchmark = subCategoryInsightsMap.get(sub);
+      if (ir3y === null || ir3y === undefined || !benchmark?.Avg_IR_3Y) return;
+      total += 1;
+      if (ir3y > (benchmark.Avg_IR_3Y ?? 0)) winners += 1;
+    });
+    return { winners, total };
+  }, [holdings, subCategoryInsightsMap]);
+
+  const yieldTrapValue = useMemo(() => {
+    return holdings
+      .filter((row) => (row.analytics?.Percentile_in_SubCategory ?? 100) < 25)
+      .reduce((sum, row) => sum + row.value, 0);
+  }, [holdings]);
+
+  const styleTilt = useMemo(() => {
+    let equityTotal = 0;
+    let tiltValue = 0;
+    holdings.forEach((row) => {
+      const category = row.amfi?.category || row.analytics?.Category || "";
+      if (category.toLowerCase() !== "equity") return;
+      equityTotal += row.value;
+      const sub = (row.amfi?.subCategory || row.analytics?.Sub_Category || "").toLowerCase();
+      if (sub.includes("small") || sub.includes("mid")) tiltValue += row.value;
+    });
+    return equityTotal > 0 ? tiltValue / equityTotal : null;
+  }, [holdings]);
+
+  const riskDnaScore = useMemo(() => {
+    let weighted = 0;
+    let total = 0;
+    holdings.forEach((row) => {
+      const category = row.amfi?.category || row.analytics?.Category || "";
+      const sub = row.amfi?.subCategory || row.analytics?.Sub_Category || "";
+      const score = riskScoreForSubCategory(sub, category);
+      weighted += score * row.value;
+      total += row.value;
+    });
+    return total > 0 ? weighted / total : null;
+  }, [holdings]);
+
   const expectedPortfolioReturn = useMemo(() => {
     if (!portfolio.length) return 10;
     let total = 0;
@@ -611,237 +804,11 @@ export default function MutualFundHealthCheckDashboard() {
       total += weight;
     });
     return total > 0 ? Number((weighted / total).toFixed(2)) : 10;
-  }, [uniquePortfolioFunds, analyticsMap]);
-
-  const totalMonthlySip = useMemo(() => {
-    if (!data?.sipPlans?.length) return 0;
-    return data.sipPlans.reduce((sum, plan) => sum + (plan.monthlyAmount || 0), 0);
-  }, [data]);
-
-  const growthProjection = useMemo(() => {
-    return buildFutureGrowth(summary.totalValue || 0, summary.invested || 0, totalMonthlySip, expectedPortfolioReturn, 15);
-  }, [summary.totalValue, summary.invested, totalMonthlySip, expectedPortfolioReturn]);
-
-  const niftyBenchmark = useMemo(() => {
-    const niftyKey = normalizeBenchmark("nifty 50 tri");
-    const nifty = benchmarkMap.get(niftyKey);
-    if (!nifty) return null;
-    const period = nifty.return10Y !== undefined ? "10Y" : nifty.return5Y !== undefined ? "5Y" : nifty.return3Y !== undefined ? "3Y" : nifty.return1Y !== undefined ? "1Y" : null;
-    if (!period) return null;
-    const benchmarkReturn =
-      period === "10Y"
-        ? nifty.return10Y
-        : period === "5Y"
-        ? nifty.return5Y
-        : period === "3Y"
-        ? nifty.return3Y
-        : nifty.return1Y;
-    if (benchmarkReturn === null || benchmarkReturn === undefined) return null;
-    return { benchmarkReturn, period };
-  }, [benchmarkMap]);
-
-  const classifyFundType = (name: string, analytics?: FundAnalytics) => {
-    const haystack = `${name} ${analytics?.Category || ""} ${analytics?.Sub_Category || ""}`.toLowerCase();
-    if (haystack.includes("index") || haystack.includes("etf") || haystack.includes("passive")) return "passive";
-    if ((analytics?.Sub_Category || "").toLowerCase().includes("etf")) return "passive";
-    return "active";
-  };
-
-  const benchmarkComparisons = useMemo(() => {
-    const active: Array<{
-      name: string;
-      delta: number;
-      period: string;
-      fundReturn: number;
-      benchmarkReturn: number;
-      weight: number;
-      benchmarkName: string;
-    }> = [];
-    const passive: Array<{
-      name: string;
-      delta: number;
-      period: string;
-      fundReturn: number;
-      benchmarkReturn: number;
-      weight: number;
-      benchmarkName: string;
-    }> = [];
-
-    uniquePortfolioFunds.forEach((row) => {
-      const analytics = getFundAnalytics(row.mfName);
-      if (!analytics) return;
-      const benchmarkName = analytics.Benchmark_Name || fundReturnMap.get(normalizeFundName(row.mfName))?.benchmarkName;
-      const benchmarkKey = benchmarkName ? normalizeBenchmark(benchmarkName) : "";
-      const benchmarkReturns = benchmarkKey ? benchmarkMap.get(benchmarkKey) : null;
-      const periods: Array<[string, number | null, number | null]> = [
-        [
-          "5Y",
-          analytics.Fund_Return_5Y,
-          analytics.Benchmark_Return_5Y ?? benchmarkReturns?.return5Y ?? null,
-        ],
-        [
-          "3Y",
-          analytics.Fund_Return_3Y,
-          analytics.Benchmark_Return_3Y ?? benchmarkReturns?.return3Y ?? null,
-        ],
-        [
-          "1Y",
-          analytics.Fund_Return_1Y,
-          analytics.Benchmark_Return_1Y ?? benchmarkReturns?.return1Y ?? null,
-        ],
-      ];
-      const usable = periods.find((entry) => entry[1] !== null && entry[2] !== null);
-      if (!usable) return;
-      const [period, fundReturn, benchmarkReturn] = usable as [string, number, number];
-      const item = {
-        name: row.mfName,
-        delta: fundReturn - benchmarkReturn,
-        period,
-        fundReturn,
-        benchmarkReturn,
-        weight: row.currentValue || 0,
-        benchmarkName: benchmarkName || "Benchmark",
-      };
-      const type = classifyFundType(row.mfName, analytics);
-      if (type === "passive") passive.push(item);
-      else active.push(item);
-    });
-
-    return { active, passive };
   }, [portfolio, analyticsMap]);
-
-  const activeStats = useMemo(() => {
-    if (!benchmarkComparisons.active.length) return null;
-    const total = benchmarkComparisons.active.length;
-    const wins = benchmarkComparisons.active.filter((item) => item.delta >= 0).length;
-    const avgDelta =
-      benchmarkComparisons.active.reduce((sum, item) => sum + item.delta, 0) / benchmarkComparisons.active.length;
-    const laggards = [...benchmarkComparisons.active].sort((a, b) => a.delta - b.delta).slice(0, 3);
-    const weightTotal = benchmarkComparisons.active.reduce((sum, item) => sum + item.weight, 0) || 1;
-    const underperformingWeight = benchmarkComparisons.active
-      .filter((item) => item.delta < 0)
-      .reduce((sum, item) => sum + item.weight, 0);
-    return {
-      total,
-      wins,
-      avgDelta,
-      laggards,
-      underperformingShare: underperformingWeight / weightTotal,
-    };
-  }, [benchmarkComparisons.active]);
-
-  const passiveStats = useMemo(() => {
-    if (!benchmarkComparisons.passive.length) return null;
-    const avgTracking =
-      benchmarkComparisons.passive.reduce((sum, item) => sum + Math.abs(item.delta), 0) /
-      benchmarkComparisons.passive.length;
-    const worstTracking = [...benchmarkComparisons.passive].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 3);
-    return { avgTracking, worstTracking };
-  }, [benchmarkComparisons.passive]);
-
-  const benchmarkCoverage = useMemo(() => {
-    const totalFunds = uniquePortfolioFunds.length;
-    const covered = benchmarkComparisons.active.length + benchmarkComparisons.passive.length;
-    return { totalFunds, covered };
-  }, [uniquePortfolioFunds, benchmarkComparisons]);
-
-  const benchmarkMovers = useMemo(() => {
-    const activeWinners = [...benchmarkComparisons.active].sort((a, b) => b.delta - a.delta).slice(0, 3);
-    const activeLaggards = [...benchmarkComparisons.active].sort((a, b) => a.delta - b.delta).slice(0, 3);
-    const passiveDrift = [...benchmarkComparisons.passive]
-      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
-      .slice(0, 3);
-    return { activeWinners, activeLaggards, passiveDrift };
-  }, [benchmarkComparisons]);
-
-  const benchmarkInsights = useMemo(() => {
-    const total = benchmarkComparisons.active.length + benchmarkComparisons.passive.length;
-    const winners = [...benchmarkComparisons.active, ...benchmarkComparisons.passive].filter((item) => item.delta >= 0).length;
-    const winRate = total ? winners / total : 0;
-    const activeAvg = benchmarkComparisons.active.length
-      ? benchmarkComparisons.active.reduce((sum, item) => sum + item.delta, 0) / benchmarkComparisons.active.length
-      : null;
-    const passiveAvg = benchmarkComparisons.passive.length
-      ? benchmarkComparisons.passive.reduce((sum, item) => sum + item.delta, 0) / benchmarkComparisons.passive.length
-      : null;
-    const worst = [...benchmarkComparisons.active, ...benchmarkComparisons.passive].sort((a, b) => a.delta - b.delta).slice(0, 3);
-    return { winRate, activeAvg, passiveAvg, worst };
-  }, [benchmarkComparisons]);
-
-  const mixShare = useMemo(() => {
-    const activeWeight = benchmarkComparisons.active.reduce((sum, item) => sum + item.weight, 0);
-    const passiveWeight = benchmarkComparisons.passive.reduce((sum, item) => sum + item.weight, 0);
-    const total = activeWeight + passiveWeight || 1;
-    return {
-      activeWeight,
-      passiveWeight,
-      activeShare: activeWeight / total,
-      passiveShare: passiveWeight / total,
-    };
-  }, [benchmarkComparisons]);
-
-  const benchmarkTable = useMemo(() => {
-    return uniquePortfolioFunds.map((row) => {
-      const analytics = getFundAnalytics(row.mfName);
-      const normalized = normalizeFundName(row.mfName);
-      const fundReturns = fundReturnMap.get(normalized);
-      const benchmarkName = analytics?.Benchmark_Name || fundReturns?.benchmarkName || "-";
-      const benchmarkKey = benchmarkName && benchmarkName !== "-" ? normalizeBenchmark(benchmarkName) : "";
-      const benchmarkReturns = benchmarkKey ? benchmarkMap.get(benchmarkKey) : null;
-
-      const fundReturnCandidates: Array<[string, number | null | undefined]> = [
-        ["10Y", fundReturns?.return10Y],
-        ["5Y", analytics?.Fund_Return_5Y],
-        ["3Y", analytics?.Fund_Return_3Y],
-        ["1Y", analytics?.Fund_Return_1Y],
-      ];
-      const fundReturnPick = fundReturnCandidates.find((entry) => entry[1] !== null && entry[1] !== undefined) || ["-", null];
-      const fundPeriod = fundReturnPick[0] as string;
-      const fundReturn = fundReturnPick[1] ?? null;
-
-      const benchmarkReturnByPeriod = (period: string) => {
-        if (!benchmarkReturns) return null;
-        if (period === "10Y") return benchmarkReturns.return10Y ?? null;
-        if (period === "5Y") return benchmarkReturns.return5Y ?? null;
-        if (period === "3Y") return benchmarkReturns.return3Y ?? null;
-        if (period === "1Y") return benchmarkReturns.return1Y ?? null;
-        return null;
-      };
-
-      const benchmarkReturn = benchmarkReturnByPeriod(fundPeriod) ?? benchmarkReturns?.return10Y ?? null;
-      const benchmarkPeriod = benchmarkReturnByPeriod(fundPeriod) ? fundPeriod : benchmarkReturns?.return10Y ? "10Y" : "-";
-      const delta = fundReturn !== null && benchmarkReturn !== null ? fundReturn - benchmarkReturn : null;
-
-      return {
-        name: row.mfName,
-        benchmarkName,
-        fundReturn,
-        fundPeriod,
-        benchmarkReturn,
-        benchmarkPeriod,
-        delta,
-      };
-    });
-  }, [uniquePortfolioFunds, fundReturnMap, benchmarkMap, analyticsMap]);
-
-  const postureSummary = useMemo(() => {
-    const activeShare = mixShare.activeShare;
-    const passiveShare = mixShare.passiveShare;
-    if (activeShare >= 0.6 && activeStats && activeStats.underperformingShare >= 0.5) {
-      return "Active-heavy mix with many lagging funds. Consider shifting part of the core into a low-cost index fund and review underperformers.";
-    }
-    if (passiveShare >= 0.6 && passiveStats && passiveStats.avgTracking <= 1.2) {
-      return "Passive core is steady and tracking well. Keep costs low and review if tracking widens.";
-    }
-    if (passiveShare >= 0.6 && passiveStats && passiveStats.avgTracking > 1.2) {
-      return "Passive allocation is high but tracking differences look wide. Compare expense ratios or similar index alternatives.";
-    }
-    return "Balanced active/passive mix. Focus on trimming laggards and keep your passive core as the stability anchor.";
-  }, [mixShare, activeStats, passiveStats]);
 
   const xirrValue = useMemo(() => {
     if (!portfolio.length) return null;
-    const allTransactions = portfolio.flatMap((fund) =>
+    const allTransactions: Array<{ amount: number; date: Date; type: "buy" | "sell" }> = portfolio.flatMap((fund) =>
       fund.allTransactions.map((txn) => ({
         amount: txn.amount,
         date: new Date(txn.date),
@@ -856,10 +823,275 @@ export default function MutualFundHealthCheckDashboard() {
     return xirr(cashflows);
   }, [portfolio, summary.totalValue]);
 
+  const projectionReturn = useMemo(
+    () => (xirrValue !== null ? xirrValue * 100 : expectedPortfolioReturn),
+    [xirrValue, expectedPortfolioReturn]
+  );
+
+  const totalMonthlySip = useMemo(() => {
+    if (!data?.sipPlans?.length) return 0;
+    return data.sipPlans.reduce((sum, plan) => sum + (plan.monthlyAmount || 0), 0);
+  }, [data]);
+
+  const growthProjection = useMemo(() => {
+    return buildFutureGrowth(summary.totalValue || 0, summary.invested || 0, totalMonthlySip, projectionReturn, 15);
+  }, [summary.totalValue, summary.invested, totalMonthlySip, projectionReturn]);
+
+  const etfByBenchmark = useMemo(() => {
+    const map = new Map<string, ETFAnalytics[]>();
+    etfAnalytics.forEach((etf) => {
+      const key = normalizeBenchmark(etf.Benchmark_Name || "");
+      if (!key) return;
+      const list = map.get(key) || [];
+      list.push(etf);
+      map.set(key, list);
+    });
+    map.forEach((list, key) => {
+      list.sort((a, b) => (b.ETF_Score ?? 0) - (a.ETF_Score ?? 0));
+      map.set(key, list);
+    });
+    return map;
+  }, [etfAnalytics]);
+
+  const etfByName = useMemo(() => {
+    const map = new Map<string, ETFAnalytics>();
+    etfAnalytics.forEach((etf) => {
+      const key = normalizeFundName(etf.ETF_Name || "");
+      if (!key) return;
+      map.set(key, etf);
+    });
+    return map;
+  }, [etfAnalytics]);
+
+  const underperformingActive = useMemo(() => {
+    return activeHoldings.filter((row) => (row.analytics?.Alpha_3Y ?? 0) <= 0);
+  }, [activeHoldings]);
+
+  const lostAlphaAmount = useMemo(() => {
+    return underperformingActive.reduce((sum, row) => {
+      const alpha = row.analytics?.Alpha_3Y ?? 0;
+      if (alpha >= 0) return sum;
+      return sum + (row.value * Math.abs(alpha)) / 100;
+    }, 0);
+  }, [underperformingActive]);
+
+  const activeAudit = useMemo(() => {
+    return activeHoldings.map((row) => {
+      const analytics = row.analytics;
+      const category = analytics?.Category || "";
+      const subCategory = analytics?.Sub_Category || row.amfi?.subCategory || "";
+      const categoryAvgAlpha = category ? categoryInsightsMap.get(category)?.Avg_Alpha_3Y ?? null : null;
+      const categoryAvgIr = subCategory ? subCategoryInsightsMap.get(subCategory)?.Avg_IR_3Y ?? null : null;
+      const alpha = analytics?.Alpha_3Y ?? null;
+      const ir3y = analytics?.IR_3Y ?? null;
+      const compositeScore = analytics?.Composite_Score ?? null;
+      const benchmarkName = row.benchmarkName || "-";
+      const benchmarkKey = benchmarkName !== "-" ? normalizeBenchmark(benchmarkName) : "";
+      const benchmarkReturn = benchmarkKey ? benchmarkMap.get(benchmarkKey)?.return3Y ?? null : null;
+      const fundReturn = analytics?.Fund_Return_3Y ?? row.amfi?.return3Y ?? null;
+      const delta = fundReturn !== null && benchmarkReturn !== null ? fundReturn - benchmarkReturn : null;
+      const scoreOk = compositeScore !== null ? compositeScore >= 55 : true;
+      const alphaOk = alpha !== null ? alpha >= 0 : true;
+      const irOk = ir3y !== null ? (categoryAvgIr !== null ? ir3y >= categoryAvgIr : ir3y >= 0) : true;
+      const performanceOk = delta !== null ? delta >= 0 : true;
+      const trigger = !(performanceOk && scoreOk && alphaOk && irOk);
+      const status = alpha !== null && alpha >= 0 ? "Continue" : trigger ? "Review" : "Continue";
+      const bestEtf = benchmarkKey ? etfByBenchmark.get(benchmarkKey)?.[0] : undefined;
+      return {
+        name: row.name,
+        benchmarkName,
+        fundReturn,
+        benchmarkReturn,
+        delta,
+        alpha,
+        ir3y,
+        categoryAvgIr,
+        compositeScore,
+        categoryAvgAlpha,
+        status,
+        suggestion: status === "Review" && bestEtf ? bestEtf.ETF_Name : null,
+        suggestionScore: bestEtf?.ETF_Score ?? null,
+      };
+    });
+  }, [activeHoldings, benchmarkMap, etfByBenchmark, categoryInsightsMap, subCategoryInsightsMap]);
+
+  const passiveAudit = useMemo(() => {
+    return passiveHoldings.map((row) => {
+      const benchmarkName = row.benchmarkName || "-";
+      const benchmarkKey = benchmarkName !== "-" ? normalizeBenchmark(benchmarkName) : "";
+      const bestEtf = benchmarkKey ? etfByBenchmark.get(benchmarkKey)?.[0] : undefined;
+      const currentEtf = etfByName.get(normalizeFundName(row.name));
+      const tracking = currentEtf?.Tracking_Diff_3Y ?? null;
+      const bestTracking = bestEtf?.Tracking_Diff_3Y ?? null;
+      const fundReturn = row.analytics?.Fund_Return_3Y ?? row.amfi?.return3Y ?? null;
+      const benchmarkReturn = benchmarkKey ? benchmarkMap.get(benchmarkKey)?.return3Y ?? null : null;
+      const delta = fundReturn !== null && benchmarkReturn !== null ? fundReturn - benchmarkReturn : null;
+      const needsSwitch =
+        (tracking !== null && bestTracking !== null ? tracking - bestTracking > 0.5 : false) ||
+        (delta !== null ? delta < 0 : false);
+      const status = needsSwitch ? "Review" : "Continue";
+      return {
+        name: row.name,
+        benchmarkName,
+        fundReturn,
+        benchmarkReturn,
+        delta,
+        tracking,
+        bestTracking,
+        status,
+        suggestion: status === "Review" && bestEtf ? bestEtf.ETF_Name : null,
+        bestEtfName: bestEtf?.ETF_Name ?? null,
+      };
+    });
+  }, [passiveHoldings, benchmarkMap, etfByBenchmark, etfByName]);
+
+  const activeReviewCount = useMemo(() => activeAudit.filter((row) => row.status !== "Continue").length, [activeAudit]);
+  const passiveSwitchCount = useMemo(
+    () => passiveAudit.filter((row) => row.suggestion).length,
+    [passiveAudit]
+  );
+
+  const executivePulse = useMemo(() => {
+    const xirrPct = xirrValue !== null ? xirrValue * 100 : null;
+    const hurdle = alphaHurdle ?? null;
+    const diff = xirrPct !== null && hurdle !== null ? xirrPct - hurdle : null;
+    const direction = diff === null ? "matching" : diff >= 0 ? "beating" : "trailing";
+    const underperformingCount = activeReviewCount;
+    return {
+      xirrPct,
+      hurdle,
+      diff,
+      direction,
+      underperformingCount,
+    };
+  }, [xirrValue, alphaHurdle, activeReviewCount]);
+
   const report = useMemo(() => {
     if (!data) return null;
     return buildReportData(data, portfolio, summary.totalValue, xirrValue, schemeLookup);
   }, [data, portfolio, summary.totalValue, xirrValue, schemeLookup]);
+
+  const insightCards = useMemo(() => {
+    const cards: Array<{ title: string; summary: string; detail: string }> = [];
+
+    if (executivePulse.diff !== null) {
+      cards.push({
+        title: "Market hurdle check",
+        summary: `Your XIRR is ${executivePulse.direction} the Nifty 50 TRI 10Y bar by ${formatPct2(executivePulse.diff)}.`,
+        detail: "Use this as a reality check for long-term performance. If the gap stays negative for long periods, review the core funds.",
+      });
+    }
+
+    if (activeReviewCount > 0) {
+      cards.push({
+        title: "Active fund cleanup",
+        summary: `${activeReviewCount} active funds need review, with about ${formatCurrency(lostAlphaAmount)} in potential annual drag.`,
+        detail: "Prioritize funds with negative 3Y alpha and large benchmark gaps. Replace only after checking tax impact and exit loads.",
+      });
+    }
+
+    if (passiveSwitchCount > 0) {
+      cards.push({
+        title: "Passive tracking drift",
+        summary: `${passiveSwitchCount} passive funds show tracking drift versus the best ETF.`,
+        detail: "Switching to a tighter-tracking ETF can improve returns without changing risk exposure.",
+      });
+    }
+
+    if (yieldTrapValue > 0) {
+      cards.push({
+        title: "Low-ranked exposure",
+        summary: `${formatCurrency(yieldTrapValue)} sits in the bottom 25% of category peers.`,
+        detail: "These are common sources of long-term drag. Check performance persistence and consider consolidation.",
+      });
+    }
+
+    (report?.insights || []).slice(0, 3).forEach((insight) => {
+      cards.push({
+        title: insight.title,
+        summary: insight.observation,
+        detail: insight.suggestedCheck || insight.meaning || "Review this area during your next portfolio check.",
+      });
+    });
+
+    return cards;
+  }, [report, executivePulse, activeReviewCount, passiveSwitchCount, lostAlphaAmount, yieldTrapValue]);
+
+  const pdfInsights = useMemo(() => {
+    const metrics = [
+      {
+        title: "Market hurdle (Nifty 50 TRI 10Y)",
+        value: formatPct2(alphaHurdle),
+        note: "Long-term index reference",
+      },
+      {
+        title: "Active winners",
+        value: activeHitRate !== null ? formatPct2(activeHitRate * 100) : "-",
+        note: "Active money beating benchmark",
+      },
+      {
+        title: "Consistency check",
+        value: consistencyScore.total ? `${consistencyScore.winners}/${consistencyScore.total}` : "-",
+        note: "Funds above category average",
+      },
+      {
+        title: "Low-ranked funds",
+        value: formatCurrency(yieldTrapValue),
+        note: "Bottom 25% of peers",
+      },
+      {
+        title: "Style tilt (mid/small)",
+        value: styleTilt !== null ? formatPct2(styleTilt * 100) : "-",
+        note: "Higher swings if >50%",
+      },
+      {
+        title: "Risk profile",
+        value: riskDnaScore !== null ? riskDnaScore.toFixed(1) : "-",
+        note: "1 low risk • 10 high risk",
+      },
+    ];
+
+    const executiveSummary =
+      `Portfolio XIRR ${formatPct2(executivePulse.xirrPct)} vs Nifty 50 TRI 10Y ${formatPct2(executivePulse.hurdle)} ` +
+      `(${executivePulse.direction} by ${formatPct2(executivePulse.diff)}). ` +
+      `${activeReviewCount} active funds need review; potential drag ${formatCurrency(lostAlphaAmount)} per year.`;
+
+    const activeAuditRows = activeAudit.slice(0, 12).map((row) => ({
+      name: row.name,
+      benchmark: row.benchmarkName,
+      gap: row.delta !== null ? `${row.delta >= 0 ? "+" : ""}${row.delta.toFixed(2)}%` : "-",
+      action: row.suggestion ? `Review → ${row.suggestion}` : row.status,
+    }));
+
+    const passiveAuditRows = passiveAudit.slice(0, 12).map((row) => ({
+      name: row.name,
+      benchmark: row.benchmarkName,
+      gap: row.delta !== null ? `${row.delta >= 0 ? "+" : ""}${row.delta.toFixed(2)}%` : "-",
+      tracking: row.tracking !== null ? `${row.tracking.toFixed(2)}%` : "-",
+      action: row.suggestion ? `Review → ${row.suggestion}` : row.status,
+    }));
+
+    return {
+      metrics,
+      executiveSummary,
+      activeAuditRows,
+      passiveAuditRows,
+      insightCards,
+    };
+  }, [
+    alphaHurdle,
+    activeHitRate,
+    consistencyScore,
+    yieldTrapValue,
+    styleTilt,
+    riskDnaScore,
+    executivePulse,
+    activeReviewCount,
+    lostAlphaAmount,
+    activeAudit,
+    passiveAudit,
+    insightCards,
+  ]);
   useEffect(() => {
     setSchemePath([]);
   }, [report]);
@@ -936,12 +1168,12 @@ export default function MutualFundHealthCheckDashboard() {
   }, [report, selectedAmc]);
 
   if (loading || !user) {
-    return <div className="p-12 text-center">Loading...</div>;
+    return <div className="min-h-screen bg-[#F5F8FF] p-12 text-center">Loading...</div>;
   }
 
   if (processing) {
     return (
-      <div className="p-12 text-center">
+      <div className="min-h-screen bg-[#F5F8FF] p-12 text-center">
         <div className="text-lg font-semibold text-[#1F2937] dark:text-[#F5F6F3]">Preparing your dashboard...</div>
         <div className="mt-2 text-sm text-[#6B7C70] dark:text-[#D5D9CF]">
           We are downloading NAV history and rebuilding your portfolio. This can take a few minutes for large CAS files.
@@ -965,21 +1197,27 @@ export default function MutualFundHealthCheckDashboard() {
             Here is your portfolio snapshot based on the CAS you uploaded. XIRR, flows, and performance reflect your actual transactions.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
+            <a
+              href="#nivesify-insights"
+              className="rounded-full bg-gradient-to-r from-[#BDA06D] via-[#D2B57E] to-[#E6D4A5] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#1F2937] shadow-[0_12px_28px_-18px_rgba(189,160,109,0.7)]"
+            >
+              Nivesify Insights
+            </a>
             <button
               onClick={() => router.push("/mutual-fund-health-check/portfolio")}
-              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
+              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#111111]"
             >
               View portfolio
             </button>
             <button
               onClick={() => router.push("/mutual-fund-health-check/transactions")}
-              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
+              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#111111]"
             >
               View transactions
             </button>
             <button
               onClick={() => router.push("/mutual-fund-health-check")}
-              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#2F5D7C]"
+              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#111111]"
             >
               Re-upload CAS
             </button>
@@ -996,6 +1234,7 @@ export default function MutualFundHealthCheckDashboard() {
                   },
                   xirrValue,
                   report,
+                  insights: pdfInsights,
                   holder: {
                     name: data?.holder?.name || "-",
                     pan: data?.holder?.pan,
@@ -1009,597 +1248,548 @@ export default function MutualFundHealthCheckDashboard() {
                 });
               }}
               disabled={!report}
-              className="rounded-full bg-[#2F5D7C] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white disabled:opacity-50"
+              className="rounded-full border border-[#D5D9CF] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#111111] disabled:opacity-50"
             >
               Download report
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-4">
           {[
-            { title: "Total Value", value: formatCurrency(summary.totalValue) },
-            { title: "Invested", value: formatCurrency(summary.invested) },
-            { title: "All Time Returns", value: formatCurrency(summary.allTimeProfit) },
+            {
+              title: "Total value",
+              value: formatCurrency(summary.totalValue),
+              note: "Current portfolio value",
+              tooltip: tooltips.totalValue,
+            },
             {
               title: "Portfolio XIRR",
               value: xirrValue !== null ? formatPct(xirrValue * 100, 1) : "Unavailable",
+              note: "Annualized portfolio return",
+              tooltip: tooltips.xirr,
             },
             {
-              title: "Monthly Income if retired",
+              title: "All-time returns",
+              value: formatCurrency(summary.allTimeProfit),
+              note: "Overall gain so far",
+              tooltip: tooltips.allTimeReturns,
+            },
+            {
+              title: "Invested",
+              value: formatCurrency(summary.invested),
+              note: "Capital invested",
+              tooltip: tooltips.invested,
+            },
+            {
+              title: "Funds in holding",
+              value: report ? `${report.holdingsCount}` : "-",
+              note: "Active holdings",
+              tooltip: tooltips.holdings,
+            },
+            {
+              title: "Top fund share",
+              value: summary.totalValue && report ? `${(report.topOneShare * 100).toFixed(1)}%` : "-",
+              note: "Largest fund weight",
+              tooltip: tooltips.topFund,
+            },
+            {
+              title: "Top 5 share",
+              value: summary.totalValue && report ? `${(report.topFiveShare * 100).toFixed(1)}%` : "-",
+              note: "Top 5 combined weight",
+              tooltip: tooltips.topFive,
+            },
+            {
+              title: "Monthly income",
               value: formatCurrency(summary.totalValue / 25 / 12),
+              note: "25x rule estimate",
+              tooltip: tooltips.monthlyIncome,
             },
           ].map((card) => (
             <div
               key={card.title}
-              className="rounded-3xl border border-[#E6E8E1] bg-white p-3 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]"
+              className="rounded-3xl border border-[#E6E8E1] bg-white p-4 text-center shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]"
             >
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#6B7C70]">
+              <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#6B7C70]">
                 <span>{card.title}</span>
-                <InfoTip
-                  text={
-                    card.title === "Total Value"
-                      ? tooltips.totalValue
-                      : card.title === "Invested"
-                      ? tooltips.invested
-                      : card.title === "All Time Returns"
-                      ? tooltips.allTimeReturns
-                      : card.title === "Portfolio XIRR"
-                      ? tooltips.xirr
-                      : tooltips.monthlyIncome
-                  }
-                />
+                <InfoTip text={card.tooltip} />
               </div>
-              <div className="mt-2 text-lg font-semibold text-[#1F2937]">{card.value}</div>
+              <div className="mt-2 text-xl font-semibold text-[#1F2937]">{card.value}</div>
+              <div className="mt-2 text-[11px] text-[#6B7C70]">{card.note}</div>
             </div>
           ))}
-          <div className="rounded-3xl border border-[#E6E8E1] bg-white p-3 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-[#6B7C70]">Portfolio vs Nifty 50 TRI</div>
-            {(() => {
-              const portfolioXirr = xirrValue !== null ? xirrValue * 100 : null;
-              const benchmark = niftyBenchmark?.benchmarkReturn ?? null;
-              const delta = portfolioXirr !== null && benchmark !== null ? portfolioXirr - benchmark : null;
-              return (
-                <div className="mt-2 space-y-2 text-xs text-[#6B7C70]">
-                  <div className="flex items-center justify-between">
-                    <span>XIRR</span>
-                    <span className="text-[#1F2937]">{formatPct(portfolioXirr, 1)}</span>
-                    <span className={`text-[10px] font-semibold ${delta !== null && delta >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                      {delta !== null ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%` : "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Nifty 50 TRI</span>
-                    <span className="text-[#1F2937]">{formatPct(benchmark, 1)}</span>
-                    <span className="text-[10px] text-[#9AA3AF]">{niftyBenchmark?.period || "-"}</span>
-                  </div>
-                </div>
-              );
-            })()}
-            <div className="mt-2 text-[10px] text-[#9AA3AF]">AMFI benchmark return.</div>
-          </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("overview")}
-            className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.2em] ${
-              activeTab === "overview"
-                ? "border-[#2F5D7C] bg-[#EAF1FB] text-[#2F5D7C]"
-                : "border-[#D5D9CF] bg-white text-[#6B7C70]"
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("benchmark")}
-            className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.2em] ${
-              activeTab === "benchmark"
-                ? "border-[#2F5D7C] bg-[#EAF1FB] text-[#2F5D7C]"
-                : "border-[#D5D9CF] bg-white text-[#6B7C70]"
-            }`}
-          >
-            Benchmark intelligence
-          </button>
-        </div>
-        {activeTab === "overview" && (
-          <>
-            <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-              <div className="rounded-3xl border border-[#DDE6F3] bg-white p-4 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Manual additions</div>
-                    <div className="text-base font-semibold text-[#1F2937]">Add SIPs or one-time investments</div>
-                    <div className="text-[11px] text-[#6B7C70]">These are merged with CAS holdings for diagnostics.</div>
+        <div id="manual-additions" className="rounded-3xl border border-[#DDE6F3] bg-white p-4 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Manual additions</div>
+              <div className="text-base font-semibold text-[#1F2937]">Add SIPs or one-time investments</div>
+              <div className="text-[11px] text-[#6B7C70]">These are merged with CAS holdings for diagnostics.</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowManualSection((prev) => !prev)}
+              className="rounded-full border border-[#D5D9CF] bg-white px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-[#111111]"
+            >
+              {showManualSection ? "Collapse" : "Add investments"}
+            </button>
+          </div>
+
+          {showManualSection && (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">One-time investment</div>
+                <div className="mt-3 grid gap-3">
+                  <input
+                    value={manualDraft.schemeName}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const scheme = findSchemeForName(name);
+                      setManualDraft((prev) => ({
+                        ...prev,
+                        schemeName: name,
+                        schemeCode:
+                          scheme && normalizeFundName(scheme.schemeName || "") === normalizeFundName(name)
+                            ? String(scheme.schemeCode)
+                            : "",
+                      }));
+                    }}
+                    placeholder="Search fund name"
+                    className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                  />
+                  {manualSuggestions.length > 0 && (
+                    <div className="rounded-2xl border border-[#E6E8E1] bg-white p-2 text-xs text-[#1F2937]">
+                      <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-[#9AA3AF]">Suggestions</div>
+                      <div className="grid gap-1">
+                        {manualSuggestions.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() =>
+                              setManualDraft((prev) => {
+                                const scheme = findSchemeForName(name);
+                                return {
+                                  ...prev,
+                                  schemeName: name,
+                                  schemeCode: scheme ? String(scheme.schemeCode) : "",
+                                };
+                              })
+                            }
+                            className="rounded-xl px-2 py-1 text-left text-[12px] text-[#1F2937] hover:bg-[#F5F8FF]"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {manualDraft.schemeName.trim().length > 0 && manualDraft.schemeName.trim().length < 4 && (
+                    <div className="text-[11px] text-[#9AA3AF]">Type at least 4 letters to see fund suggestions.</div>
+                  )}
+                  {manualDraft.schemeName.trim().length >= 4 && !manualDraft.schemeCode && (
+                    <div className="text-[11px] text-[#B35A5A]">No NAV match yet. Pick a suggestion.</div>
+                  )}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      value={manualDraft.amount}
+                      onChange={(e) => setManualDraft((prev) => ({ ...prev, amount: e.target.value }))}
+                      placeholder="Amount (INR)"
+                      className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                    />
+                    <input
+                      type="date"
+                      value={manualDraft.date}
+                      onChange={(e) => setManualDraft((prev) => ({ ...prev, date: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                    />
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowManualSection((prev) => !prev)}
-                    className="rounded-full border border-[#D5D9CF] bg-white px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-[#2F5D7C]"
+                    onClick={handleAddManual}
+                    className="rounded-full bg-[#2F5D7C] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white"
                   >
-                    {showManualSection ? "Collapse" : "Add investments"}
+                    Add manual investment
                   </button>
                 </div>
-
-                {showManualSection && (
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">One-time investment</div>
-                      <div className="mt-3 grid gap-3">
-                        <input
-                          value={manualDraft.schemeName}
-                          onChange={(e) => {
-                            const name = e.target.value;
-                            const scheme = findSchemeForName(name);
-                            setManualDraft((prev) => ({
-                              ...prev,
-                              schemeName: name,
-                              schemeCode:
-                                scheme && normalizeFundName(scheme.schemeName || "") === normalizeFundName(name)
-                                  ? String(scheme.schemeCode)
-                                  : "",
-                            }));
-                          }}
-                          placeholder="Search fund name"
-                          className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                        />
-                        {manualSuggestions.length > 0 && (
-                          <div className="rounded-2xl border border-[#E6E8E1] bg-white p-2 text-xs text-[#1F2937]">
-                            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-[#9AA3AF]">Suggestions</div>
-                            <div className="grid gap-1">
-                              {manualSuggestions.map((name) => (
-                                <button
-                                  key={name}
-                                  type="button"
-                                  onClick={() =>
-                                    setManualDraft((prev) => {
-                                      const scheme = findSchemeForName(name);
-                                      return {
-                                        ...prev,
-                                        schemeName: name,
-                                        schemeCode: scheme ? String(scheme.schemeCode) : "",
-                                      };
-                                    })
-                                  }
-                                  className="rounded-xl px-2 py-1 text-left text-[12px] text-[#1F2937] hover:bg-[#F5F8FF]"
-                                >
-                                  {name}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {manualDraft.schemeName.trim().length > 0 && manualDraft.schemeName.trim().length < 4 && (
-                          <div className="text-[11px] text-[#9AA3AF]">Type at least 4 letters to see fund suggestions.</div>
-                        )}
-                        {manualDraft.schemeName.trim().length >= 4 && !manualDraft.schemeCode && (
-                          <div className="text-[11px] text-[#B35A5A]">No NAV match yet. Pick a suggestion.</div>
-                        )}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <input
-                            value={manualDraft.amount}
-                            onChange={(e) => setManualDraft((prev) => ({ ...prev, amount: e.target.value }))}
-                            placeholder="Amount (INR)"
-                            className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                          />
-                          <input
-                            type="date"
-                            value={manualDraft.date}
-                            onChange={(e) => setManualDraft((prev) => ({ ...prev, date: e.target.value }))}
-                            className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddManual}
-                          className="rounded-full bg-[#2F5D7C] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white"
-                        >
-                          Add manual investment
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">SIP plan</div>
-                      <div className="mt-3 grid gap-3">
-                        <input
-                          value={sipDraft.schemeName}
-                          onChange={(e) => {
-                            const name = e.target.value;
-                            const scheme = findSchemeForName(name);
-                            setSipDraft((prev) => ({
-                              ...prev,
-                              schemeName: name,
-                              schemeCode:
-                                scheme && normalizeFundName(scheme.schemeName || "") === normalizeFundName(name)
-                                  ? String(scheme.schemeCode)
-                                  : "",
-                            }));
-                          }}
-                          placeholder="Search fund name"
-                          className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                        />
-                        {sipSuggestions.length > 0 && (
-                          <div className="rounded-2xl border border-[#E6E8E1] bg-white p-2 text-xs text-[#1F2937]">
-                            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-[#9AA3AF]">Suggestions</div>
-                            <div className="grid gap-1">
-                              {sipSuggestions.map((name) => (
-                                <button
-                                  key={name}
-                                  type="button"
-                                  onClick={() =>
-                                    setSipDraft((prev) => {
-                                      const scheme = findSchemeForName(name);
-                                      return {
-                                        ...prev,
-                                        schemeName: name,
-                                        schemeCode: scheme ? String(scheme.schemeCode) : "",
-                                      };
-                                    })
-                                  }
-                                  className="rounded-xl px-2 py-1 text-left text-[12px] text-[#1F2937] hover:bg-[#F5F8FF]"
-                                >
-                                  {name}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {sipDraft.schemeName.trim().length > 0 && sipDraft.schemeName.trim().length < 4 && (
-                          <div className="text-[11px] text-[#9AA3AF]">Type at least 4 letters to see fund suggestions.</div>
-                        )}
-                        {sipDraft.schemeName.trim().length >= 4 && !sipDraft.schemeCode && (
-                          <div className="text-[11px] text-[#B35A5A]">No NAV match yet. Pick a suggestion.</div>
-                        )}
-                        <input
-                          value={sipDraft.monthlyAmount}
-                          onChange={(e) => setSipDraft((prev) => ({ ...prev, monthlyAmount: e.target.value }))}
-                          placeholder="Monthly SIP (INR)"
-                          className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                        />
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <input
-                            type="date"
-                            value={sipDraft.startDate}
-                            onChange={(e) => setSipDraft((prev) => ({ ...prev, startDate: e.target.value }))}
-                            className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                          />
-                          <input
-                            type="date"
-                            value={sipDraft.endDate}
-                            onChange={(e) => setSipDraft((prev) => ({ ...prev, endDate: e.target.value }))}
-                            className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddSip}
-                          className="rounded-full bg-[#2F5D7C] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white"
-                        >
-                          Add SIP plan
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {(data?.manualInvestments?.length || data?.sipPlans?.length) && (
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowManualList((prev) => !prev)}
-                      className="rounded-full border border-[#D5D9CF] bg-white px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-[#2F5D7C]"
-                    >
-                      {showManualList ? "Hide saved additions" : "Show saved additions"}
-                    </button>
-                    {showManualList && (
-                      <div className="mt-3 grid gap-3 text-xs text-[#6B7C70] md:grid-cols-2">
-                        {(data.manualInvestments || []).map((item) => (
-                          <div key={item.id} className="rounded-2xl border border-[#EEF0E8] bg-white px-3 py-2">
-                            <div className="text-[10px] uppercase tracking-[0.2em]">Manual investment</div>
-                            <div className="mt-1 text-sm text-[#1F2937]">{item.schemeName}</div>
-                            <div className="text-[11px]">INR {formatCurrency(item.amount)} · {item.date}</div>
-                          </div>
-                        ))}
-                        {(data.sipPlans || []).map((plan) => (
-                          <div key={plan.id} className="rounded-2xl border border-[#EEF0E8] bg-white px-3 py-2">
-                            <div className="text-[10px] uppercase tracking-[0.2em]">SIP plan</div>
-                            <div className="mt-1 text-sm text-[#1F2937]">{plan.schemeName}</div>
-                            <div className="text-[11px]">
-                              INR {formatCurrency(plan.monthlyAmount)}/mo · {plan.startDate}{plan.endDate ? ` → ${plan.endDate}` : ""}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
-              <div className="rounded-3xl border border-[#DDE6F3] bg-white p-4 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Future growth</div>
-                    <div className="text-base font-semibold text-[#1F2937]">Portfolio projection (15 years)</div>
-                    <div className="text-[11px] text-[#6B7C70]">
-                      Assumes {formatPct(expectedPortfolioReturn, 1)} annual return from weighted fund history.
+              <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">SIP plan</div>
+                <div className="mt-3 grid gap-3">
+                  <input
+                    value={sipDraft.schemeName}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const scheme = findSchemeForName(name);
+                      setSipDraft((prev) => ({
+                        ...prev,
+                        schemeName: name,
+                        schemeCode:
+                          scheme && normalizeFundName(scheme.schemeName || "") === normalizeFundName(name)
+                            ? String(scheme.schemeCode)
+                            : "",
+                      }));
+                    }}
+                    placeholder="Search fund name"
+                    className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                  />
+                  {sipSuggestions.length > 0 && (
+                    <div className="rounded-2xl border border-[#E6E8E1] bg-white p-2 text-xs text-[#1F2937]">
+                      <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-[#9AA3AF]">Suggestions</div>
+                      <div className="grid gap-1">
+                        {sipSuggestions.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() =>
+                              setSipDraft((prev) => {
+                                const scheme = findSchemeForName(name);
+                                return {
+                                  ...prev,
+                                  schemeName: name,
+                                  schemeCode: scheme ? String(scheme.schemeCode) : "",
+                                };
+                              })
+                            }
+                            className="rounded-xl px-2 py-1 text-left text-[12px] text-[#1F2937] hover:bg-[#F5F8FF]"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                  )}
+                  {sipDraft.schemeName.trim().length > 0 && sipDraft.schemeName.trim().length < 4 && (
+                    <div className="text-[11px] text-[#9AA3AF]">Type at least 4 letters to see fund suggestions.</div>
+                  )}
+                  {sipDraft.schemeName.trim().length >= 4 && !sipDraft.schemeCode && (
+                    <div className="text-[11px] text-[#B35A5A]">No NAV match yet. Pick a suggestion.</div>
+                  )}
+                  <input
+                    value={sipDraft.monthlyAmount}
+                    onChange={(e) => setSipDraft((prev) => ({ ...prev, monthlyAmount: e.target.value }))}
+                    placeholder="Monthly SIP (INR)"
+                    className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                  />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      type="date"
+                      value={sipDraft.startDate}
+                      onChange={(e) => setSipDraft((prev) => ({ ...prev, startDate: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                    />
+                    <input
+                      type="date"
+                      value={sipDraft.endDate}
+                      onChange={(e) => setSipDraft((prev) => ({ ...prev, endDate: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#D5D9CF] bg-white px-3 py-2 text-sm text-[#1F2937]"
+                    />
                   </div>
-                </div>
-                <div className="mt-4 h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={growthProjection} margin={chartMargin}>
-                      <CartesianGrid stroke="#EEF2F7" vertical={false} />
-                      <XAxis dataKey="year" {...xAxisDefaults} />
-                      <YAxis {...axisDefaults} tickFormatter={(value) => formatCurrency(Number(value))} />
-                      <Tooltip
-                        formatter={(value: number, name: string) => [
-                          formatCurrency(Number(value)),
-                          name === "corpus" ? "Projected value" : "Invested",
-                        ]}
-                        labelFormatter={(label) => `Year ${label}`}
-                        contentStyle={{ borderRadius: 16, borderColor: "#E6E8E1" }}
-                        cursor={{ stroke: "transparent" }}
-                      />
-                      <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeDasharray="5 4" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <button
+                    type="button"
+                    onClick={handleAddSip}
+                    className="rounded-full bg-[#2F5D7C] px-4 py-2 text-xs uppercase tracking-[0.2em] text-white"
+                  >
+                    Add SIP plan
+                  </button>
                 </div>
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        {activeTab === "benchmark" && (
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-[#DDE6F3] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
-              <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Benchmark intelligence</div>
-              <div className="mt-2 text-lg font-semibold text-[#1F2937]">How your funds behave vs their benchmarks</div>
-              <div className="mt-1 text-xs text-[#6B7C70]">
-                Fund-level benchmark returns only. Portfolio cashflows are not used here.
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#6B7C70]">
-                <span className="rounded-full border border-[#E6E8E1] bg-[#FBFCFA] px-2 py-1">
-                  Coverage {benchmarkCoverage.covered}/{benchmarkCoverage.totalFunds}
-                </span>
-                <span className="rounded-full border border-[#E6E8E1] bg-[#FBFCFA] px-2 py-1">
-                  Active {formatPct(mixShare.activeShare * 100, 0)} · Passive {formatPct(mixShare.passiveShare * 100, 0)}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Portfolio posture</div>
-                <div className="mt-2 text-sm text-[#1F2937]">{postureSummary}</div>
-              </div>
-              <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Active alpha check</div>
-                {activeStats ? (
-                  <div className="mt-2 space-y-2 text-xs text-[#1F2937]">
-                    <div>
-                      {activeStats.wins}/{activeStats.total} beating benchmark · Avg delta {formatPct(activeStats.avgDelta, 1)}
+          {(data?.manualInvestments?.length || data?.sipPlans?.length) && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setShowManualList((prev) => !prev)}
+                className="rounded-full border border-[#D5D9CF] bg-white px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-[#2F5D7C]"
+              >
+                {showManualList ? "Hide saved additions" : "Show saved additions"}
+              </button>
+              {showManualList && (
+                <div className="mt-3 grid gap-3 text-xs text-[#6B7C70] md:grid-cols-2">
+                  {(data.manualInvestments || []).map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-[#EEF0E8] bg-white px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.2em]">Manual investment</div>
+                      <div className="mt-1 text-sm text-[#1F2937]">{item.schemeName}</div>
+                      <div className="text-[11px]">INR {formatCurrency(item.amount)} · {item.date}</div>
                     </div>
-                    <div className="text-[11px] text-[#6B7C70]">
-                      Underperforming value share {formatPct(activeStats.underperformingShare * 100, 0)}
+                  ))}
+                  {(data.sipPlans || []).map((plan) => (
+                    <div key={plan.id} className="rounded-2xl border border-[#EEF0E8] bg-white px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.2em]">SIP plan</div>
+                      <div className="mt-1 text-sm text-[#1F2937]">{plan.schemeName}</div>
+                      <div className="text-[11px]">
+                        INR {formatCurrency(plan.monthlyAmount)}/mo · {plan.startDate}{plan.endDate ? ` → ${plan.endDate}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 text-xs text-[#6B7C70]">Active benchmark data is still sparse. Keep tracking as more funds mature.</div>
-                )}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartCard
+            title="Future growth"
+            footer={`Projection uses ${formatPct(projectionReturn, 1)} annual return (portfolio XIRR).`}
+            options={[{ label: "15 years", value: "15" }]}
+            value="15"
+            onChange={() => undefined}
+            showSelect={false}
+          >
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={growthProjection} margin={chartMargin}>
+                  <CartesianGrid stroke="#EEF2F7" vertical={false} />
+                  <XAxis dataKey="year" {...xAxisDefaults} />
+                  <YAxis {...axisDefaults} tickFormatter={(value) => formatCurrency(Number(value))} />
+                  <Tooltip
+                    formatter={(value: number | undefined, name: string | undefined) => [
+                      formatCurrency(Number(value ?? 0)),
+                      name === "corpus" ? "Projected value" : "Invested",
+                    ]}
+                    labelFormatter={(label) => `Year ${label}`}
+                    contentStyle={{ borderRadius: 16, borderColor: "#E6E8E1" }}
+                    cursor={{ stroke: "transparent" }}
+                  />
+                  <Line type="monotone" dataKey="invested" stroke="#BDA06D" strokeDasharray="5 4" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="corpus" stroke="#2F5D7C" strokeWidth={3} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          <ChartCard
+            title="Performance"
+            footer="Invested value vs current value over time"
+            options={performanceOptions}
+            value={performanceChart}
+            onChange={setPerformanceChart}
+          >
+            {lineHasData ? (
+              <div className="h-64 w-full" id="mfhc-performance-chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={lineData} margin={chartMargin}>
+                    <CartesianGrid vertical={false} stroke="#EEF2F7" />
+                    <XAxis
+                      dataKey="name"
+                      {...xAxisDefaults}
+                      interval={0}
+                      tickFormatter={(value, index) => formatXAxisTick(value, index, lineData.length)}
+                    />
+                    <YAxis
+                      {...axisDefaults}
+                      tickFormatter={(value) => formatCurrency(Number(value))}
+                      domain={["auto", "auto"]}
+                      tickCount={5}
+                    />
+                    <Tooltip
+                      formatter={(value: number | undefined, name: string | undefined) => [
+                        formatCurrency(Number(value ?? 0)),
+                        name === "valueOne" ? "Invested" : "Current Value",
+                      ]}
+                      contentStyle={{ borderRadius: 16, borderColor: "#E6E8E1" }}
+                      labelFormatter={(label) => `Date: ${label}`}
+                      cursor={{ stroke: "transparent" }}
+                    />
+                    <Line type="monotone" dataKey="valueOne" stroke="#BDA06D" strokeWidth={2} dot={false} name="Invested" />
+                    <Line type="monotone" dataKey="valueTwo" stroke="#2F5D7C" strokeWidth={3} dot={false} name="Current" />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <div className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Passive tracking</div>
-                {passiveStats ? (
-                  <div className="mt-2 space-y-2 text-xs text-[#1F2937]">
-                    <div>Avg tracking difference {formatPct(passiveStats.avgTracking, 1)}</div>
-                    <div className="text-[11px] text-[#6B7C70]">
-                      Review funds with tracking above 1.5%.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 text-xs text-[#6B7C70]">Passive funds look thin. Consider adding a low-cost index core.</div>
-                )}
+            ) : (
+              <div className="flex h-64 items-center justify-center text-sm text-[#6B7C70]">
+                NAV data is still loading. Please try again in a moment.
+              </div>
+            )}
+          </ChartCard>
+        </div>
+
+        <section id="nivesify-insights" className="space-y-6">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">Nivesify insights</p>
+            <h2 className="text-2xl md:text-3xl font-serif text-[#1F2937]">Portfolio diagnosis</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-[#E6E8E1] bg-white p-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Market hurdle (Nifty 50 TRI 10Y)</div>
+              <div className="mt-2 text-lg font-semibold text-[#1F2937]">{formatPct2(alphaHurdle)}</div>
+              <div className="text-[11px] text-[#6B7C70]">Your XIRR {formatPct2(executivePulse.xirrPct)}</div>
+            </div>
+            <div className="rounded-2xl border border-[#E6E8E1] bg-white p-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Active winners</div>
+              <div className="mt-2 text-lg font-semibold text-[#1F2937]">
+                {activeHitRate !== null ? formatPct2(activeHitRate * 100) : "-"}
+              </div>
+              <div className="text-[11px] text-[#6B7C70]">Share of active money beating benchmark</div>
+            </div>
+            <div className="rounded-2xl border border-[#E6E8E1] bg-white p-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Consistency check</div>
+              <div className="mt-2 text-lg font-semibold text-[#1F2937]">
+                {consistencyScore.total ? `${consistencyScore.winners}/${consistencyScore.total}` : "-"}
+              </div>
+              <div className="text-[11px] text-[#6B7C70]">Funds above category average</div>
+            </div>
+            <div className="rounded-2xl border border-[#E6E8E1] bg-white p-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Low-ranked funds</div>
+              <div className="mt-2 text-lg font-semibold text-[#1F2937]">{formatCurrency(yieldTrapValue)}</div>
+              <div className="text-[11px] text-[#6B7C70]">Money in bottom 25% of category</div>
+            </div>
+            <div className="rounded-2xl border border-[#E6E8E1] bg-white p-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Style tilt (mid/small)</div>
+              <div className="mt-2 text-lg font-semibold text-[#1F2937]">
+                {styleTilt !== null ? formatPct2(styleTilt * 100) : "-"}
+              </div>
+              <div className="text-[11px] text-[#6B7C70]">
+                {styleTilt !== null && styleTilt > 0.5 ? "Higher swings than a large-cap index" : "Balanced exposure"}
               </div>
             </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-[#EEF0E8] bg-white p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Benchmark win rate</div>
-                <div className="mt-2 text-lg font-semibold text-[#1F2937]">{formatPct(benchmarkInsights.winRate * 100, 0)}</div>
-                <div className="text-[11px] text-[#6B7C70]">Share of funds beating benchmarks.</div>
+            <div className="rounded-2xl border border-[#E6E8E1] bg-white p-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Risk profile</div>
+              <div className="mt-2 text-lg font-semibold text-[#1F2937]">
+                {riskDnaScore !== null ? riskDnaScore.toFixed(1) : "-"}
               </div>
-              <div className="rounded-2xl border border-[#EEF0E8] bg-white p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Active avg alpha</div>
-                <div className="mt-2 text-lg font-semibold text-[#1F2937]">{formatPct(benchmarkInsights.activeAvg, 1)}</div>
-                <div className="text-[11px] text-[#6B7C70]">Mean spread vs benchmarks.</div>
-              </div>
-              <div className="rounded-2xl border border-[#EEF0E8] bg-white p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Passive avg drift</div>
-                <div className="mt-2 text-lg font-semibold text-[#1F2937]">{formatPct(benchmarkInsights.passiveAvg, 1)}</div>
-                <div className="text-[11px] text-[#6B7C70]">Tracking spread vs benchmarks.</div>
-              </div>
+              <div className="text-[11px] text-[#6B7C70]">1 low risk • 10 high risk</div>
             </div>
+          </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-[#EEF0E8] bg-white p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Active winners & laggards</div>
-                {benchmarkMovers.activeWinners.length > 0 || benchmarkMovers.activeLaggards.length > 0 ? (
-                  <div className="mt-3 space-y-2 text-xs text-[#1F2937]">
-                    {benchmarkMovers.activeWinners.map((fund) => (
-                      <div key={`win-${fund.name}`} className="flex items-center justify-between">
-                        <span className="truncate">{fund.name}</span>
-                        <span className="text-emerald-600">+{fund.delta.toFixed(1)}% ({fund.period})</span>
-                      </div>
-                    ))}
-                    {benchmarkMovers.activeLaggards.map((fund) => (
-                      <div key={`lag-${fund.name}`} className="flex items-center justify-between">
-                        <span className="truncate">{fund.name}</span>
-                        <span className="text-rose-600">{fund.delta.toFixed(1)}% ({fund.period})</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-2 text-xs text-[#6B7C70]">Use the table below to spot emerging winners and laggards.</div>
-                )}
-              </div>
-              <div className="rounded-2xl border border-[#EEF0E8] bg-white p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Passive tracking drift</div>
-                {benchmarkMovers.passiveDrift.length > 0 ? (
-                  <div className="mt-3 space-y-2 text-xs text-[#1F2937]">
-                    {benchmarkMovers.passiveDrift.map((fund) => (
-                      <div key={`passive-${fund.name}`} className="flex items-center justify-between">
-                        <span className="truncate">{fund.name}</span>
-                        <span className="text-[#B35A5A]">{Math.abs(fund.delta).toFixed(1)}% ({fund.period})</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-2 text-xs text-[#6B7C70]">Passive coverage is low. Review passive alternatives with strong tracking.</div>
-                )}
-              </div>
+          <div className="rounded-3xl border border-[#DDE6F3] bg-white p-4 text-sm leading-relaxed text-[#1F2937]">
+            Your portfolio XIRR is <span className="font-semibold">{formatPct2(executivePulse.xirrPct)}</span>,
+            which is <span className="font-semibold">{executivePulse.direction}</span> the Nifty 50 TRI 10Y bar
+            (<span className="font-semibold">{formatPct2(executivePulse.hurdle)}</span>) by
+            <span className="font-semibold"> {formatPct2(executivePulse.diff)}</span>.
+            <br />
+            We also see <span className="font-semibold">{executivePulse.underperformingCount}</span> active funds that are not beating their benchmarks.
+            That drag is roughly <span className="font-semibold">{formatCurrency(lostAlphaAmount)}</span> per year in lost alpha.
+          </div>
+
+          <details className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
+            <summary className="cursor-pointer text-[11px] uppercase tracking-[0.2em] text-[#2F5D7C]">
+              How these are calculated
+            </summary>
+            <div className="mt-2 space-y-2">
+              <div>Market hurdle: 10-year return of a large, long-running Nifty 50 TRI benchmark fund from AMFI data.</div>
+              <div>Active winners: share of active money with positive 3Y alpha.</div>
+              <div>Consistency check: funds with 3Y IR above their category average.</div>
+              <div>Low-ranked funds: money parked in the bottom 25% of category peers.</div>
             </div>
+          </details>
 
-            <div className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
-              <span className="text-[#1F2937]">Decision guide:</span> keep winners with consistent alpha, review laggards below benchmark for 3Y+, and build a low-cost passive core if active alpha is weak.
-            </div>
-
-            <div className="rounded-3xl border border-[#DDE6F3] bg-white p-4 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Holdings vs benchmarks</div>
-              <div className="mt-2 text-sm text-[#1F2937]">Fund returns compared to their stated benchmarks.</div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-3xl border border-[#DDE6F3] bg-white p-4">
+              <div className="text-center text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Active fund audit</div>
+              <div className="mt-2 text-center text-sm font-medium text-[#1F2937]">
+                {activeReviewCount} active funds need review. Score, gap, and risk-adjusted returns decide the action.
+              </div>
               <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full text-xs">
+                <table className="min-w-full text-[11px] sm:text-xs">
                   <thead className="text-[#6B7C70]">
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold">Fund</th>
-                      <th className="px-3 py-2 text-left font-semibold">Benchmark</th>
-                      <th className="px-3 py-2 text-right font-semibold">Fund Return</th>
-                      <th className="px-3 py-2 text-right font-semibold">Benchmark Return</th>
-                      <th className="px-3 py-2 text-right font-semibold">Delta</th>
+                      <th className="px-2 py-2 text-left font-semibold">Fund</th>
+                      <th className="px-2 py-2 text-left font-semibold">Benchmark</th>
+                      <th className="px-2 py-2 text-right font-semibold">Gap vs benchmark</th>
+                      <th className="px-2 py-2 text-left font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {benchmarkTable.map((row) => (
+                    {activeAudit.map((row) => (
                       <tr key={row.name} className="border-t border-[#EEF0E8]">
-                        <td className="px-3 py-2 text-left text-[#1F2937]">{row.name}</td>
-                        <td className="px-3 py-2 text-left text-[#6B7C70]">{row.benchmarkName}</td>
-                        <td className="px-3 py-2 text-right text-[#1F2937]">
-                          {row.fundReturn !== null ? `${row.fundReturn.toFixed(1)}% (${row.fundPeriod})` : "-"}
-                        </td>
-                        <td className="px-3 py-2 text-right text-[#1F2937]">
-                          {row.benchmarkReturn !== null ? `${row.benchmarkReturn.toFixed(1)}% (${row.benchmarkPeriod})` : "-"}
-                        </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-2 py-2 text-left text-[#1F2937]">{row.name}</td>
+                        <td className="px-2 py-2 text-left text-[#6B7C70]">{row.benchmarkName}</td>
+                        <td className="px-2 py-2 text-right">
                           {row.delta !== null ? (
                             <span className={row.delta >= 0 ? "text-emerald-600" : "text-rose-600"}>
-                              {row.delta >= 0 ? "+" : ""}{row.delta.toFixed(1)}%
+                              {row.delta >= 0 ? "+" : ""}{row.delta.toFixed(2)}%
                             </span>
                           ) : (
                             "-"
                           )}
+                        </td>
+                        <td className="px-2 py-2 text-left">
+                          <span className={row.status === "Continue" ? "text-emerald-600" : "text-rose-600"}>
+                            {row.status}
+                          </span>
+                          {row.suggestion && (
+                            <span className="ml-2 text-[11px] text-[#6B7C70]">→ {row.suggestion}</span>
+                          )}
+                          <details className="mt-2 text-[11px] text-[#6B7C70]">
+                            <summary className="cursor-pointer uppercase tracking-[0.18em] text-[#2F5D7C]">Details</summary>
+                            <div className="mt-2 space-y-1">
+                              <div>Fund 3Y: {formatPct2(row.fundReturn)} · Bench 3Y: {formatPct2(row.benchmarkReturn)}</div>
+                              <div>Alpha 3Y: {formatPct2(row.alpha)} · IR 3Y: {formatPct2(row.ir3y)}</div>
+                              <div>Category IR avg: {formatPct2(row.categoryAvgIr)}</div>
+                              <div>Composite score: {row.compositeScore !== null ? row.compositeScore.toFixed(0) : "-"}</div>
+                            </div>
+                          </details>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="mt-2 text-[10px] text-[#9AA3AF]">Benchmarks come from AMFI raw data. Fund returns use AMFI 10Y when available; otherwise 5Y/3Y/1Y from analysis data.</div>
+            </div>
+
+            <div className="rounded-3xl border border-[#DDE6F3] bg-white p-4">
+              <div className="text-center text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Passive fund audit</div>
+              <div className="mt-2 text-center text-sm font-medium text-[#1F2937]">
+                {passiveSwitchCount} passive funds show tracking drift or benchmark lag.
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-[11px] sm:text-xs">
+                  <thead className="text-[#6B7C70]">
+                    <tr>
+                      <th className="px-2 py-2 text-left font-semibold">Fund</th>
+                      <th className="px-2 py-2 text-left font-semibold">Benchmark</th>
+                      <th className="px-2 py-2 text-right font-semibold">Gap vs benchmark</th>
+                      <th className="px-2 py-2 text-right font-semibold">Tracking diff 3Y</th>
+                      <th className="px-2 py-2 text-left font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {passiveAudit.map((row) => (
+                      <tr key={row.name} className="border-t border-[#EEF0E8]">
+                        <td className="px-2 py-2 text-left text-[#1F2937]">{row.name}</td>
+                        <td className="px-2 py-2 text-left text-[#6B7C70]">{row.benchmarkName}</td>
+                        <td className="px-2 py-2 text-right">
+                          {row.delta !== null ? (
+                            <span className={row.delta >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                              {row.delta >= 0 ? "+" : ""}{row.delta.toFixed(2)}%
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-right text-[#1F2937]">{formatPct2(row.tracking)}</td>
+                        <td className="px-2 py-2 text-left">
+                          <span className={row.status === "Continue" ? "text-emerald-600" : "text-rose-600"}>
+                            {row.status}
+                          </span>
+                          {row.suggestion && (
+                            <span className="ml-2 text-[11px] text-[#6B7C70]">→ {row.suggestion}</span>
+                          )}
+                          <details className="mt-2 text-[11px] text-[#6B7C70]">
+                            <summary className="cursor-pointer uppercase tracking-[0.18em] text-[#2F5D7C]">Details</summary>
+                            <div className="mt-2 space-y-1">
+                              <div>Fund 3Y: {formatPct2(row.fundReturn)} · Bench 3Y: {formatPct2(row.benchmarkReturn)}</div>
+                              <div>Tracking diff: {formatPct2(row.tracking)} · Best ETF: {row.bestEtfName || "-"}</div>
+                              <div>Best ETF tracking: {formatPct2(row.bestTracking)}</div>
+                            </div>
+                          </details>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        )}
+        </section>
 
-        {activeTab === "overview" && (
-          <>
-            <div className="grid gap-4 md:grid-cols-3">
-          {report
-            ? [
-                {
-                  title: "Funds in holding",
-                  value: `${report.holdingsCount}`,
-                  note: "Funds with active value",
-                  tooltip: tooltips.holdings,
-                },
-                {
-                  title: "Top fund share",
-                  value: summary.totalValue ? `${(report.topOneShare * 100).toFixed(1)}%` : "-",
-                  note: "Concentration in your largest fund",
-                  tooltip: tooltips.topFund,
-                },
-                {
-                  title: "Top 5 share",
-                  value: summary.totalValue ? `${(report.topFiveShare * 100).toFixed(1)}%` : "-",
-                  note: "Share of top five funds",
-                  tooltip: tooltips.topFive,
-                },
-              ].map((insight) => (
-                <div
-                  key={insight.title}
-                  className="rounded-3xl border border-[#E6E8E1] bg-[#FBFCFA] p-4"
-                >
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#6B7C70]">
-                    <span>{insight.title}</span>
-                    <InfoTip text={insight.tooltip} />
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-[#1F2937]">{insight.value}</div>
-                  <div className="mt-2 text-[11px] text-[#6B7C70]">{insight.note}</div>
-                </div>
-              ))
-            : null}
-            </div>
-
-            <div className="grid gap-6">
-          <div>
-            <ChartCard
-              title="Performance"
-              footer="Invested value vs current value over time"
-              options={performanceOptions}
-              value={performanceChart}
-              onChange={setPerformanceChart}
-            >
-              {lineHasData ? (
-                <div className="h-64 w-full" id="mfhc-performance-chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={lineData} margin={chartMargin}>
-                      <CartesianGrid vertical={false} stroke="#EEF2F7" />
-                      <XAxis
-                        dataKey="name"
-                        {...xAxisDefaults}
-                        interval={0}
-                        tickFormatter={(value, index) => formatXAxisTick(value, index, lineData.length)}
-                      />
-                      <YAxis
-                        {...axisDefaults}
-                        tickFormatter={(value) => formatCurrency(Number(value))}
-                        domain={["auto", "auto"]}
-                        tickCount={5}
-                      />
-                      <Tooltip
-                        formatter={(value: number, name: string) => [
-                          formatCurrency(value),
-                          name === "valueOne" ? "Invested" : "Current Value",
-                        ]}
-                        contentStyle={{ borderRadius: 16, borderColor: "#E6E8E1" }}
-                        labelFormatter={(label) => `Date: ${label}`}
-                        cursor={{ stroke: "transparent" }}
-                      />
-                      <Line type="monotone" dataKey="valueOne" stroke="#BDA06D" strokeWidth={2} dot={false} name="Invested" />
-                      <Line type="monotone" dataKey="valueTwo" stroke="#2F5D7C" strokeWidth={3} dot={false} name="Current" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="flex h-64 items-center justify-center text-sm text-[#6B7C70]">
-                  NAV data is still loading. Please try again in a moment.
-                </div>
-              )}
-            </ChartCard>
-          </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           <ChartCard
             title="Scheme allocation"
             footer={`${schemeLevelLabel}. Tap a slice to drill down.`}
@@ -1630,9 +1820,10 @@ export default function MutualFundHealthCheckDashboard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number, name: string) => {
-                        const percent = schemeTotal ? (Number(value) / schemeTotal) * 100 : 0;
-                        return [formatCurrency(Number(value)), `${name} (${percent.toFixed(1)}%)`];
+                      formatter={(value: number | undefined, name: string | undefined) => {
+                        const safeValue = Number(value ?? 0);
+                        const percent = schemeTotal ? (safeValue / schemeTotal) * 100 : 0;
+                        return [formatCurrency(safeValue), `${name ?? ""} (${percent.toFixed(1)}%)`];
                       }}
                       contentStyle={{ borderRadius: 16, borderColor: "#E6E8E1" }}
                     />
@@ -1721,9 +1912,10 @@ export default function MutualFundHealthCheckDashboard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number, name: string) => {
-                        const percent = amcTotalValue ? (Number(value) / amcTotalValue) * 100 : 0;
-                        return [formatCurrency(Number(value)), `${name} (${percent.toFixed(1)}%)`];
+                      formatter={(value: number | undefined, name: string | undefined) => {
+                        const safeValue = Number(value ?? 0);
+                        const percent = amcTotalValue ? (safeValue / amcTotalValue) * 100 : 0;
+                        return [formatCurrency(safeValue), `${name ?? ""} (${percent.toFixed(1)}%)`];
                       }}
                       contentStyle={{ borderRadius: 16, borderColor: "#E6E8E1" }}
                     />
@@ -1782,41 +1974,23 @@ export default function MutualFundHealthCheckDashboard() {
               </div>
             ) : null}
           </ChartCard>
-            </div>
+        </div>
 
-            {report?.insights?.length ? (
+        {insightCards.length ? (
           <div className="rounded-3xl border border-[#E6E8E1] bg-white p-6 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
             <div className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Actionable insights</div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {report.insights.map((insight) => (
-                <div key={insight.title} className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-[#1F2937]">{insight.title}</div>
-                    <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] ${signalClass(insight.signal)}`}>
-                      {insight.signal}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-2 text-xs text-[#6B7C70]">
-                    <div><span className="text-[#1F2937]">Observation:</span> {insight.observation}</div>
-                    <div><span className="text-[#1F2937]">What this indicates:</span> {insight.meaning}</div>
-                    <div><span className="text-[#1F2937]">Reassurance:</span> {insight.reassurance}</div>
-                    <div><span className="text-[#1F2937]">Suggested check:</span> {insight.suggestedCheck}</div>
-                  </div>
-                </div>
+            <div className="mt-2 text-sm text-[#1F2937]">Priority takeaways. Expand each card for the next step.</div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {insightCards.map((insight) => (
+                <details key={insight.title} className="rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#1F2937]">{insight.title}</summary>
+                  <div className="mt-2 text-xs text-[#6B7C70]">{insight.summary}</div>
+                  <div className="mt-2 text-xs text-[#6B7C70]">Next step: {insight.detail}</div>
+                </details>
               ))}
             </div>
-            {report.insightSummary && (
-              <div className="mt-4 rounded-2xl border border-[#EEF0E8] bg-white p-4 text-sm text-[#1F2937]">
-                {report.insightSummary}
-              </div>
-            )}
-            <div className="mt-4 rounded-2xl border border-[#EEF0E8] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
-              <span className="text-[#1F2937]">Signal guide:</span> Normal = healthy range, Elevated = review soon, Watch-worthy = monitor closely, Strong/Aggressive = high attention area.
-            </div>
           </div>
-            ) : null}
-          </>
-        )}
+        ) : null}
 
         <div className="rounded-2xl border border-[#E6E8E1] bg-[#FBFCFA] p-4 text-xs text-[#6B7C70]">
           {disclaimerText}

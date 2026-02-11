@@ -1,5 +1,7 @@
 export interface FundAnalytics {
   Fund_Name: string;
+  ISIN?: string | null;
+  ISIN_Code?: string | null;
   AMC: string;
   Category: string;
   Sub_Category: string;

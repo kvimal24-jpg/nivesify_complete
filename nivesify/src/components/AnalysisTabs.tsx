@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
+  { label: "Match", href: "/mutual-fund-match" },
   { label: "Analysis", href: "/mutual-fund-analysis" },
   { label: "Active", href: "/active-funds" },
   { label: "Passive", href: "/index-funds" },

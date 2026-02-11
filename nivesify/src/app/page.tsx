@@ -74,6 +74,7 @@ export default function Home() {
                 title: 'My Money Dashboard',
                 desc: 'Add all your investments — mutual funds, PF, fixed deposits, gold, cash. See your full financial picture and future direction in one place.',
                 quote: 'Know where you stand.',
+                href: '/dashboard',
                 icon: (
                   <svg width="36" height="36" fill="none" stroke="#2F5D7C" strokeWidth="1.6">
                     <rect x="6" y="6" width="24" height="24" rx="4" />
@@ -85,6 +86,7 @@ export default function Home() {
                 title: 'Mutual Fund Health Check',
                 desc: 'Upload your CAS. See portfolio and fund-level XIRR, compare with benchmarks, and get clear actions — keep, reduce, or exit.',
                 quote: 'Let returns justify effort.',
+                href: '/mutual-fund-health-check/dashboard',
                 icon: (
                   <svg width="36" height="36" fill="none" stroke="#2F5D7C" strokeWidth="1.6">
                     <path d="M9 26V12M18 26V9M27 26V16" />
@@ -92,9 +94,10 @@ export default function Home() {
                 )
               },
               {
-                title: 'Mutual Fund Analysis',
-                desc: 'Industry-wide insights, category strength, and plain-language methodology before you pick active or index funds.',
-                quote: 'Start with the industry map.',
+                title: 'Find My Mutual Fund Match',
+                desc: 'Turn life goals into a SIP plan and a fund mix built for your time horizon and risk comfort.',
+                quote: 'Match goals to funds.',
+                href: '/mutual-fund-match',
                 icon: (
                   <svg width="36" height="36" fill="none" stroke="#2F5D7C" strokeWidth="1.6">
                     <path d="M6 10h24M6 18h18M6 26h20" />
@@ -105,6 +108,7 @@ export default function Home() {
                 title: 'Life Calculators',
                 desc: 'Retirement, FIRE, education, sabbaticals, big purchases. Model real life decisions, not just investment returns.',
                 quote: 'Decide with clarity.',
+                href: '/dashboard/calculators',
                 icon: (
                   <svg width="36" height="36" fill="none" stroke="#2F5D7C" strokeWidth="1.6">
                     <path d="M8 10h20v18H8z" />
@@ -156,43 +160,15 @@ export default function Home() {
                 </div>
               );
 
-              if (card.title === 'Mutual Fund Health Check') {
+              if (card.href) {
                 return (
-                  <Link key={i} href="/mutual-fund-health-check/dashboard" className="block h-full">
+                  <Link key={i} href={card.href} className="block h-full">
                     {cardBody}
                   </Link>
                 );
               }
 
-              if (card.title === 'My Money Dashboard') {
-                return (
-                  <Link key={i} href="/dashboard" className="block h-full">
-                    {cardBody}
-                  </Link>
-                );
-              }
-
-              if (card.title === 'Life Calculators') {
-                return (
-                  <Link key={i} href="/dashboard/calculators" className="block h-full">
-                    {cardBody}
-                  </Link>
-                );
-              }
-
-              if (card.title === 'Mutual Fund Analysis') {
-                return (
-                  <Link key={i} href="/mutual-fund-analysis" className="block h-full">
-                    {cardBody}
-                  </Link>
-                );
-              }
-
-              return (
-                <div key={i}>
-                  {cardBody}
-                </div>
-              );
+              return <div key={i}>{cardBody}</div>;
             })}
 
           </div>

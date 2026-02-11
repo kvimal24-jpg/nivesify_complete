@@ -13,6 +13,34 @@ export type ReportInsight = {
   severity: "info" | "warning" | "positive";
 };
 
+export type PdfInsightMetric = {
+  title: string;
+  value: string;
+  note: string;
+};
+
+export type PdfAuditRow = {
+  name: string;
+  benchmark?: string;
+  gap?: string;
+  tracking?: string;
+  action: string;
+};
+
+export type PdfInsightCard = {
+  title: string;
+  summary: string;
+  detail: string;
+};
+
+export type PdfInsights = {
+  metrics: PdfInsightMetric[];
+  executiveSummary: string;
+  activeAuditRows: PdfAuditRow[];
+  passiveAuditRows: PdfAuditRow[];
+  insightCards: PdfInsightCard[];
+};
+
 export type SchemeBreakdownNode = {
   name: string;
   size?: number;
@@ -480,13 +508,14 @@ export const generatePdfReport = async (params: {
   summary: { totalValue: number; invested: number; allTimeProfit: number; monthlyIncome: number };
   xirrValue: number | null;
   report: ReportData;
+  insights: PdfInsights;
   holder: { name: string; pan?: string; email?: string };
   chartIds: { performance: string; scheme: string; amc: string };
 }) => {
   const [{ jsPDF }] = await Promise.all([import("jspdf")]);
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const { summary, report, xirrValue, logoUrl, holder } = params;
+  const { summary, report, xirrValue, logoUrl, holder, insights } = params;
   void params.chartIds;
 
   const loadLogo = async () => {
@@ -515,15 +544,16 @@ export const generatePdfReport = async (params: {
   const theme = {
     ink: [31, 41, 55] as const,
     muted: [107, 124, 112] as const,
-    border: [206, 214, 204] as const,
-    surface: [246, 248, 242] as const,
-    accent: [74, 93, 78] as const,
+    border: [214, 221, 232] as const,
+    surface: [245, 248, 255] as const,
+    accent: [47, 93, 124] as const,
+    accentSoft: [234, 241, 251] as const,
     warn: [181, 90, 90] as const,
-    line: [225, 230, 221] as const,
+    line: [225, 232, 244] as const,
     signal: {
-      Normal: [74, 93, 78] as const,
-      Elevated: [138, 109, 59] as const,
-      "Watch-worthy": [154, 90, 44] as const,
+      Normal: [47, 93, 124] as const,
+      Elevated: [189, 160, 109] as const,
+      "Watch-worthy": [169, 113, 62] as const,
       Strong: [181, 90, 90] as const,
       Aggressive: [156, 63, 63] as const,
     },
@@ -535,6 +565,8 @@ export const generatePdfReport = async (params: {
     body: 9,
     small: 8,
   };
+  const lineHeight = 11;
+  const tableHeaderHeight = 22;
 
   const drawLogo = (x: number, y: number, w: number, h: number) => {
     if (!logoData) return;
@@ -548,6 +580,13 @@ export const generatePdfReport = async (params: {
     doc.text(text, marginX, y);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(typeScale.body);
+  };
+
+  const addSectionSubtitle = (text: string, y: number) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(typeScale.small);
+    doc.setTextColor(...theme.muted);
+    doc.text(text, marginX, y);
   };
 
   const drawDivider = (y: number) => {
@@ -602,27 +641,27 @@ export const generatePdfReport = async (params: {
     }
 
     const drawHeader = () => {
-      doc.setFillColor(...theme.surface);
+      doc.setFillColor(...theme.accentSoft);
       doc.setDrawColor(...theme.border);
-      doc.rect(marginX, y, contentWidth, 20, "FD");
+      doc.rect(marginX, y, contentWidth, tableHeaderHeight, "FD");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
+      doc.setFontSize(typeScale.small);
       doc.setTextColor(...theme.muted);
       let x = marginX + 8;
       headers.forEach((header, index) => {
-        doc.text(header, x, y + 13);
+        doc.text(header, x, y + 14);
         x += colWidths[index];
       });
-      y += 24;
+      y += tableHeaderHeight + 4;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(typeScale.body);
       doc.setTextColor(...theme.ink);
 
       let dividerX = marginX;
       colWidths.forEach((width) => {
         dividerX += width;
         doc.setDrawColor(...theme.line);
-        doc.line(dividerX, y - 24, dividerX, y + 4);
+        doc.line(dividerX, y - tableHeaderHeight - 4, dividerX, y + 4);
       });
     };
 
@@ -635,12 +674,12 @@ export const generatePdfReport = async (params: {
       }
 
       const cellLines = row.map((cell, index) =>
-        doc.splitTextToSize(cell, colWidths[index] - 6)
+        doc.splitTextToSize(cell, colWidths[index] - 10)
       );
-      const rowHeight = Math.max(...cellLines.map((lines) => lines.length)) * 10 + 8;
+      const rowHeight = Math.max(...cellLines.map((lines) => lines.length)) * lineHeight + 8;
       let cellX = marginX + 8;
       cellLines.forEach((lines, index) => {
-        doc.text(lines, cellX, y + 10);
+        doc.text(lines, cellX, y + lineHeight);
         cellX += colWidths[index];
       });
       let dividerX = marginX;
@@ -664,7 +703,7 @@ export const generatePdfReport = async (params: {
   doc.setFillColor(...theme.surface);
   doc.rect(0, 0, pageWidth, pageHeight, "F");
   doc.setFillColor(...theme.accent);
-  doc.rect(0, 0, 12, pageHeight, "F");
+  doc.rect(0, 0, 10, pageHeight, "F");
   drawLogo(marginX, 60, 90, 34);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
@@ -686,13 +725,13 @@ export const generatePdfReport = async (params: {
   const coverCardY = 230;
   const coverCards = [
     { title: "Total value", value: formatCurrencyPlain(summary.totalValue) },
-    { title: "Invested", value: formatCurrencyPlain(summary.invested) },
     { title: "Portfolio XIRR", value: formatPercent(xirrValue, 2) },
+    { title: "All-time returns", value: formatCurrencyPlain(summary.allTimeProfit) },
   ];
   coverCards.forEach((card, index) => {
     const x = marginX + index * (coverCardWidth + 12);
     doc.setDrawColor(...theme.border);
-    doc.setFillColor(...theme.surface);
+    doc.setFillColor(...theme.accentSoft);
     doc.roundedRect(x, coverCardY, coverCardWidth, 60, 10, 10, "FD");
     doc.setFillColor(...theme.accent);
     doc.rect(x, coverCardY, 4, 60, "F");
@@ -710,6 +749,8 @@ export const generatePdfReport = async (params: {
   let cursorY = 76;
   addSectionTitle("Portfolio summary", cursorY);
   cursorY += 14;
+  addSectionSubtitle("Key account details and current portfolio snapshot.", cursorY);
+  cursorY += 12;
 
   cursorY = drawTable({
     headers: ["Investor details", "Value"],
@@ -728,11 +769,11 @@ export const generatePdfReport = async (params: {
   const cardGap = 16;
   const cards = [
     { title: "Total value", value: formatCurrencyPlain(summary.totalValue) },
-    { title: "Invested", value: formatCurrencyPlain(summary.invested) },
-    { title: "All-time returns", value: formatCurrencyPlain(summary.allTimeProfit) },
     { title: "Portfolio XIRR", value: formatPercent(xirrValue, 2) },
-    { title: "Monthly income (25x)", value: formatCurrencyPlain(summary.monthlyIncome) },
+    { title: "All-time returns", value: formatCurrencyPlain(summary.allTimeProfit) },
+    { title: "Invested", value: formatCurrencyPlain(summary.invested) },
     { title: "Holdings count", value: `${report.holdingsCount}` },
+    { title: "Monthly income (25x)", value: formatCurrencyPlain(summary.monthlyIncome) },
   ];
 
   cards.forEach((card, index) => {
@@ -741,7 +782,7 @@ export const generatePdfReport = async (params: {
     const x = marginX + col * (cardWidth + cardGap);
     const y = cursorY + row * (cardHeight + 12);
     doc.setDrawColor(...theme.border);
-    doc.setFillColor(...theme.surface);
+    doc.setFillColor(...theme.accentSoft);
     doc.rect(x, y, cardWidth, cardHeight, "FD");
     doc.setFillColor(...theme.accent);
     doc.rect(x, y, 4, cardHeight, "F");
@@ -757,6 +798,8 @@ export const generatePdfReport = async (params: {
 
   drawDivider(cursorY);
   cursorY += 16;
+  addSectionSubtitle("Quick performance metrics at a glance.", cursorY);
+  cursorY += 10;
   const performanceRows = [
     ["Current value", formatCurrencyPlain(summary.totalValue)],
     ["Invested", formatCurrencyPlain(summary.invested)],
@@ -777,8 +820,75 @@ export const generatePdfReport = async (params: {
   cursorY += 10;
   drawDivider(cursorY);
   cursorY += 16;
+  addSectionTitle("Nivesify insights", cursorY);
+  cursorY += 14;
+  addSectionSubtitle("Your portfolio diagnosis in simple numbers.", cursorY);
+  cursorY += 10;
+
+  const insightMetricRows = insights.metrics.map((metric, index) => [
+    String(index + 1),
+    metric.title,
+    metric.value,
+    metric.note,
+  ]);
+
+  cursorY = drawTable({
+    headers: ["#", "Metric", "Value", "Why it matters"],
+    rows: insightMetricRows,
+    colWidths: [24, 170, 70, 251],
+    startY: cursorY,
+  });
+
+  cursorY += 10;
+  if (cursorY > pageHeight - 120) {
+    cursorY = startNewPage();
+  }
+  doc.setDrawColor(...theme.border);
+  doc.setFillColor(...theme.accentSoft);
+  const summaryLines = doc.splitTextToSize(insights.executiveSummary, contentWidth - 20);
+  const summaryHeight = summaryLines.length * lineHeight + 24;
+  doc.roundedRect(marginX, cursorY, contentWidth, summaryHeight, 8, 8, "FD");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(typeScale.body);
+  doc.setTextColor(...theme.ink);
+  doc.text(summaryLines, marginX + 10, cursorY + 18);
+  cursorY += summaryHeight + 12;
+
+  cursorY = drawTable({
+    headers: ["Fund", "Benchmark", "Gap", "Action"],
+    rows: insights.activeAuditRows.map((row) => [
+      row.name,
+      row.benchmark || "-",
+      row.gap || "-",
+      row.action,
+    ]),
+    colWidths: [180, 140, 70, 125],
+    startY: cursorY,
+    title: "Active fund audit",
+  });
+
+  cursorY += 10;
+  cursorY = drawTable({
+    headers: ["Fund", "Benchmark", "Gap", "Tracking", "Action"],
+    rows: insights.passiveAuditRows.map((row) => [
+      row.name,
+      row.benchmark || "-",
+      row.gap || "-",
+      row.tracking || "-",
+      row.action,
+    ]),
+    colWidths: [170, 120, 60, 70, 110],
+    startY: cursorY,
+    title: "Passive fund audit",
+  });
+
+  cursorY += 10;
+  drawDivider(cursorY);
+  cursorY += 16;
   addSectionTitle("Allocation summary", cursorY);
   cursorY += 14;
+  addSectionSubtitle("Where your money is allocated by category and AMC.", cursorY);
+  cursorY += 10;
 
   const categoryTotals = new Map<string, number>();
   report.fundDetails.forEach((fund) => {
@@ -819,99 +929,40 @@ export const generatePdfReport = async (params: {
   drawDivider(cursorY);
   cursorY += 16;
   addSectionTitle("Actionable insights", cursorY);
-  cursorY += 12;
+  cursorY += 10;
+  drawDivider(cursorY);
+  cursorY += 16;
 
-  report.insights.forEach((insight) => {
-    const cardHeightBase = 56;
-    if (cursorY > pageHeight - 130) {
+  insights.insightCards.forEach((insight, index) => {
+    if (cursorY > pageHeight - 120) {
       cursorY = startNewPage();
     }
-    const signalColor = theme.signal[insight.signal] || theme.accent;
-    const signalTextColor =
-      insight.signal === "Strong" || insight.signal === "Aggressive"
-        ? [255, 255, 255]
-        : theme.ink;
-    const borderColor =
-      insight.severity === "warning" ? theme.warn : insight.severity === "positive" ? theme.accent : theme.border;
+    const summaryLines = doc.splitTextToSize(insight.summary, contentWidth - 24);
+    const detailLines = doc.splitTextToSize(`Next step: ${insight.detail}`, contentWidth - 24);
+    const contentHeight = (summaryLines.length + detailLines.length) * lineHeight + 28;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(typeScale.body);
-    doc.setTextColor(...theme.ink);
-    const observationLines = doc.splitTextToSize(`Observation: ${insight.observation}`, contentWidth - 24);
-    const meaningLines = doc.splitTextToSize(`What this indicates: ${insight.meaning}`, contentWidth - 24);
-    const reassuranceLines = doc.splitTextToSize(`Reassurance: ${insight.reassurance}`, contentWidth - 24);
-    const actionLines = doc.splitTextToSize(`Suggested check: ${insight.suggestedCheck}`, contentWidth - 24);
-    const contentHeight =
-      (observationLines.length + meaningLines.length + reassuranceLines.length + actionLines.length) * 10 + 36;
-    const boxHeight = Math.max(cardHeightBase, contentHeight + 24);
-
-    doc.setDrawColor(...borderColor);
-    doc.setFillColor(...theme.surface);
-    doc.roundedRect(marginX, cursorY, contentWidth, boxHeight, 10, 10, "FD");
+    doc.setDrawColor(...theme.border);
+    doc.setFillColor(...theme.accentSoft);
+    doc.roundedRect(marginX, cursorY, contentWidth, contentHeight, 10, 10, "FD");
     doc.setFillColor(...theme.line);
-    doc.roundedRect(marginX, cursorY, 6, boxHeight, 8, 8, "F");
+    doc.roundedRect(marginX, cursorY, 6, contentHeight, 8, 8, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(...theme.ink);
-    doc.text(insight.title, marginX + 14, cursorY + 16);
-    const signalText = insight.signal.toUpperCase();
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(typeScale.small);
-    const signalWidth = doc.getTextWidth(signalText) + 14;
-    const signalX = marginX + contentWidth - signalWidth - 10;
-    doc.setDrawColor(...theme.border);
-    doc.setFillColor(...signalColor);
-    doc.roundedRect(signalX, cursorY + 6, signalWidth, 16, 8, 8, "FD");
-    doc.setTextColor(...signalTextColor);
-    doc.text(signalText, signalX + 7, cursorY + 18);
+    doc.text(`${index + 1}. ${insight.title}`, marginX + 14, cursorY + 16);
 
-    doc.setTextColor(...theme.ink);
-
-    let innerY = cursorY + 32;
-    doc.text(observationLines, marginX + 12, innerY);
-    innerY += observationLines.length * 10;
-    doc.text(meaningLines, marginX + 12, innerY);
-    innerY += meaningLines.length * 10;
-    doc.setTextColor(...theme.muted);
-    doc.text(reassuranceLines, marginX + 12, innerY);
-    innerY += reassuranceLines.length * 10;
-    doc.setTextColor(...theme.ink);
-    doc.text(actionLines, marginX + 12, innerY);
-
-    cursorY += boxHeight + 12;
-  });
-
-  if (report.insightSummary) {
-    if (cursorY > pageHeight - 90) {
-      cursorY = startNewPage();
-    }
-    doc.setDrawColor(...theme.border);
-    doc.setFillColor(...theme.surface);
-    doc.roundedRect(marginX, cursorY, contentWidth, 44, 8, 8, "FD");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(typeScale.body);
     doc.setTextColor(...theme.ink);
-    doc.text(doc.splitTextToSize(report.insightSummary, contentWidth - 20), marginX + 10, cursorY + 26);
-    cursorY += 56;
-  }
+    let innerY = cursorY + 32;
+    doc.text(summaryLines, marginX + 12, innerY);
+    innerY += summaryLines.length * lineHeight;
+    doc.setTextColor(...theme.muted);
+    doc.text(detailLines, marginX + 12, innerY);
 
-  if (cursorY > pageHeight - 90) {
-    cursorY = startNewPage();
-  }
-  doc.setDrawColor(...theme.border);
-  doc.setFillColor(...theme.surface);
-  doc.roundedRect(marginX, cursorY, contentWidth, 48, 8, 8, "FD");
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(typeScale.small);
-  doc.setTextColor(...theme.muted);
-  doc.text(
-    "Signal guide: Normal = healthy range, Elevated = review soon, Watch-worthy = monitor closely, Strong/Aggressive = high attention area.",
-    marginX + 10,
-    cursorY + 28,
-    { maxWidth: contentWidth - 20 }
-  );
-  cursorY += 60;
+    cursorY += contentHeight + 12;
+  });
 
   cursorY = startNewPage();
   addSectionTitle("Holdings detail", cursorY);

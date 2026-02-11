@@ -295,7 +295,7 @@ export default function ActiveFundsExplorer({
 
   return (
     <section className="mt-12">
-      <div className="flex flex-wrap gap-3 border-b border-[#D9DED5] pb-4">
+      <div className="flex gap-2 overflow-x-auto border-b border-[#E7EDF7] pb-3">
         {[
           { key: "insights", label: "Insights" },
           { key: "shortlist", label: "Shortlisted" },
@@ -306,7 +306,7 @@ export default function ActiveFundsExplorer({
             key={item.key}
             type="button"
             onClick={() => setTab(item.key as TabKey)}
-            className={`px-4 py-2 rounded-full text-sm font-serif transition-all ${
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-serif transition-all ${
               tab === item.key
                 ? "bg-[#4A5D4E] text-white"
                 : "bg-white text-[#4A5D4E] border border-[#4A5D4E]/20"
@@ -319,97 +319,98 @@ export default function ActiveFundsExplorer({
 
       {tab === "insights" && (
         <div className="mt-8 space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Coverage</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">{manifest?.counts?.funds ?? funds.length}</p>
-              <p className="text-sm font-serif text-[#6B7C70]">active funds tracked</p>
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">{manifest?.counts?.funds ?? funds.length}</p>
+              <p className="text-xs font-serif text-[#6B7C70]">active funds tracked</p>
             </div>
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Top 10 percent</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">{topCount}</p>
-              <p className="text-sm font-serif text-[#6B7C70]">consistent alpha</p>
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">{topCount}</p>
+              <p className="text-xs font-serif text-[#6B7C70]">consistent alpha</p>
             </div>
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Avg alpha 3Y</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">
                 {avgAlpha3Y === null ? "-" : `${avgAlpha3Y.toFixed(2)}%`}
               </p>
-              <p className="text-sm font-serif text-[#6B7C70]">across active universe</p>
+              <p className="text-xs font-serif text-[#6B7C70]">across active universe</p>
             </div>
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Median IR 3Y</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">
                 {medianIr3Y === null ? "-" : formatNumber(medianIr3Y, 2)}
               </p>
-              <p className="text-sm font-serif text-[#6B7C70]">risk-adjusted skill</p>
+              <p className="text-xs font-serif text-[#6B7C70]">risk-adjusted skill</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {topReturnInsights.map((item) => (
-              <div key={item.label} className="bg-[#FFF8EC] border border-[#E7DDC7] rounded-2xl p-4">
+              <div key={item.label} className="bg-[#FFF8EC] border border-[#E7EDF7] rounded-2xl p-3">
                 <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">{item.label}</p>
-                <p className="mt-3 text-lg font-serif text-[#1F2937]">{item.subCategory}</p>
-                <p className="text-xs font-serif text-[#6B7C70]">Category: {item.category}</p>
-                <p className="text-xs font-serif text-[#6B7C70]">Avg return: {formatPct(item.value)}</p>
-                <p className="text-xs font-serif text-[#6B7C70]">AUM: {formatCompact(item.aum)} Cr</p>
+                <p className="mt-2 text-base font-serif text-[#1F2937] break-words">{item.subCategory}</p>
+                <p className="text-[11px] font-serif text-[#6B7C70]">Category: {item.category}</p>
+                <p className="text-[11px] font-serif text-[#6B7C70]">Avg return: {formatPct(item.value)}</p>
+                <p className="text-[11px] font-serif text-[#6B7C70]">AUM: {formatCompact(item.aum)} Cr</p>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#EEF4FF] border border-[#DDE3EE] rounded-2xl p-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+            <div className="bg-[#EEF4FF] border border-[#E7EDF7] rounded-2xl p-3">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Highest beat rate</p>
-              <p className="mt-3 text-lg font-serif text-[#1F2937]">{topBeatCategory?.Category_Name ?? "-"}</p>
-              <p className="text-xs font-serif text-[#6B7C70]">
+              <p className="mt-2 text-base font-serif text-[#1F2937] break-words">{topBeatCategory?.Category_Name ?? "-"}</p>
+              <p className="text-[11px] font-serif text-[#6B7C70]">
                 Beat rate: {formatPct(topBeatCategory?.Pct_Funds_Beating_Benchmark_3Y, 1)}
               </p>
             </div>
-            <div className="bg-[#EAF1E8] border border-[#DCE7D7] rounded-2xl p-4">
+            <div className="bg-[#EAF1E8] border border-[#E7EDF7] rounded-2xl p-3">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Best risk-adjusted</p>
-              <p className="mt-3 text-lg font-serif text-[#1F2937]">{topIrCategory?.Category_Name ?? "-"}</p>
-              <p className="text-xs font-serif text-[#6B7C70]">Avg IR 3Y: {formatNumber(topIrCategory?.Avg_IR_3Y, 2)}</p>
+              <p className="mt-2 text-base font-serif text-[#1F2937] break-words">{topIrCategory?.Category_Name ?? "-"}</p>
+              <p className="text-[11px] font-serif text-[#6B7C70]">Avg IR 3Y: {formatNumber(topIrCategory?.Avg_IR_3Y, 2)}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-[#EAF1E8] border border-[#DCE7D7] rounded-3xl p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="bg-[#EAF1E8] border border-[#E7EDF7] rounded-3xl p-4">
               <h3 className="text-lg font-serif text-[#1F2937]">Industry pulse</h3>
-              <p className="mt-3 text-sm font-serif text-[#4A5D4E] leading-relaxed">
+              <p className="mt-2 text-xs font-serif text-[#4A5D4E]">
                 {industryInsight?.Pct_Funds_Beating_Benchmark_3Y === null ||
                 industryInsight?.Pct_Funds_Beating_Benchmark_3Y === undefined
-                  ? "Benchmark success data is unavailable in this run."
-                  : `${industryInsight.Pct_Funds_Beating_Benchmark_3Y.toFixed(1)}% of funds beat their benchmarks over 3Y.`}
+                  ? "3Y beat-rate data is unavailable."
+                  : `${industryInsight.Pct_Funds_Beating_Benchmark_3Y.toFixed(1)}% beat rate (3Y).`}
               </p>
-              <div className="mt-4 text-sm font-serif text-[#4A5D4E] space-y-1">
-                <div>Avg 3Y return: {formatPct(industryInsight?.Avg_3Y_Return)}</div>
-                <div>Avg alpha 3Y: {formatPct(industryInsight?.Avg_Alpha_3Y)}</div>
-                <div>Total AUM: {formatCompact(industryInsight?.Total_AUM)} Cr</div>
-              </div>
+              <details className="mt-2 text-xs font-serif text-[#4A5D4E]">
+                <summary className="cursor-pointer text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Details</summary>
+                <div className="mt-2 space-y-1">
+                  <div>Avg 3Y return: {formatPct(industryInsight?.Avg_3Y_Return)}</div>
+                  <div>Avg alpha 3Y: {formatPct(industryInsight?.Avg_Alpha_3Y)}</div>
+                  <div>Total AUM: {formatCompact(industryInsight?.Total_AUM)} Cr</div>
+                </div>
+              </details>
             </div>
-            <div className="bg-[#F7F0E6] border border-[#E8DDC6] rounded-3xl p-6">
+            <div className="bg-[#F7F0E6] border border-[#E7EDF7] rounded-3xl p-4">
               <h3 className="text-lg font-serif text-[#1F2937]">Category advantage</h3>
-              <p className="mt-3 text-sm font-serif text-[#4A5D4E] leading-relaxed">
-                Use this table to see which categories give active managers the most room to add value.
-              </p>
-              <div className="mt-4 text-sm font-serif text-[#4A5D4E]">
-                Avg IR 3Y: {formatNumber(industryInsight?.Avg_IR_3Y, 2)}
-              </div>
+              <p className="mt-2 text-xs font-serif text-[#4A5D4E]">Scan categories where skill shows up consistently.</p>
+              <details className="mt-2 text-xs font-serif text-[#4A5D4E]">
+                <summary className="cursor-pointer text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Details</summary>
+                <div className="mt-2">Avg IR 3Y: {formatNumber(industryInsight?.Avg_IR_3Y, 2)}</div>
+              </details>
             </div>
-            <div className="bg-[#EEF1F6] border border-[#DDE3EE] rounded-3xl p-6">
+            <div className="bg-[#EEF1F6] border border-[#E7EDF7] rounded-3xl p-4">
               <h3 className="text-lg font-serif text-[#1F2937]">Data freshness</h3>
-              <p className="mt-3 text-sm font-serif text-[#4A5D4E] leading-relaxed">
-                Data as of {manifest?.reportDate ?? "latest run"}. Pipeline refreshes daily.
-              </p>
-              <div className="mt-4 text-sm font-serif text-[#4A5D4E]">
-                Total records: {manifest?.counts?.raw ?? "-"}
-              </div>
+              <p className="mt-2 text-xs font-serif text-[#4A5D4E]">As of {manifest?.reportDate ?? "latest run"}.</p>
+              <details className="mt-2 text-xs font-serif text-[#4A5D4E]">
+                <summary className="cursor-pointer text-[11px] uppercase tracking-[0.2em] text-[#6B7C70]">Details</summary>
+                <div className="mt-2">Total records: {manifest?.counts?.raw ?? "-"}</div>
+              </details>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white border border-[#E7EDF7] rounded-3xl p-5">
               <h3 className="text-lg font-serif text-[#1F2937] mb-4">Category scoreboard</h3>
               <FilterableTable
                 data={categoryReturnStats}
@@ -458,7 +459,7 @@ export default function ActiveFundsExplorer({
               />
             </div>
 
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="bg-white border border-[#E7EDF7] rounded-3xl p-5">
               <h3 className="text-lg font-serif text-[#1F2937] mb-4">Sub-category signals</h3>
               <FilterableTable
                 data={subCategoryReturnStats}
@@ -508,11 +509,12 @@ export default function ActiveFundsExplorer({
             </div>
           </div>
 
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+          <div className="bg-white border border-[#E7EDF7] rounded-3xl p-5">
             <h3 className="text-lg font-serif text-[#1F2937]">Category momentum</h3>
-            <p className="mt-2 text-sm font-serif text-[#4A5D4E]">
-              Alpha shows outperformance; beat rate shows how often managers deliver it.
-            </p>
+            <details className="mt-2 text-xs font-serif text-[#4A5D4E]">
+              <summary className="cursor-pointer text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Read more</summary>
+              <p className="mt-2">Alpha shows outperformance; beat rate shows how often managers deliver it.</p>
+            </details>
             <div className="mt-6 space-y-4">
               {chartCategories.map((row) => {
                 const alphaValue = row.Avg_Alpha_3Y ?? 0;
@@ -522,9 +524,9 @@ export default function ActiveFundsExplorer({
 
                 return (
                   <div key={`chart-${row.Category_Name}`} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm font-serif text-[#1F2937]">
-                      <span>{row.Category_Name}</span>
-                      <span className="text-xs text-[#6B7C70]">Alpha {formatPct(alphaValue)} | Beat {formatPct(beatValue, 1)}</span>
+                    <div className="flex items-start justify-between gap-2 text-xs font-serif text-[#1F2937]">
+                      <span className="min-w-0 break-words">{row.Category_Name}</span>
+                      <span className="shrink-0 text-[10px] text-[#6B7C70]">Alpha {formatPct(alphaValue)} | Beat {formatPct(beatValue, 1)}</span>
                     </div>
                     <div className="h-2 rounded-full bg-[#EEF1E9] overflow-hidden">
                       <div
@@ -544,15 +546,18 @@ export default function ActiveFundsExplorer({
       )}
 
       {tab === "shortlist" && (
-        <div className="mt-8 space-y-8">
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-5 md:p-6">
+        <div className="mt-8 space-y-6">
+          <div className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
             <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Shortlist logic</p>
-            <h3 className="mt-2 text-2xl font-serif text-[#1F2937]">Two leading funds per core sub-category.</h3>
-            <p className="mt-2 text-sm font-serif text-[#4A5D4E] max-w-2xl">
-              We focus on the largest sub-categories by AUM, then pick funds with the strongest composite
-              score, healthy scale, and consistent alpha. Use this as a starting point, not a final decision.
-            </p>
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <h3 className="mt-2 text-xl md:text-2xl font-serif text-[#1F2937]">Two leading funds per core sub-category.</h3>
+            <details className="mt-2 text-xs font-serif text-[#4A5D4E] max-w-2xl">
+              <summary className="cursor-pointer text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Why these picks</summary>
+              <p className="mt-2">
+                We focus on large sub-categories, then pick funds with strong composite scores, healthy scale,
+                and consistent alpha. Use this as a starting point, not a final decision.
+              </p>
+            </details>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 gap-3 text-xs">
               <label className="space-y-2">
                 <span className="text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Category</span>
                 <select
@@ -589,14 +594,14 @@ export default function ActiveFundsExplorer({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {filteredShortlist.map((group) => (
-              <div key={`${group.category}-${group.subCategory}`} className="bg-white border border-[#E3E7DF] rounded-3xl p-5">
+              <div key={`${group.category}-${group.subCategory}`} className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">{group.category}</p>
-                    <h4 className="mt-2 text-lg font-serif text-[#1F2937]">{group.subCategory}</h4>
-                    <p className="text-xs text-[#6B7C70]">AUM: {formatNumber(group.aum, 0)} Cr</p>
+                    <h4 className="mt-1 text-base font-serif text-[#1F2937] break-words">{group.subCategory}</h4>
+                    <p className="text-[11px] text-[#6B7C70]">AUM: {formatNumber(group.aum, 0)} Cr</p>
                   </div>
                   <details className="text-xs text-[#6B7C70]">
                     <summary className="cursor-pointer">i</summary>
@@ -605,10 +610,10 @@ export default function ActiveFundsExplorer({
                 </div>
                 <div className="mt-4 space-y-3">
                   {group.picks.map((fund) => (
-                    <div key={`${fund.Fund_Name}-${fund.AMC}`} className="border border-[#EDF0EA] rounded-2xl p-4">
-                      <div className="text-sm font-serif text-[#1F2937]">{fund.Fund_Name}</div>
-                      <div className="text-xs text-[#6B7C70]">{fund.AMC}</div>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#6B7C70]">
+                    <div key={`${fund.Fund_Name}-${fund.AMC}`} className="border border-[#E7EDF7] rounded-2xl p-3">
+                      <div className="text-xs font-serif text-[#1F2937] break-words">{fund.Fund_Name}</div>
+                      <div className="text-[11px] text-[#6B7C70]">{fund.AMC}</div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-[#6B7C70]">
                         <div>AUM: {formatNumber(fund.Current_AUM, 0)} Cr</div>
                         <div>Score: {formatNumber(fund.Composite_Score, 2)}</div>
                         <div>Alpha 3Y: {tonePct(fund.Alpha_3Y)}</div>
@@ -624,7 +629,7 @@ export default function ActiveFundsExplorer({
       )}
 
       {tab === "methodology" && (
-        <div className="mt-8 space-y-8">
+        <div className="mt-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
@@ -643,20 +648,23 @@ export default function ActiveFundsExplorer({
                   "Composite Score blends alpha and IR so funds must perform and stay consistent to rank well.",
               },
             ].map((card) => (
-              <div
+              <details
                 key={card.title}
-                className="bg-white border border-[#E3E7DF] rounded-3xl p-6 shadow-[0_24px_60px_-40px_rgba(31,41,55,0.3)]"
+                className="bg-white border border-[#E7EDF7] rounded-3xl p-5 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]"
               >
-                <h3 className="text-lg font-serif text-[#1F2937]">{card.title}</h3>
-                <p className="mt-3 text-sm font-serif text-[#4A5D4E] leading-relaxed">{card.desc}</p>
-              </div>
+                <summary className="cursor-pointer text-base font-serif text-[#1F2937]">{card.title}</summary>
+                <p className="mt-2 text-xs font-serif text-[#4A5D4E] leading-relaxed">{card.desc}</p>
+              </details>
             ))}
           </div>
 
-          <div className="bg-[#F7F4EC] border border-[#E7DDC7] rounded-3xl p-6 text-sm font-serif text-[#5A4B2B]">
-            How to use this: first scan categories where the success rate is high, then shortlist funds with
-            strong 3Y alpha and IR. Finally, compare costs and your holding horizon before deciding.
-          </div>
+          <details className="bg-[#F7F4EC] border border-[#E7EDF7] rounded-3xl p-5 text-xs font-serif text-[#5A4B2B]">
+            <summary className="cursor-pointer text-xs uppercase tracking-[0.2em]">How to use</summary>
+            <p className="mt-3">
+              Scan categories with high success rates, then shortlist funds with strong 3Y alpha and IR.
+              Finally, compare costs and holding horizon before deciding.
+            </p>
+          </details>
 
           <details className="text-sm font-serif text-[#4A5D4E]">
             <summary className="cursor-pointer">Show full field glossary</summary>
@@ -672,22 +680,24 @@ export default function ActiveFundsExplorer({
 
       {tab === "data" && (
         <div className="mt-8 space-y-6">
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-5 md:p-6">
-            <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">How to use the screener</p>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-serif text-[#4A5D4E]">
-              <div className="bg-[#F7F4EC] border border-[#E7DDC7] rounded-2xl p-4">1. Start with a category or benchmark.</div>
-              <div className="bg-[#EEF4FF] border border-[#DDE3EE] rounded-2xl p-4">2. Filter by alpha/IR and AUM to keep quality.</div>
-              <div className="bg-[#EAF1E8] border border-[#DCE7D7] rounded-2xl p-4">3. Open a fund card to compare details.</div>
+          <details className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
+            <summary className="cursor-pointer text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">
+              How to use the screener
+            </summary>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-serif text-[#4A5D4E]">
+              <div className="bg-[#F7F4EC] border border-[#E7EDF7] rounded-2xl p-3">1. Start with a category or benchmark.</div>
+              <div className="bg-[#EEF4FF] border border-[#E7EDF7] rounded-2xl p-3">2. Filter by alpha/IR and AUM.</div>
+              <div className="bg-[#EAF1E8] border border-[#E7EDF7] rounded-2xl p-3">3. Open a fund card to compare.</div>
             </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-8 gap-4">
-            <div className="lg:col-span-2">
+          </details>
+          <div className="grid grid-cols-2 lg:grid-cols-8 gap-3">
+            <div className="col-span-2 lg:col-span-2">
               <label className="text-xs uppercase tracking-[0.2em] font-serif text-[#6B7C70]">Search</label>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Fund or AMC"
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -698,7 +708,7 @@ export default function ActiveFundsExplorer({
                   setCategory(event.target.value);
                   setSubCategory("All");
                 }}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               >
                 <option value="All">All</option>
                 {categories.map((item) => (
@@ -713,7 +723,7 @@ export default function ActiveFundsExplorer({
               <select
                 value={subCategory}
                 onChange={(event) => setSubCategory(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               >
                 <option value="All">All</option>
                 {subCategories.map((item) => (
@@ -728,7 +738,7 @@ export default function ActiveFundsExplorer({
               <select
                 value={benchmark}
                 onChange={(event) => setBenchmark(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               >
                 <option value="All">All</option>
                 {benchmarks.map((item) => (
@@ -744,7 +754,7 @@ export default function ActiveFundsExplorer({
                 type="number"
                 value={minAlpha3Y}
                 onChange={(event) => setMinAlpha3Y(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -753,7 +763,7 @@ export default function ActiveFundsExplorer({
                 type="number"
                 value={minAlpha5Y}
                 onChange={(event) => setMinAlpha5Y(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -762,7 +772,7 @@ export default function ActiveFundsExplorer({
                 type="number"
                 value={minIr3Y}
                 onChange={(event) => setMinIr3Y(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -771,7 +781,7 @@ export default function ActiveFundsExplorer({
                 type="number"
                 value={minIr5Y}
                 onChange={(event) => setMinIr5Y(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -780,11 +790,11 @@ export default function ActiveFundsExplorer({
                 type="number"
                 value={minAum}
                 onChange={(event) => setMinAum(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div className="flex items-end">
-              <label className="flex items-center gap-3 text-sm font-serif text-[#4A5D4E]">
+              <label className="flex items-center gap-2 text-xs font-serif text-[#4A5D4E]">
                 <input
                   type="checkbox"
                   checked={topOnly}
@@ -797,16 +807,16 @@ export default function ActiveFundsExplorer({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm font-serif text-[#6B7C70]">{filtered.length} funds matched</p>
-            <p className="text-xs font-serif text-[#6B7C70]">Data as of {manifest?.reportDate ?? "latest run"}</p>
+            <p className="text-xs font-serif text-[#6B7C70]">{filtered.length} funds matched</p>
+            <p className="text-[11px] font-serif text-[#6B7C70]">Data as of {manifest?.reportDate ?? "latest run"}</p>
           </div>
 
           <div className="md:hidden space-y-3">
             {filtered.map((fund) => (
-              <div key={`card-${fund.AMC}-${fund.Fund_Name}`} className="border border-[#E3E7DF] rounded-2xl p-4 bg-white">
-                <div className="text-sm font-serif text-[#1F2937]">{fund.Fund_Name}</div>
-                <div className="text-xs text-[#6B7C70]">{fund.AMC}</div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#6B7C70]">
+              <div key={`card-${fund.AMC}-${fund.Fund_Name}`} className="border border-[#E7EDF7] rounded-2xl p-3 bg-white">
+                <div className="text-xs font-serif text-[#1F2937] break-words">{fund.Fund_Name}</div>
+                <div className="text-[11px] text-[#6B7C70]">{fund.AMC}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-[#6B7C70]">
                   <div>Category: {fund.Category}</div>
                   <div>Sub: {fund.Sub_Category}</div>
                   <div>Benchmark: {fund.Benchmark_Name}</div>
@@ -821,7 +831,7 @@ export default function ActiveFundsExplorer({
                 <button
                   type="button"
                   onClick={() => openDetails(fund)}
-                  className="mt-3 text-xs text-[#4A5D4E] underline"
+                  className="mt-3 text-[11px] text-[#4A5D4E] underline"
                 >
                   View details
                 </button>
@@ -939,12 +949,12 @@ export default function ActiveFundsExplorer({
 
           {selected && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/30 px-4">
-              <div className="max-w-2xl w-full bg-gradient-to-br from-[#FFFFFF] to-[#F6F8F3] border border-[#E3E7DF] rounded-3xl p-6 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.6)]">
+              <div className="max-w-2xl w-full bg-gradient-to-br from-[#FFFFFF] to-[#F6F8F3] border border-[#E7EDF7] rounded-3xl p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Fund snapshot</p>
-                    <h3 className="mt-2 text-xl font-serif text-[#1F2937]">{selected.Fund_Name}</h3>
-                    <p className="text-sm font-serif text-[#6B7C70]">{selected.AMC}</p>
+                    <h3 className="mt-2 text-lg font-serif text-[#1F2937]">{selected.Fund_Name}</h3>
+                    <p className="text-xs font-serif text-[#6B7C70]">{selected.AMC}</p>
                   </div>
                   <button
                     type="button"
@@ -955,8 +965,8 @@ export default function ActiveFundsExplorer({
                   </button>
                 </div>
 
-                <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="bg-white border border-[#E3E7DF] rounded-2xl p-4">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-white border border-[#E7EDF7] rounded-2xl p-3">
                     <div className="flex items-center gap-2 text-[#1F2937]">
                       <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#EAF1E8]">
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
@@ -971,7 +981,7 @@ export default function ActiveFundsExplorer({
                       <div>Benchmark: {selected.Benchmark_Name}</div>
                     </div>
                   </div>
-                  <div className="bg-white border border-[#E3E7DF] rounded-2xl p-4">
+                  <div className="bg-white border border-[#E7EDF7] rounded-2xl p-3">
                     <div className="flex items-center gap-2 text-[#1F2937]">
                       <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#EEF4FF]">
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
@@ -988,7 +998,7 @@ export default function ActiveFundsExplorer({
                       <div>IR 3Y: {formatNumber(selected.IR_3Y, 2)}</div>
                     </div>
                   </div>
-                  <div className="bg-white border border-[#E3E7DF] rounded-2xl p-4">
+                  <div className="bg-white border border-[#E7EDF7] rounded-2xl p-3">
                     <div className="flex items-center gap-2 text-[#1F2937]">
                       <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#FFF2DA]">
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">

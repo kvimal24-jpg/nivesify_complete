@@ -207,7 +207,7 @@ export default function PassiveFundsExplorer({
 
   return (
     <section className="mt-12">
-      <div className="flex flex-wrap gap-3 border-b border-[#D9DED5] pb-4">
+      <div className="flex gap-2 overflow-x-auto border-b border-[#E7EDF7] pb-3">
         {[
           { key: "insights", label: "Insights" },
           { key: "shortlist", label: "Shortlisted" },
@@ -218,7 +218,7 @@ export default function PassiveFundsExplorer({
             key={item.key}
             type="button"
             onClick={() => setTab(item.key as TabKey)}
-            className={`px-4 py-2 rounded-full text-sm font-serif transition-all ${
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-serif transition-all ${
               tab === item.key
                 ? "bg-[#4A5D4E] text-white"
                 : "bg-white text-[#4A5D4E] border border-[#4A5D4E]/20"
@@ -231,50 +231,54 @@ export default function PassiveFundsExplorer({
 
       {tab === "insights" && (
         <div className="mt-8 space-y-10">
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-5 md:p-6">
+          <div className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
             <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Passive philosophy</p>
             <h3 className="mt-2 text-2xl font-serif text-[#1F2937]">Own the market, minimize leakage.</h3>
-            <p className="mt-3 text-sm font-serif text-[#4A5D4E] max-w-2xl">
-              Passive funds are about capturing market returns at the lowest possible cost. The two levers that
-              matter most are tracking difference and fund scale. We surface the trackers with tighter replication
-              and enough AUM to trade efficiently.
+            <p className="mt-2 text-sm font-serif text-[#4A5D4E] max-w-2xl">
+              Focus on tracking difference and scale.
             </p>
+            <details className="mt-2 text-xs font-serif text-[#4A5D4E] max-w-2xl">
+              <summary className="cursor-pointer text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Why this matters</summary>
+              <p className="mt-2">
+                Tight tracking reduces leakage. Higher AUM improves liquidity and execution.
+              </p>
+            </details>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Coverage</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">{manifest?.counts?.etfs ?? etfs.length}</p>
-              <p className="text-sm font-serif text-[#6B7C70]">passive funds tracked</p>
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">{manifest?.counts?.etfs ?? etfs.length}</p>
+              <p className="text-xs font-serif text-[#6B7C70]">passive funds tracked</p>
             </div>
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Benchmarks</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">{benchmarks.length}</p>
-              <p className="text-sm font-serif text-[#6B7C70]">indices with trackers</p>
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">{benchmarks.length}</p>
+              <p className="text-xs font-serif text-[#6B7C70]">indices with trackers</p>
             </div>
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Median TD 3Y</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">
                 {medianTd === null ? "-" : `${medianTd.toFixed(2)}%`}
               </p>
-              <p className="text-sm font-serif text-[#6B7C70]">lower is tighter tracking</p>
+              <p className="text-xs font-serif text-[#6B7C70]">lower is tighter tracking</p>
             </div>
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Total AUM</p>
-              <p className="mt-4 text-3xl font-serif text-[#1F2937]">{formatCompact(totalPassiveAum)}</p>
-              <p className="text-sm font-serif text-[#6B7C70]">across passive universe</p>
+              <p className="mt-3 text-2xl font-serif text-[#1F2937]">{formatCompact(totalPassiveAum)}</p>
+              <p className="text-xs font-serif text-[#6B7C70]">across passive universe</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white border border-[#E7EDF7] rounded-3xl p-5">
               <h3 className="text-lg font-serif text-[#1F2937] mb-4">Benchmark leaders</h3>
               <div className="space-y-4">
                 {benchmarkLeaders.map((leader) => {
                   return (
-                    <div key={leader.Benchmark} className="border border-[#EDF0EA] rounded-2xl p-4">
-                      <div className="text-sm font-serif text-[#6B7C70]">{leader.Benchmark}</div>
-                      <div className="mt-2 text-lg font-serif text-[#1F2937]">{leader.Best_Fund}</div>
-                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-[#6B7C70]">
+                    <div key={leader.Benchmark} className="border border-[#E7EDF7] rounded-2xl p-3">
+                      <div className="text-xs font-serif text-[#6B7C70] break-words">{leader.Benchmark}</div>
+                      <div className="mt-1 text-base font-serif text-[#1F2937] break-words">{leader.Best_Fund}</div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[#6B7C70]">
                         <span>Best TD 3Y: {formatPct(leader.Best_TD_3Y)}</span>
                         <span>Total AUM: {formatNumber(leader.Total_AUM, 0)} Cr</span>
                       </div>
@@ -284,7 +288,7 @@ export default function PassiveFundsExplorer({
               </div>
             </div>
 
-            <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+            <div className="bg-white border border-[#E7EDF7] rounded-3xl p-5">
               <h3 className="text-lg font-serif text-[#1F2937] mb-4">Benchmark discipline</h3>
               <FilterableTable
                 data={benchmarkStats}
@@ -368,19 +372,20 @@ export default function PassiveFundsExplorer({
             </div>
           </div>
 
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-6">
+          <div className="bg-white border border-[#E7EDF7] rounded-3xl p-5">
             <h3 className="text-lg font-serif text-[#1F2937]">Tracking discipline by benchmark</h3>
-            <p className="mt-2 text-sm font-serif text-[#4A5D4E]">
-              Lower average tracking difference means closer index replication.
-            </p>
+            <details className="mt-2 text-xs font-serif text-[#4A5D4E]">
+              <summary className="cursor-pointer text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Read more</summary>
+              <p className="mt-2">Lower average tracking difference means closer index replication.</p>
+            </details>
             <div className="mt-6 space-y-4">
               {chartBenchmarks.map((row) => {
                 const width = Math.round((row.avg / maxTracking) * 100);
                 return (
                   <div key={`bench-${row.name}`} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm font-serif text-[#1F2937]">
-                      <span>{row.name}</span>
-                      <span className="text-xs text-[#6B7C70]">Avg TD 3Y {row.avg.toFixed(2)}%</span>
+                    <div className="flex items-start justify-between gap-2 text-xs font-serif text-[#1F2937]">
+                      <span className="min-w-0 break-words">{row.name}</span>
+                      <span className="shrink-0 text-[10px] text-[#6B7C70]">Avg TD 3Y {row.avg.toFixed(2)}%</span>
                     </div>
                     <div className="h-2 rounded-full bg-[#EEF1E9] overflow-hidden">
                       <div className="h-full bg-[#4A5D4E]" style={{ width: `${width}%` }} />
@@ -394,17 +399,20 @@ export default function PassiveFundsExplorer({
       )}
 
       {tab === "shortlist" && (
-        <div className="mt-8 space-y-8">
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-5 md:p-6">
+        <div className="mt-8 space-y-6">
+          <div className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
             <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Shortlist logic</p>
-            <h3 className="mt-2 text-2xl font-serif text-[#1F2937]">Low tracking difference, strong scale.</h3>
-            <p className="mt-2 text-sm font-serif text-[#4A5D4E] max-w-2xl">
-              We focus on the biggest benchmarks by AUM and highlight the two trackers with the lowest tracking
-              difference. This keeps cost leakage low while preserving liquidity.
-            </p>
+            <h3 className="mt-2 text-xl md:text-2xl font-serif text-[#1F2937]">Low tracking difference, strong scale.</h3>
+            <details className="mt-2 text-xs font-serif text-[#4A5D4E] max-w-2xl">
+              <summary className="cursor-pointer text-xs uppercase tracking-[0.2em] text-[#6B7C70]">Why these picks</summary>
+              <p className="mt-2">
+                We focus on the biggest benchmarks by AUM and highlight two trackers with the lowest tracking
+                difference to keep leakage low while preserving liquidity.
+              </p>
+            </details>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {benchmarkLeaders.map((leader) => {
               const picks = etfs
                 .filter((etf) => etf.Benchmark_Name === leader.Benchmark)
@@ -412,12 +420,12 @@ export default function PassiveFundsExplorer({
                 .slice(0, 2);
 
               return (
-                <div key={`short-${leader.Benchmark}`} className="bg-white border border-[#E3E7DF] rounded-3xl p-5">
+                <div key={`short-${leader.Benchmark}`} className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Benchmark</p>
-                      <h4 className="mt-2 text-lg font-serif text-[#1F2937]">{leader.Benchmark}</h4>
-                      <p className="text-xs text-[#6B7C70]">Total AUM: {formatNumber(leader.Total_AUM, 0)} Cr</p>
+                      <h4 className="mt-1 text-base font-serif text-[#1F2937] break-words">{leader.Benchmark}</h4>
+                      <p className="text-[11px] text-[#6B7C70]">Total AUM: {formatNumber(leader.Total_AUM, 0)} Cr</p>
                     </div>
                     <details className="text-xs text-[#6B7C70]">
                       <summary className="cursor-pointer">i</summary>
@@ -426,10 +434,10 @@ export default function PassiveFundsExplorer({
                   </div>
                   <div className="mt-4 space-y-3">
                     {picks.map((etf) => (
-                      <div key={`${etf.ETF_Name}-${etf.AMC}`} className="border border-[#EDF0EA] rounded-2xl p-4">
-                        <div className="text-sm font-serif text-[#1F2937]">{etf.ETF_Name}</div>
-                        <div className="text-xs text-[#6B7C70]">{etf.AMC}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#6B7C70]">
+                      <div key={`${etf.ETF_Name}-${etf.AMC}`} className="border border-[#E7EDF7] rounded-2xl p-3">
+                        <div className="text-xs font-serif text-[#1F2937] break-words">{etf.ETF_Name}</div>
+                        <div className="text-[11px] text-[#6B7C70]">{etf.AMC}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-[#6B7C70]">
                           <div>TD 3Y: {formatPct(etf.Tracking_Diff_3Y)}</div>
                           <div>AUM: {formatNumber(etf.Fund_AUM, 0)} Cr</div>
                           <div>1Y: {formatPair(etf.Fund_Return_1Y, etf.Benchmark_Return_1Y)}</div>
@@ -446,7 +454,7 @@ export default function PassiveFundsExplorer({
       )}
 
       {tab === "methodology" && (
-        <div className="mt-8 space-y-8">
+        <div className="mt-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
@@ -465,20 +473,23 @@ export default function PassiveFundsExplorer({
                   "Healthy AUM improves execution and lowers impact costs during rebalancing.",
               },
             ].map((card) => (
-              <div
+              <details
                 key={card.title}
-                className="bg-white border border-[#E3E7DF] rounded-3xl p-6 shadow-[0_24px_60px_-40px_rgba(31,41,55,0.3)]"
+                className="bg-white border border-[#E7EDF7] rounded-3xl p-5 shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]"
               >
-                <h3 className="text-lg font-serif text-[#1F2937]">{card.title}</h3>
-                <p className="mt-3 text-sm font-serif text-[#4A5D4E] leading-relaxed">{card.desc}</p>
-              </div>
+                <summary className="cursor-pointer text-base font-serif text-[#1F2937]">{card.title}</summary>
+                <p className="mt-2 text-xs font-serif text-[#4A5D4E] leading-relaxed">{card.desc}</p>
+              </details>
             ))}
           </div>
 
-          <div className="bg-[#F7F4EC] border border-[#E7DDC7] rounded-3xl p-6 text-sm font-serif text-[#5A4B2B]">
-            How to use this: start with the index that matches your risk tolerance, then pick the tracker with
-            the lowest tracking difference and a healthy AUM. Confirm expense ratio before switching.
-          </div>
+          <details className="bg-[#F7F4EC] border border-[#E7EDF7] rounded-3xl p-5 text-xs font-serif text-[#5A4B2B]">
+            <summary className="cursor-pointer text-xs uppercase tracking-[0.2em]">How to use</summary>
+            <p className="mt-3">
+              Start with the index that matches your risk tolerance, then pick the tracker with the lowest
+              tracking difference and healthy AUM. Confirm expense ratio before switching.
+            </p>
+          </details>
 
           <details className="text-sm font-serif text-[#4A5D4E]">
             <summary className="cursor-pointer">Show tracking terms glossary</summary>
@@ -494,22 +505,24 @@ export default function PassiveFundsExplorer({
 
       {tab === "data" && (
         <div className="mt-8 space-y-6">
-          <div className="bg-white border border-[#E3E7DF] rounded-3xl p-5 md:p-6">
-            <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">How to use the screener</p>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-serif text-[#4A5D4E]">
-              <div className="bg-[#F7F4EC] border border-[#E7DDC7] rounded-2xl p-4">1. Choose a benchmark.</div>
-              <div className="bg-[#EEF4FF] border border-[#DDE3EE] rounded-2xl p-4">2. Filter by TD and AUM.</div>
-              <div className="bg-[#EAF1E8] border border-[#DCE7D7] rounded-2xl p-4">3. Open a tracker card to compare.</div>
+          <details className="bg-white border border-[#E7EDF7] rounded-3xl p-4">
+            <summary className="cursor-pointer text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">
+              How to use the screener
+            </summary>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-serif text-[#4A5D4E]">
+              <div className="bg-[#F7F4EC] border border-[#E7EDF7] rounded-2xl p-3">1. Choose a benchmark.</div>
+              <div className="bg-[#EEF4FF] border border-[#E7EDF7] rounded-2xl p-3">2. Filter by TD and AUM.</div>
+              <div className="bg-[#EAF1E8] border border-[#E7EDF7] rounded-2xl p-3">3. Open a tracker card.</div>
             </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className="lg:col-span-2">
+          </details>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="col-span-2 lg:col-span-2">
               <label className="text-xs uppercase tracking-[0.2em] font-serif text-[#6B7C70]">Search</label>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Fund or AMC"
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -517,7 +530,7 @@ export default function PassiveFundsExplorer({
               <select
                 value={benchmark}
                 onChange={(event) => setBenchmark(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               >
                 <option value="All">All</option>
                 {benchmarks.map((item) => (
@@ -533,7 +546,7 @@ export default function PassiveFundsExplorer({
                 type="number"
                 value={minAum}
                 onChange={(event) => setMinAum(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
             <div>
@@ -544,22 +557,22 @@ export default function PassiveFundsExplorer({
                 type="number"
                 value={maxTrackingDiff}
                 onChange={(event) => setMaxTrackingDiff(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-[#E3E7DF] bg-white px-4 py-3 text-sm font-serif"
+                className="mt-1 w-full rounded-2xl border border-[#E7EDF7] bg-white px-3 py-2 text-xs font-serif"
               />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm font-serif text-[#6B7C70]">{filtered.length} funds matched</p>
-            <p className="text-xs font-serif text-[#6B7C70]">Data as of {manifest?.reportDate ?? "latest run"}</p>
+            <p className="text-xs font-serif text-[#6B7C70]">{filtered.length} funds matched</p>
+            <p className="text-[11px] font-serif text-[#6B7C70]">Data as of {manifest?.reportDate ?? "latest run"}</p>
           </div>
 
           <div className="md:hidden space-y-3">
             {filtered.map((etf) => (
-              <div key={`card-${etf.AMC}-${etf.ETF_Name}`} className="border border-[#E3E7DF] rounded-2xl p-4 bg-white">
-                <div className="text-sm font-serif text-[#1F2937]">{etf.ETF_Name}</div>
-                <div className="text-xs text-[#6B7C70]">{etf.AMC}</div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#6B7C70]">
+              <div key={`card-${etf.AMC}-${etf.ETF_Name}`} className="border border-[#E7EDF7] rounded-2xl p-3 bg-white">
+                <div className="text-xs font-serif text-[#1F2937] break-words">{etf.ETF_Name}</div>
+                <div className="text-[11px] text-[#6B7C70]">{etf.AMC}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-[#6B7C70]">
                   <div>Benchmark: {etf.Benchmark_Name}</div>
                   <div>AUM: {formatNumber(etf.Fund_AUM, 0)} Cr</div>
                   <div>TD 3Y: {formatPct(etf.Tracking_Diff_3Y)}</div>
@@ -572,7 +585,7 @@ export default function PassiveFundsExplorer({
                 <button
                   type="button"
                   onClick={() => openDetails(etf)}
-                  className="mt-3 text-xs text-[#4A5D4E] underline"
+                  className="mt-3 text-[11px] text-[#4A5D4E] underline"
                 >
                   View details
                 </button>
@@ -671,12 +684,12 @@ export default function PassiveFundsExplorer({
 
           {selected && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/30 px-4">
-              <div className="max-w-2xl w-full bg-gradient-to-br from-[#FFFFFF] to-[#F6F8F3] border border-[#E3E7DF] rounded-3xl p-6 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.6)]">
+              <div className="max-w-2xl w-full bg-gradient-to-br from-[#FFFFFF] to-[#F6F8F3] border border-[#E7EDF7] rounded-3xl p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Tracker snapshot</p>
-                    <h3 className="mt-2 text-xl font-serif text-[#1F2937]">{selected.ETF_Name}</h3>
-                    <p className="text-sm font-serif text-[#6B7C70]">{selected.AMC}</p>
+                    <h3 className="mt-2 text-lg font-serif text-[#1F2937]">{selected.ETF_Name}</h3>
+                    <p className="text-xs font-serif text-[#6B7C70]">{selected.AMC}</p>
                   </div>
                   <button
                     type="button"
@@ -687,8 +700,8 @@ export default function PassiveFundsExplorer({
                   </button>
                 </div>
 
-                <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="bg-white border border-[#E3E7DF] rounded-2xl p-4">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-white border border-[#E7EDF7] rounded-2xl p-3">
                     <div className="flex items-center gap-2 text-[#1F2937]">
                       <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#EAF1E8]">
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
@@ -702,7 +715,7 @@ export default function PassiveFundsExplorer({
                       <div>Rank: {selected.Rank_within_Benchmark}</div>
                     </div>
                   </div>
-                  <div className="bg-white border border-[#E3E7DF] rounded-2xl p-4">
+                  <div className="bg-white border border-[#E7EDF7] rounded-2xl p-3">
                     <div className="flex items-center gap-2 text-[#1F2937]">
                       <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#EEF4FF]">
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
