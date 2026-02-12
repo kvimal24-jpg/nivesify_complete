@@ -94,9 +94,9 @@ export default function Home() {
                 )
               },
               {
-                title: 'Find My Mutual Fund Match',
-                desc: 'Turn life goals into a SIP plan and a fund mix built for your time horizon and risk comfort.',
-                quote: 'Match goals to funds.',
+                title: 'The Mutual Fund World',
+                desc: 'Match goals to funds, analyze performance, explore active and passive options. Your complete guide to navigating Indian mutual funds.',
+                quote: 'Discover, analyze, decide.',
                 href: '/mutual-fund-match',
                 icon: (
                   <svg width="36" height="36" fill="none" stroke="#2F5D7C" strokeWidth="1.6">
