@@ -12,7 +12,7 @@ export default function Header() {
   const NAV_LINKS = [
     { name: "Dashboard", href: "/dashboard" },
     { name: "Mutual Fund Portfolio", href: "/mutual-fund-health-check" },
-    { name: "Mutual Fund Analysis", href: "/mutual-fund-analysis" },
+    { name: "The Mutual Fund World", href: "/mutual-fund-match" },
     { name: "Calculators", href: "/dashboard/calculators" },
   ];
 
