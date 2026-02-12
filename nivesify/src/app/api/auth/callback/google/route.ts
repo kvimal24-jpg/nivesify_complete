@@ -60,8 +60,9 @@ export async function GET(request: NextRequest) {
     const sessionToken = await signSession({ userId: finalUserId, email: googleUser.email });
     cookieStore.set("session_token", sessionToken, {
       path: "/",
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       httpOnly: true,
+      sameSite: "lax",
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
     });
 

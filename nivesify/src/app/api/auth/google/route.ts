@@ -17,14 +17,16 @@ export async function GET() {
   const cookieStore = await cookies();
   cookieStore.set("google_oauth_state", state, {
     path: "/",
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     httpOnly: true,
+    sameSite: "lax",
     maxAge: 60 * 10, // 10 minutes
   });
   cookieStore.set("google_code_verifier", codeVerifier, {
     path: "/",
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     httpOnly: true,
+    sameSite: "lax",
     maxAge: 60 * 10,
   });
 
