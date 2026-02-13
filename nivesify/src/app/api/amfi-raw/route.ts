@@ -1,5 +1,6 @@
 import { getR2JsonResponse } from "@/lib/r2";
 
 export async function GET() {
-  return getR2JsonResponse("data/latest/amfi_raw");
+  // Fetch the file with the exact name 'amfi_raw.json' in the expected folder
+  return getR2JsonResponse("data/latest/amfi_raw.json");
 }
