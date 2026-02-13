@@ -1,5 +1,5 @@
-import { getLatestR2JsonResponse } from "@/lib/r2";
+import { getR2JsonResponse } from "@/lib/r2";
 
 export async function GET() {
-  return getLatestR2JsonResponse("data/latest/amfi_raw_");
+  return getR2JsonResponse("data/latest/amfi_raw");
 }
