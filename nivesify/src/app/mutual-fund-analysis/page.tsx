@@ -142,10 +142,16 @@ export default async function MutualFundAnalysisPage() {
   );
 
   return (
-    <div className="bg-gradient-to-br from-[#F4F7F2] via-[#F7F2E7] to-[#EDF1F6] text-[#1F2937] min-h-screen">
-      <section className="max-w-6xl mx-auto px-5 pt-14 pb-14">
+    <div className="min-h-screen bg-[#F5F8FF] text-[#1F2937]">
+      <section className="relative overflow-hidden px-5 pt-14 pb-14">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/3 w-[520px] h-[520px] bg-[#2F5D7C]/10 rounded-full blur-[160px]" />
+          <div className="absolute bottom-1/3 right-1/4 w-[420px] h-[420px] bg-[#9BB4D6]/20 rounded-full blur-[140px]" />
+        </div>
+
+        <div className="relative max-w-6xl mx-auto">
         <AnalysisTabs />
-        <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif">Mutual Fund Analysis</p>
+        <p className="text-xs uppercase tracking-[0.35em] text-[#6B7C70] font-serif mt-8">Mutual Fund Analysis</p>
         <h1 className="mt-3 text-3xl md:text-5xl font-serif tracking-tight">Understand the industry before you pick funds.</h1>
         <p className="mt-3 max-w-2xl text-sm font-serif text-[#4A5D4E] leading-relaxed">
           The industry map: category skill, benchmark gaps, and where active or passive wins.
@@ -327,6 +333,7 @@ export default async function MutualFundAnalysisPage() {
           This content is for informational purposes only and does not constitute investment advice. Past
           performance is not indicative of future results. Please consult a licensed advisor before making
           investment decisions.
+        </div>
         </div>
       </section>
     </div>

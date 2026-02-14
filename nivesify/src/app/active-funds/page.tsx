@@ -67,8 +67,14 @@ export default async function ActiveFundsPage() {
   ];
 
   return (
-    <div className="bg-gradient-to-br from-[#F4F7F2] via-[#F7F2E7] to-[#EDF1F6] text-[#1F2937] min-h-screen">
-      <section className="max-w-6xl mx-auto px-5 pt-14 pb-10">
+    <div className="min-h-screen bg-[#F5F8FF] text-[#1F2937]">
+      <section className="relative overflow-hidden px-5 pt-14 pb-10">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/3 w-[520px] h-[520px] bg-[#2F5D7C]/10 rounded-full blur-[160px]" />
+          <div className="absolute bottom-1/3 right-1/4 w-[420px] h-[420px] bg-[#9BB4D6]/20 rounded-full blur-[140px]" />
+        </div>
+
+        <div className="relative max-w-6xl mx-auto">
         <div className="mb-8">
           <AnalysisTabs />
         </div>
@@ -100,6 +106,7 @@ export default async function ActiveFundsPage() {
           This content is for informational purposes only and does not constitute investment advice. Past
           performance is not indicative of future results. Please consult a licensed advisor before making
           investment decisions.
+        </div>
         </div>
       </section>
     </div>
