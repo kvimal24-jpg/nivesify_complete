@@ -7,7 +7,7 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
-		"deploy": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
+		"deploy": "npx opennextjs-cloudflare build && npx wrangler deploy",
 		"deploy:staging": "npx opennextjs-cloudflare build && npx wrangler deploy -c wrangler.staging.jsonc",
 		"upload": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",
 		"preview": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview",
