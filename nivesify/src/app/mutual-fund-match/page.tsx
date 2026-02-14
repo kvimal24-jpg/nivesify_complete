@@ -1,4 +1,4 @@
-//DEMO
+//Try new
 "use client";
 
 import React, { useState } from "react";
@@ -18,17 +18,6 @@ const GOAL_TEMPLATES = [
   { name: "Home Down Payment", type: "mandatory", targetAmount: 3000000, years: 5, inflation: 6 },
   { name: "Car Purchase", type: "aspirational", targetAmount: 800000, years: 3, inflation: 5 },
 ];
-
-// Role definitions
-const ROLE_CONFIG = {
-  anchor: { emoji: "🛡️", name: "Anchor", color: "#2F5D7C" },
-  pillar: { emoji: "🏛️", name: "Pillar", color: "#2F5D7C" },
-  contrarian: { emoji: "🎯", name: "Contrarian", color: "#2F5D7C" },
-  speedster: { emoji: "⚡", name: "Speedster", color: "#2F5D7C" },
-  compounder: { emoji: "📈", name: "Compounder", color: "#2F5D7C" },
-  allrounder: { emoji: "🌐", name: "All-Rounder", color: "#2F5D7C" },
-  stabilizer: { emoji: "⚖️", name: "Stabilizer", color: "#2F5D7C" },
-};
 
 export default function MutualFundMatchPage() {
   const [currentStep, setCurrentStep] = useState<"input" | "processing" | "results">("input");
@@ -300,429 +289,400 @@ export default function MutualFundMatchPage() {
 
         {currentStep === "results" && results && (
           <div className="space-y-6 animate-fadeIn">
-            {/* SECTION 1: Understanding the Framework */}
+            {/* SECTION 1: 4x4 Matrix Framework */}
             <details className={`${cardClass} p-6`} open>
               <summary className="cursor-pointer text-xl font-serif text-[#1F2937] mb-4 hover:text-[#2F5D7C]">
-                📚 Step 1: Understanding the 4×4 Matrix Framework
+                📚 Step 1: The 4×4 Matrix Framework
               </summary>
               
               <div className="space-y-4 pl-4">
                 <p className="text-sm text-[#4A5D4E] leading-relaxed">
-                  We diversify portfolios across <strong>TWO dimensions</strong>: Market Size (Large, Mid, Small, Total Market) 
-                  and Investment Style (Value, Growth, Momentum). This creates 12 possible combinations, protecting you when any single segment underperforms.
+                  We diversify across <strong>TWO dimensions</strong>: Size (Large, Mid, Small, Total Market) + Debt, 
+                  and Style (Value, Growth, Momentum). This creates protection against any single segment underperformance.
                 </p>
 
-                {/* 4x4
-                 Matrix Table - Complete Framework */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
+                  <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-[#EEF4FA]">
-                        <th className="p-3 text-left border border-[#DDE6F3] font-semibold text-[#1F2937]">Size \ Style</th>
-                        <th className="p-3 text-center border border-[#DDE6F3] font-semibold text-[#1F2937]">Value/Contra</th>
-                        <th className="p-3 text-center border border-[#DDE6F3] font-semibold text-[#1F2937]">Core/Growth</th>
-                        <th className="p-3 text-center border border-[#DDE6F3] font-semibold text-[#1F2937]">Momentum/Alpha</th>
+                        <th className="p-3 text-left border border-[#DDE6F3] font-semibold">Size \ Style</th>
+                        <th className="p-3 text-center border border-[#DDE6F3] font-semibold">Value/Contra</th>
+                        <th className="p-3 text-center border border-[#DDE6F3] font-semibold">Core/Growth</th>
+                        <th className="p-3 text-center border border-[#DDE6F3] font-semibold">Momentum/Alpha</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { size: "Large Cap", cells: ["Value Funds", "Large Cap / Nifty 50", "—"] },
-                        { size: "Mid Cap", cells: ["—", "Mid Cap 150", "Mid Momentum"] },
-                        { size: "Small Cap", cells: ["—", "Small Cap 250", "Small Momentum"] },
-                        { size: "Total Market", cells: ["—", "Flexi/Multi Cap", "—"] }
-                      ].map((row) => (
-                        <tr key={row.size}>
-                          <td className="p-3 border border-[#DDE6F3] font-medium bg-[#F5F8FF]">{row.size}</td>
-                          {row.cells.map((cell, idx) => (
-                            <td
-                              key={idx}
-                              className={`p-3 border border-[#DDE6F3] text-center text-xs ${
-                                cell === "—" ? "bg-white text-[#9BB4D6]" : "bg-[#D5E8F0] text-[#1F2937]"
-                              }`}
-                            >
-                              {cell}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
+                      <tr>
+                        <td className="p-3 border border-[#DDE6F3] font-medium bg-[#F5F8FF]">Large Cap</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Value Fund</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Nifty 50 ETF</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center text-[#9BB4D6]">—</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border border-[#DDE6F3] font-medium bg-[#F5F8FF]">Mid Cap</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center text-[#9BB4D6]">—</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Mid 150 ETF</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Mid Momentum</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border border-[#DDE6F3] font-medium bg-[#F5F8FF]">Small Cap</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center text-[#9BB4D6]">—</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Small 250 ETF</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Small Momentum</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border border-[#DDE6F3] font-medium bg-[#F5F8FF]">Total Market</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center text-[#9BB4D6]">—</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center bg-[#D5E8F0]">Flexi/Multi Cap</td>
+                        <td className="p-3 border border-[#DDE6F3] text-center text-[#9BB4D6]">—</td>
+                      </tr>
+                      <tr className="bg-[#FFF9E6]">
+                        <td className="p-3 border border-[#DDE6F3] font-medium">Debt (Safety)</td>
+                        <td colSpan={3} className="p-3 border border-[#DDE6F3] text-center">
+                          Liquid / Money Market / Short Duration
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
 
-                {/* Active vs ETF Decision Box */}
-                <div className="p-3 bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                  <div className="text-xs font-semibold text-[#1F2937] mb-2">How we choose Active vs ETF:</div>
-                  <div className="space-y-1 text-xs text-[#4A5D4E]">
-                    <div>✅ <strong>Active Fund:</strong> When Alpha &gt; 1.5% AND Beat Rate &gt; 65% (Example: Value/Contra funds)</div>
-                    <div>📉 <strong>ETF/Index:</strong> When Alpha &lt; 0.5% OR Beat Rate &lt; 50% (Example: Mid Cap, Small Cap)</div>
+                <div className="p-3 bg-[#F5F8FF] rounded-xl border border-[#DDE6F3] text-xs">
+                  <div className="font-semibold text-[#1F2937] mb-2">Active vs ETF Decision:</div>
+                  <div className="space-y-1 text-[#4A5D4E]">
+                    <div>✅ <strong>Active:</strong> Alpha &gt; 1.5% AND Beat Rate &gt; 65% (e.g., Value/Contra)</div>
+                    <div>📉 <strong>ETF:</strong> Alpha &lt; 0.5% OR Beat Rate &lt; 50% (e.g., Mid/Small Cap)</div>
                   </div>
-                </div>
-
-                <div className="p-3 bg-[#EEF4FA] rounded-xl text-xs text-[#4A5D4E]">
-                  💡 <strong>Why this works:</strong> When Growth underperforms, Value protects you. When Large Caps lag, Mid/Small compensate.
                 </div>
               </div>
             </details>
 
-            {/* SECTION 2: The Core-7 Roles */}
+            {/* SECTION 2: Core-7 Roles */}
             <details className={`${cardClass} p-6`} open>
               <summary className="cursor-pointer text-xl font-serif text-[#1F2937] mb-4 hover:text-[#2F5D7C]">
-                🎯 Step 2: The Core-7 Portfolio Roles (Complete Framework)
+                🎯 Step 2: The Core-7 Portfolio Roles
               </summary>
 
-              <div className="space-y-4 pl-4">
-                <p className="text-sm text-[#4A5D4E] leading-relaxed">
-                  The 16 matrix positions consolidate into <strong>7 functional roles</strong>. Each role has specific sub-categories and top funds.
+              <div className="space-y-3 pl-4">
+                <p className="text-sm text-[#4A5D4E] mb-4">
+                  The 16 matrix positions consolidate into 7 roles. Each role serves a specific purpose in goal-based portfolios.
                 </p>
 
-                <div className="space-y-3">
-                  {/* Role 1: Anchor */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">🛡️</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">Anchor</div>
-                            <div className="text-xs text-[#6B7C70]">Safety & liquidity for near-term goals (0-3 years)</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-[#2F5D7C] font-semibold">Debt Category</div>
+                {/* Anchor */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🛡️</span>
+                        <span className="font-semibold text-sm">Anchor</span>
+                        <span className="text-xs text-[#6B7C70]">Safety for 0-3 year goals</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Categories:</strong> Liquid Fund, Money Market, Short Duration
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] bg-white p-3 rounded-lg">
-                        <strong>Best Funds:</strong> HDFC Liquid Fund, ICICI Pru Liquid Fund, Axis Liquid Fund
-                      </div>
+                      <span className="text-xs text-[#2F5D7C]">Debt</span>
                     </div>
-                  </details>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Categories:</strong> Liquid, Money Market, Short Duration</div>
+                    <div className="bg-white p-2 rounded"><strong>Top Funds:</strong> HDFC Liquid, ICICI Pru Liquid, Axis Liquid</div>
+                  </div>
+                </details>
 
-                  {/* Role 2: Pillar */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">🏛️</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">Pillar</div>
-                            <div className="text-xs text-[#6B7C70]">Core large-cap stability with minimal tracking error</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-blue-600 font-semibold">ETF Recommended</div>
+                {/* Pillar */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🏛️</span>
+                        <span className="font-semibold text-sm">Pillar</span>
+                        <span className="text-xs text-[#6B7C70]">Core large-cap stability</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Category:</strong> Large Cap / Nifty 50
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] bg-white p-3 rounded-lg">
-                        <strong>Best Funds:</strong> Nifty 50 Index Fund, ICICI Pru Nifty 50 ETF, HDFC Index Nifty 50
-                      </div>
+                      <span className="text-xs text-blue-600">ETF</span>
                     </div>
-                  </details>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Category:</strong> Large Cap / Nifty 50</div>
+                    <div className="bg-white p-2 rounded"><strong>Top Funds:</strong> Nifty 50 Index, ICICI Nifty ETF, HDFC Index Nifty 50</div>
+                  </div>
+                </details>
 
-                  {/* Role 3: Contrarian */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">🎯</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">Contrarian</div>
-                            <div className="text-xs text-[#6B7C70]">Value/Contra for defensive alpha (High Alpha: 3-4%)</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-green-600 font-semibold">Active Recommended</div>
+                {/* Contrarian */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🎯</span>
+                        <span className="font-semibold text-sm">Contrarian</span>
+                        <span className="text-xs text-[#6B7C70]">Value/Contra defensive alpha</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Categories:</strong> Value Fund, Contra Fund, Dividend Yield Fund
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] bg-white p-3 rounded-lg">
-                        <strong>Best Funds:</strong> ICICI Pru Value Discovery, Invesco India Contra, UTI Dividend Yield
-                      </div>
-                      <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
-                        ✅ <strong>Data says Active:</strong> Avg Alpha 3.5%, Beat Rate 90%
-                      </div>
+                      <span className="text-xs text-green-600">Active (4.38% alpha)</span>
                     </div>
-                  </details>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Categories:</strong> Value, Contra, Dividend Yield</div>
+                    <div className="bg-white p-2 rounded"><strong>Top Funds:</strong> ICICI Value Discovery, Invesco Contra, UTI Dividend</div>
+                    <div className="bg-green-50 p-2 rounded text-green-700">✅ Avg Alpha 3.5%, Beat Rate 90%</div>
+                  </div>
+                </details>
 
-                  {/* Role 4: Speedster */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">⚡</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">Speedster</div>
-                            <div className="text-xs text-[#6B7C70]">Momentum to capture trending strength</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-blue-600 font-semibold">ETF Recommended</div>
+                {/* Speedster */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⚡</span>
+                        <span className="font-semibold text-sm">Speedster</span>
+                        <span className="text-xs text-[#6B7C70]">Momentum capture</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Categories:</strong> Nifty Midcap Momentum 50, Nifty Smallcap Momentum 50
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] bg-white p-3 rounded-lg">
-                        <strong>Best Funds:</strong> Motilal Oswal Midcap Momentum ETF, ICICI Pru Momentum Index
-                      </div>
+                      <span className="text-xs text-blue-600">ETF</span>
                     </div>
-                  </details>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Categories:</strong> Midcap Momentum, Smallcap Momentum</div>
+                    <div className="bg-white p-2 rounded"><strong>Top Funds:</strong> Motilal Midcap Momentum ETF, ICICI Momentum Index</div>
+                  </div>
+                </details>
 
-                  {/* Role 5: Compounder */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">📈</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">Compounder</div>
-                            <div className="text-xs text-[#6B7C70]">Active mid/small cap growth (Currently Skipped)</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-red-600 font-semibold">Skipped</div>
+                {/* Compounder */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📈</span>
+                        <span className="font-semibold text-sm">Compounder</span>
+                        <span className="text-xs text-[#6B7C70]">Active mid/small growth</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Categories:</strong> Mid Cap Active, Small Cap Active
-                      </div>
-                      <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                        ❌ <strong>Data says ETF:</strong> Mid Cap Alpha -1.17%, Small Cap Alpha -0.25%. Active managers underperforming.
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] italic">
-                        This role activates when active fund managers start beating benchmarks in mid/small cap space.
-                      </div>
+                      <span className="text-xs text-red-600">SKIPPED</span>
                     </div>
-                  </details>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Categories:</strong> Mid Cap Active, Small Cap Active</div>
+                    <div className="bg-red-50 p-2 rounded text-red-700">❌ Mid: -1.17% alpha, Small: -0.25% alpha. Active underperforming.</div>
+                    <div className="italic text-[#4A5D4E]">Activates when active managers beat benchmarks</div>
+                  </div>
+                </details>
 
-                  {/* Role 6: All-Rounder */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">🌐</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">All-Rounder</div>
-                            <div className="text-xs text-[#6B7C70]">Flexi-cap broad market coverage</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-[#2F5D7C] font-semibold">Active/ETF Mix</div>
+                {/* All-Rounder */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🌐</span>
+                        <span className="font-semibold text-sm">All-Rounder</span>
+                        <span className="text-xs text-[#6B7C70]">Broad market coverage</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Categories:</strong> Flexi Cap, Multi Cap, Nifty 500 Index
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] bg-white p-3 rounded-lg">
-                        <strong>Best Funds:</strong> Parag Parikh Flexi Cap, PGIM India Flexi Cap, Nifty 500 Index Fund
-                      </div>
+                      <span className="text-xs text-[#2F5D7C]">Mix</span>
                     </div>
-                  </details>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Categories:</strong> Flexi Cap, Multi Cap, Nifty 500</div>
+                    <div className="bg-white p-2 rounded"><strong>Top Funds:</strong> Parag Parikh Flexi, PGIM Flexi, Nifty 500 Index</div>
+                  </div>
+                </details>
 
-                  {/* Role 7: Stabilizer */}
-                  <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
-                    <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">⚖️</span>
-                          <div>
-                            <div className="font-semibold text-[#1F2937]">Stabilizer</div>
-                            <div className="text-xs text-[#6B7C70]">Hybrid for medium-term balance (3-7 years)</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-green-600 font-semibold">Active Recommended</div>
+                {/* Stabilizer */}
+                <details className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                  <summary className="cursor-pointer p-3 hover:bg-[#EEF4FA]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⚖️</span>
+                        <span className="font-semibold text-sm">Stabilizer</span>
+                        <span className="text-xs text-[#6B7C70]">Hybrid for 3-7 years</span>
                       </div>
-                    </summary>
-                    <div className="px-4 pb-4 space-y-2">
-                      <div className="text-xs text-[#6B7C70] mb-2">
-                        <strong>Sub-Categories:</strong> Balanced Advantage, Multi-Asset Allocation
-                      </div>
-                      <div className="text-xs text-[#4A5D4E] bg-white p-3 rounded-lg">
-                        <strong>Best Funds:</strong> ICICI Pru Balanced Advantage, HDFC Balanced Advantage, Quant Multi Asset
-                      </div>
-                      <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
-                        ✅ <strong>Data says Active:</strong> Avg Alpha 1.9%, Beat Rate 70%
-                      </div>
+                      <span className="text-xs text-green-600">Active (1.93% alpha)</span>
                     </div>
-                  </details>
-                </div>
-
-                <div className="p-3 bg-[#EEF4FA] rounded-xl text-xs text-[#4A5D4E]">
-                  💡 <strong>Why 7 roles?</strong> Research shows diversification benefits plateau after 6-8 holdings. These 7 give full coverage without complexity.
-                </div>
+                  </summary>
+                  <div className="px-3 pb-3 text-xs space-y-2">
+                    <div><strong>Sub-Categories:</strong> Balanced Advantage, Multi-Asset</div>
+                    <div className="bg-white p-2 rounded"><strong>Top Funds:</strong> ICICI Balanced Advantage, HDFC Balanced, Quant Multi Asset</div>
+                    <div className="bg-green-50 p-2 rounded text-green-700">✅ Avg Alpha 1.9%, Beat Rate 70%</div>
+                  </div>
+                </details>
               </div>
             </details>
 
             {/* SECTION 3: Your Personalized Portfolio */}
             <details className={`${cardClass} p-6`} open>
               <summary className="cursor-pointer text-xl font-serif text-[#1F2937] mb-4 hover:text-[#2F5D7C]">
-                🎨 Step 3: Your Personalized Portfolio (Based on Goals)
+                🎨 Step 3: Your Portfolio (Personalized for Your Goals)
               </summary>
 
-              <div className="space-y-4 pl-4">
-                {results.overallAllocation.map((alloc, idx) => {
-                  const roleKey = alloc.role || "allrounder";
-                  const roleInfo = ROLE_CONFIG[roleKey as keyof typeof ROLE_CONFIG];
+              <div className="space-y-3 pl-4">
+                <p className="text-sm text-[#4A5D4E] mb-4">
+                  Based on your <strong>{goals.length} goal(s)</strong>, here are the active roles and top fund picks:
+                </p>
 
-                  return (
-                    <details key={idx} className="bg-[#F5F8FF] rounded-xl overflow-hidden border border-[#DDE6F3]">
-                      <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA] transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{roleInfo.emoji}</span>
-                            <div>
-                              <div className="font-semibold text-[#1F2937]">{roleInfo.name}</div>
-                              <div className="text-xs text-[#6B7C70]">
-                                {alloc.isPassive ? "ETF/Index • Low Cost" : "Active Fund • High Alpha"}
+                {/* Group allocations by unique role to avoid duplicates */}
+                {(() => {
+                  const roleMap = new Map<string, typeof results.overallAllocation[0]>();
+                  results.overallAllocation.forEach(alloc => {
+                    const roleKey = alloc.role || "allrounder";
+                    if (!roleMap.has(roleKey)) {
+                      roleMap.set(roleKey, alloc);
+                    } else {
+                      // Merge allocations for same role
+                      const existing = roleMap.get(roleKey)!;
+                      existing.percentage += alloc.percentage;
+                      existing.amount += alloc.amount;
+                      // Merge fund lists
+                      const existingNames = new Set(existing.fundSuggestions.map(f => f.name));
+                      alloc.fundSuggestions.forEach(fund => {
+                        if (!existingNames.has(fund.name)) {
+                          existing.fundSuggestions.push(fund);
+                        }
+                      });
+                    }
+                  });
+
+                  const roleEmojis: Record<string, string> = {
+                    anchor: "🛡️", pillar: "🏛️", contrarian: "🎯", 
+                    speedster: "⚡", compounder: "📈", allrounder: "🌐", stabilizer: "⚖️"
+                  };
+
+                  return Array.from(roleMap.values()).map((alloc, idx) => {
+                    const roleKey = alloc.role || "allrounder";
+                    const emoji = roleEmojis[roleKey];
+
+                    return (
+                      <details key={idx} className="bg-[#F5F8FF] rounded-xl border border-[#DDE6F3]">
+                        <summary className="cursor-pointer p-4 hover:bg-[#EEF4FA]">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{emoji}</span>
+                              <div>
+                                <div className="font-semibold text-[#1F2937] capitalize">{roleKey}</div>
+                                <div className="text-xs text-[#6B7C70]">
+                                  {alloc.isPassive ? "ETF/Index • Low Cost" : "Active Fund • High Alpha"}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-[#2F5D7C]">{formatNumber(alloc.percentage)}%</div>
-                            <div className="text-xs text-[#6B7C70]">{formatCurrency(alloc.amount)}</div>
-                          </div>
-                        </div>
-                      </summary>
-
-                      <div className="px-4 pb-4 space-y-2">
-                        {alloc.fundSuggestions.slice(0, 3).map((fund, fIdx) => (
-                          <div key={fIdx} className="flex justify-between items-start p-3 bg-white rounded-lg">
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-[#1F2937]">
-                                {fund.name.length > 50 ? fund.name.substring(0, 47) + "..." : fund.name}
-                              </div>
-                              {fund.isETF && <span className="text-xs text-[#2F5D7C]">ETF</span>}
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-[#2F5D7C]">{formatNumber(alloc.percentage)}%</div>
+                              <div className="text-xs text-[#6B7C70]">{formatCurrency(alloc.amount)}</div>
                             </div>
-                            <div className="text-right ml-3">
+                          </div>
+                        </summary>
+
+                        <div className="px-4 pb-4 space-y-2">
+                          {alloc.fundSuggestions.slice(0, 3).map((fund, fIdx) => (
+                            <div key={fIdx} className="flex justify-between p-3 bg-white rounded-lg text-xs">
+                              <div className="flex-1">
+                                <div className="font-medium text-[#1F2937]">
+                                  {fund.name.length > 50 ? fund.name.substring(0, 47) + "..." : fund.name}
+                                </div>
+                                {fund.isETF && <span className="text-[#2F5D7C]">ETF</span>}
+                              </div>
                               {fund.returns3Y && (
-                                <>
-                                  <div className="text-sm font-semibold text-[#2F5D7C]">{formatNumber(fund.returns3Y)}%</div>
-                                  <div className="text-xs text-[#6B7C70]">3Y</div>
-                                </>
+                                <div className="text-right ml-3">
+                                  <div className="font-semibold text-[#2F5D7C]">{formatNumber(fund.returns3Y)}%</div>
+                                  <div className="text-[#6B7C70]">3Y</div>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  );
-                })}
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  });
+                })()}
               </div>
             </details>
 
-            {/* SECTION 4: Portfolio Evolution Timeline */}
+            {/* SECTION 4: Portfolio Evolution */}
             <details className={`${cardClass} p-6`} open>
               <summary className="cursor-pointer text-xl font-serif text-[#1F2937] mb-4 hover:text-[#2F5D7C]">
-                🔄 Step 4: How Your Portfolio Evolves (Goal by Goal)
+                🔄 Step 4: Portfolio Evolution Timeline
               </summary>
 
               <div className="space-y-6 pl-4">
-                <p className="text-sm text-[#4A5D4E] leading-relaxed">
-                  Your portfolio automatically shifts as each goal completes. Same ₹{(monthlySIPCapacity/1000).toFixed(0)}K/month, 
-                  different allocations.
+                <p className="text-sm text-[#4A5D4E]">
+                  Your portfolio transforms as each goal completes. Same ₹{(monthlySIPCapacity/1000).toFixed(0)}K/month, evolving allocations.
                 </p>
 
-                {/* Timeline */}
-                <div className="space-y-8">
-                  {results.portfolioPhases.map((phase, idx) => {
-                    const isFirst = idx === 0;
-                    const isLast = idx === results.portfolioPhases.length - 1;
+                {results.portfolioPhases.map((phase, idx) => {
+                  const isFirst = idx === 0;
+                  const isLast = idx === results.portfolioPhases.length - 1;
 
-                    // Calculate allocation for this phase
-                    const phaseAlloc: Record<string, number> = {};
-                    results.overallAllocation.forEach(alloc => {
-                      if (alloc.role && phase.rolesActive.includes(alloc.role)) {
-                        const cat = alloc.category === "Debt" ? "Debt" : 
-                                   alloc.subCategory.includes("Momentum") ? "Momentum" : "Equity";
-                        phaseAlloc[cat] = (phaseAlloc[cat] || 0) + alloc.percentage;
-                      }
-                    });
+                  // Calculate allocation breakdown
+                  const allocBreakdown: Record<string, number> = {};
+                  results.overallAllocation.forEach(alloc => {
+                    if (alloc.role && phase.rolesActive.includes(alloc.role)) {
+                      const cat = alloc.category === "Debt" ? "Debt" : 
+                                 alloc.subCategory.includes("Momentum") ? "Momentum" :
+                                 alloc.subCategory.includes("Balanced") || alloc.subCategory.includes("Hybrid") ? "Hybrid" :
+                                 "Equity";
+                      allocBreakdown[cat] = (allocBreakdown[cat] || 0) + alloc.percentage;
+                    }
+                  });
 
-                    return (
-                      <div key={idx} className="relative">
-                        <div className="flex gap-4">
-                          {/* Phase Number */}
-                          <div className="flex-shrink-0">
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
-                              isFirst ? "bg-[#2F5D7C]" : "bg-[#6B7C70]"
-                            }`}>
-                              {phase.phaseNumber}
-                            </div>
-                            {!isLast && (
-                              <div className="w-0.5 h-16 bg-[#DDE6F3] mx-auto mt-2" />
-                            )}
+                  const roleEmojis: Record<string, string> = {
+                    anchor: "🛡️", pillar: "🏛️", contrarian: "🎯", 
+                    speedster: "⚡", compounder: "📈", allrounder: "🌐", stabilizer: "⚖️"
+                  };
+
+                  return (
+                    <div key={idx} className="relative">
+                      <div className="flex gap-4">
+                        <div className="flex-shrink-0">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                            isFirst ? "bg-[#2F5D7C]" : "bg-[#6B7C70]"
+                          }`}>
+                            {phase.phaseNumber}
                           </div>
+                          {!isLast && <div className="w-0.5 h-20 bg-[#DDE6F3] mx-auto mt-2" />}
+                        </div>
 
-                          {/* Phase Content */}
-                          <div className="flex-1 pb-4">
-                            <div className={`p-4 rounded-xl border ${
-                              isFirst ? "border-[#2F5D7C] bg-[#EEF4FA]" : "border-[#DDE6F3] bg-[#F5F8FF]"
-                            }`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <div className="font-semibold text-[#1F2937]">{phase.activeGoal}</div>
-                                  <div className="text-xs text-[#6B7C70]">{phase.years}</div>
+                        <div className="flex-1 pb-4">
+                          <div className={`p-4 rounded-xl border ${
+                            isFirst ? "border-[#2F5D7C] bg-[#EEF4FA]" : "border-[#DDE6F3] bg-[#F5F8FF]"
+                          }`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <div className="font-semibold text-[#1F2937]">{phase.activeGoal}</div>
+                                <div className="text-xs text-[#6B7C70]">{phase.years}</div>
+                              </div>
+                              {isFirst && (
+                                <span className="px-2 py-1 bg-[#2F5D7C] text-white text-xs rounded-full font-semibold">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-xs text-[#4A5D4E] mb-3">{phase.description}</p>
+
+                            {/* Allocation Breakdown */}
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {Object.entries(allocBreakdown).map(([cat, pct]) => (
+                                <div key={cat} className="px-3 py-1 bg-white rounded-full text-xs">
+                                  <span className="font-bold text-[#2F5D7C]">{formatNumber(pct)}%</span>{" "}
+                                  <span className="text-[#6B7C70]">{cat}</span>
                                 </div>
-                                {isFirst && (
-                                  <span className="px-2 py-1 bg-[#2F5D7C] text-white text-xs rounded-full font-semibold">
-                                    Current
-                                  </span>
-                                )}
-                              </div>
-
-                              <p className="text-sm text-[#4A5D4E] mb-3">{phase.description}</p>
-
-                              {/* Allocation Pills */}
-                              <div className="flex flex-wrap gap-2 mb-2">
-                                {Object.entries(phaseAlloc).map(([cat, pct]) => (
-                                  <div key={cat} className="px-3 py-1 bg-white rounded-full text-xs">
-                                    <span className="font-semibold text-[#2F5D7C]">{formatNumber(pct)}%</span>
-                                    <span className="text-[#6B7C70] ml-1">{cat}</span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Active Roles */}
-                              <div className="flex flex-wrap gap-1">
-                                {phase.rolesActive.map(role => {
-                                  const r = ROLE_CONFIG[role as keyof typeof ROLE_CONFIG];
-                                  return (
-                                    <span key={role} className="text-xs text-[#6B7C70]">
-                                      {r.emoji}
-                                    </span>
-                                  );
-                                })}
-                              </div>
+                              ))}
                             </div>
 
-                            {/* Redirect Indicator */}
-                            {!isLast && (
-                              <div className="mt-3 ml-4 p-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
-                                → Portfolio shifts to {results.portfolioPhases[idx + 1].activeGoal} when this goal completes
-                              </div>
-                            )}
+                            {/* Active Roles */}
+                            <div className="flex flex-wrap gap-1">
+                              {phase.rolesActive.map(role => (
+                                <span key={role} className="text-base">{roleEmojis[role as keyof typeof roleEmojis]}</span>
+                              ))}
+                            </div>
                           </div>
+
+                          {!isLast && (
+                            <div className="mt-3 ml-4 p-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
+                              🔄 Auto-redirect: Portfolio shifts to <strong>{results.portfolioPhases[idx + 1].activeGoal}</strong> when this completes
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
 
-                <div className="p-4 bg-[#D5E8F0] rounded-xl text-xs text-[#1F2937]">
-                  ✨ <strong>The Magic:</strong> You manage ONE portfolio. We automatically redirect your SIP as each goal completes. 
-                  Zero manual work, zero money sitting idle.
+                <div className="p-3 bg-[#D5E8F0] rounded-xl text-xs">
+                  ✨ <strong>The Magic:</strong> ONE portfolio, automatic redirects, zero manual work, zero idle money.
                 </div>
               </div>
             </details>
 
-            {/* SECTION 5: Feasibility */}
+            {/* Feasibility */}
             <div className={`${cardClass} p-6`}>
               <div className="flex items-start gap-3">
                 <div className={`text-3xl ${
@@ -737,16 +697,16 @@ export default function MutualFundMatchPage() {
                     {results.feasibilityStatus === "feasible" ? "Plan is Feasible!" :
                      results.feasibilityStatus === "challenging" ? "Challenging but Possible" : "Needs Adjustment"}
                   </h3>
-                  <div className="space-y-1">
+                  <div className="space-y-1 text-sm">
                     {results.recommendations.map((rec, idx) => (
-                      <div key={idx} className="text-sm text-[#4A5D4E]">• {rec}</div>
+                      <div key={idx} className="text-[#4A5D4E]">• {rec}</div>
                     ))}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Actions */}
             <div className="flex flex-col md:flex-row gap-4 justify-center">
               <button
                 onClick={() => {
@@ -771,7 +731,7 @@ export default function MutualFundMatchPage() {
       <footer className="bg-[#1F2937] text-white py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-[#C8D0D8] text-xs">
-            Powered by the 4×4 Matrix Engine • Data from 2,006 schemes • Dynamic Portfolio Evolution
+            Powered by the 4×4 Matrix Engine • 2,006 Schemes Analyzed • Dynamic Portfolio Evolution
           </p>
         </div>
       </footer>
