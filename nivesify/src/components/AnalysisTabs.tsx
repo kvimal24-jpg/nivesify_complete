@@ -23,7 +23,7 @@ export default function AnalysisTabs() {
             href={tab.href}
             className={`px-4 py-2 rounded-full text-xs md:text-sm font-serif transition-all ${
               isActive
-                ? "bg-[#2F5D7C] text-white ring-2 ring-[#2F5D7C]/60 shadow-[0_10px_25px_-15px_rgba(47,93,124,0.5)]"
+                ? "bg-[#2F5D7C] !text-white ring-2 ring-[#2F5D7C]/60 shadow-[0_10px_25px_-15px_rgba(47,93,124,0.5)]"
                 : "bg-white text-[#1F2937] border border-[#4A5D4E]/20"
             }`}
           >
