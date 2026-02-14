@@ -319,36 +319,39 @@ export default function ActiveFundsExplorer({
 
       {tab === "insights" && (
         <div className="mt-8 space-y-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1 */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Coverage</p>
               <p className="mt-3 text-2xl font-serif text-[#1F2937]">{manifest?.counts?.funds ?? funds.length}</p>
               <p className="text-xs font-serif text-[#6B7C70]">active funds tracked</p>
             </div>
-            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
+            {/* Card 2 */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Top 10 percent</p>
               <p className="mt-3 text-2xl font-serif text-[#1F2937]">{topCount}</p>
               <p className="text-xs font-serif text-[#6B7C70]">consistent alpha</p>
             </div>
-            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
+            {/* Card 3 */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Avg alpha 3Y</p>
               <p className="mt-3 text-2xl font-serif text-[#1F2937]">
                 {avgAlpha3Y === null ? "-" : `${avgAlpha3Y.toFixed(2)}%`}
               </p>
               <p className="text-xs font-serif text-[#6B7C70]">across active universe</p>
             </div>
-            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)]">
+            {/* Card 4 */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Median IR 3Y</p>
               <p className="mt-3 text-2xl font-serif text-[#1F2937]">
                 {medianIr3Y === null ? "-" : formatNumber(medianIr3Y, 2)}
               </p>
               <p className="text-xs font-serif text-[#6B7C70]">risk-adjusted skill</p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            
+            {/* topReturnInsights cards */}
             {topReturnInsights.map((item) => (
-              <div key={item.label} className="bg-[#FFF8EC] border border-[#E7EDF7] rounded-2xl p-3">
+              <div key={item.label} className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
                 <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">{item.label}</p>
                 <p className="mt-2 text-base font-serif text-[#1F2937] break-words">{item.subCategory}</p>
                 <p className="text-[11px] font-serif text-[#6B7C70]">Category: {item.category}</p>
@@ -356,25 +359,25 @@ export default function ActiveFundsExplorer({
                 <p className="text-[11px] font-serif text-[#6B7C70]">AUM: {formatCompact(item.aum)} Cr</p>
               </div>
             ))}
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
-            <div className="bg-[#EEF4FF] border border-[#E7EDF7] rounded-2xl p-3">
+            {/* Highest beat rate card */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Highest beat rate</p>
               <p className="mt-2 text-base font-serif text-[#1F2937] break-words">{topBeatCategory?.Category_Name ?? "-"}</p>
               <p className="text-[11px] font-serif text-[#6B7C70]">
                 Beat rate: {formatPct(topBeatCategory?.Pct_Funds_Beating_Benchmark_3Y, 1)}
               </p>
             </div>
-            <div className="bg-[#EAF1E8] border border-[#E7EDF7] rounded-2xl p-3">
+
+            {/* Best risk-adjusted card */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <p className="text-xs uppercase tracking-[0.3em] text-[#6B7C70] font-serif">Best risk-adjusted</p>
               <p className="mt-2 text-base font-serif text-[#1F2937] break-words">{topIrCategory?.Category_Name ?? "-"}</p>
               <p className="text-[11px] font-serif text-[#6B7C70]">Avg IR 3Y: {formatNumber(topIrCategory?.Avg_IR_3Y, 2)}</p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-[#EAF1E8] border border-[#E7EDF7] rounded-3xl p-4">
+            {/* Industry pulse card */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <h3 className="text-lg font-serif text-[#1F2937]">Industry pulse</h3>
               <p className="mt-2 text-xs font-serif text-[#4A5D4E]">
                 {industryInsight?.Pct_Funds_Beating_Benchmark_3Y === null ||
@@ -391,7 +394,9 @@ export default function ActiveFundsExplorer({
                 </div>
               </details>
             </div>
-            <div className="bg-[#F7F0E6] border border-[#E7EDF7] rounded-3xl p-4">
+
+            {/* Category advantage card */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <h3 className="text-lg font-serif text-[#1F2937]">Category advantage</h3>
               <p className="mt-2 text-xs font-serif text-[#4A5D4E]">Scan categories where skill shows up consistently.</p>
               <details className="mt-2 text-xs font-serif text-[#4A5D4E]">
@@ -399,7 +404,9 @@ export default function ActiveFundsExplorer({
                 <div className="mt-2">Avg IR 3Y: {formatNumber(industryInsight?.Avg_IR_3Y, 2)}</div>
               </details>
             </div>
-            <div className="bg-[#EEF1F6] border border-[#E7EDF7] rounded-3xl p-4">
+
+            {/* Data freshness card */}
+            <div className="rounded-3xl border border-[#E6E8E1] bg-white p-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.35)] h-full text-center">
               <h3 className="text-lg font-serif text-[#1F2937]">Data freshness</h3>
               <p className="mt-2 text-xs font-serif text-[#4A5D4E]">As of {manifest?.reportDate ?? "latest run"}.</p>
               <details className="mt-2 text-xs font-serif text-[#4A5D4E]">

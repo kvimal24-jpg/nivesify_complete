@@ -7,10 +7,10 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
-		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-		"deploy:staging": "opennextjs-cloudflare build && npx wrangler deploy -c wrangler.staging.jsonc",
-		"upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
-		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+		"deploy": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
+		"deploy:staging": "npx opennextjs-cloudflare build && npx wrangler deploy -c wrangler.staging.jsonc",
+		"upload": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",
+		"preview": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview",
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
 	},
 	"dependencies": {
