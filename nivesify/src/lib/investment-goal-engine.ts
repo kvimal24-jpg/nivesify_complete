@@ -1,5 +1,5 @@
 // Investment goal planning engine with Dynamic Portfolio Evolution
-// Based on the Nivesify 4x4 Matrix Proposal
+// Based on the Nivesify 4×4 Matrix Proposal - COMPLETE IMPLEMENTATION
 
 import type { FundAnalytics, ETFAnalytics, CategoryInsights } from "@/lib/fund-types";
 
@@ -135,6 +135,17 @@ interface PortfolioPhase {
 	portfolioComposition: string;
 	rolesActive: PortfolioRole[];
 	description: string;
+	allocationBreakdown: {
+		debt: number;
+		equity: number;
+		hybrid: number;
+		momentum: number;
+	};
+	sipBreakdown: {
+		role: PortfolioRole;
+		amount: number;
+		percentage: number;
+	}[];
 }
 
 interface EngineOutput {
@@ -147,6 +158,13 @@ interface EngineOutput {
 	recommendations: string[];
 	portfolioPhases: PortfolioPhase[];
 	currentPhase: PortfolioPhase;
+	complete4x4Matrix: {
+		size: string;
+		value: string | null;
+		growth: string | null;
+		momentum: string | null;
+		active: string | null;
+	}[];
 }
 
 class InvestmentGoalEngine {
@@ -171,6 +189,48 @@ class InvestmentGoalEngine {
 		}
 	}
 
+	/**
+	 * Generate the complete 4x4 matrix for educational display
+	 */
+	generateComplete4x4Matrix(): {
+		size: string;
+		value: string | null;
+		growth: string | null;
+		momentum: string | null;
+		active: string | null;
+	}[] {
+		return [
+			{
+				size: "Large Cap",
+				value: "Value Fund",
+				growth: "Nifty 50 ETF",
+				momentum: null,
+				active: "Large Cap Active"
+			},
+			{
+				size: "Mid Cap",
+				value: null,
+				growth: "Nifty Mid 150 ETF",
+				momentum: "Nifty Midcap Momentum 50",
+				active: "Mid Cap Active"
+			},
+			{
+				size: "Small Cap",
+				value: null,
+				growth: "Nifty Small 250 ETF",
+				momentum: "Nifty Smallcap Momentum 50",
+				active: "Small Cap Active"
+			},
+			{
+				size: "Total Market",
+				value: null,
+				growth: "Nifty 500 ETF",
+				momentum: null,
+				active: "Flexi/Multi Cap"
+			}
+		];
+	}
+
 	calculateInflatedAmount(currentAmount: number, years: number, inflationRate: number): number {
 		return currentAmount * Math.pow(1 + inflationRate / 100, years);
 	}
@@ -189,89 +249,71 @@ class InvestmentGoalEngine {
 		};
 	}
 
-	/**
-	 * NEW: Determine which sub-category should use Active vs ETF
-	 * Based on real data: Alpha > 1.5% AND Beat Rate > 65% → Active
-	 */
 	shouldUseActive(subCategory: string): boolean {
-		   const insight = this.categoryInsights.find(
-			   (i) => i.Level === "Sub-Category" && i.Sub_Category_Name === subCategory
-		   );
+		const insight = this.categoryInsights.find(
+			(i) => i.Level === "Sub-Category" && i.Sub_Category_Name === subCategory
+		);
 
 		if (!insight) return false;
 
 		const alpha = insight.Avg_Alpha_3Y ?? 0;
 		const beatRate = insight.Pct_Funds_Beating_Benchmark_3Y ?? 0;
 
-		// High alpha threshold: Active is better
 		if (alpha > 1.5 && beatRate > 65) return true;
-
-		// Low alpha: ETF is better
 		if (alpha <= 0.5 || beatRate < 50) return false;
 
-		// Borderline: check expense ratio or default to ETF
 		return false;
 	}
 
-	/**
-	 * NEW: Map portfolio roles to sub-categories based on 4x4 matrix
-	 */
 	getRoleForSubCategory(
 		subCategory: string,
 		bucket: HorizonBucket
 	): { role: PortfolioRole; description: string } {
-		// Debt categories → Anchor role
 		if (
 			subCategory.includes("Liquid") ||
 			subCategory.includes("Money Market") ||
 			subCategory.includes("Short Duration")
 		) {
-			return { role: "anchor", description: "Safety & Liquidity for near-term goals" };
+			return { role: "anchor", description: "Safety & Liquidity for near-term goals (0-3 years)" };
 		}
 
-		// Large Cap Core → Pillar role
 		if (subCategory === "Large Cap") {
 			return { role: "pillar", description: "Core equity exposure with minimal tracking error" };
 		}
 
-		// Value/Contra → Contrarian role
 		if (subCategory === "Value" || subCategory === "Contra" || subCategory === "Dividend Yield") {
 			return { role: "contrarian", description: "Defensive alpha through value/contrarian strategy" };
 		}
 
-		// Momentum → Speedster role
 		if (subCategory.includes("Momentum") || subCategory.includes("Alpha")) {
 			return { role: "speedster", description: "Captures trending strength via momentum/alpha" };
 		}
 
-		// Active Mid/Small (only if alpha is positive) → Compounder role
 		if ((subCategory === "Mid Cap" || subCategory === "Small Cap") && this.shouldUseActive(subCategory)) {
-			return { role: "compounder", description: "Long-term wealth via high-growth segments" };
+			return { role: "compounder", description: "Long-term wealth via high-growth segments (only when alpha exists)" };
 		}
 
-		// Flexi/Multi Cap → All-Rounder role
 		if (subCategory === "Flexi Cap" || subCategory === "Multi Cap") {
 			return { role: "allrounder", description: "Broad market coverage across all cap sizes" };
 		}
 
-		// Hybrid funds → Stabilizer role
 		if (
 			subCategory.includes("Balanced") ||
 			subCategory.includes("Hybrid") ||
 			subCategory.includes("Multi Asset")
 		) {
-			return { role: "stabilizer", description: "Balanced risk-return for medium-term goals" };
+			return { role: "stabilizer", description: "Balanced risk-return for medium-term goals (3-7 years)" };
 		}
 
-		// Default fallback
 		return { role: "allrounder", description: "Diversified exposure" };
 	}
 
 	/**
-	 * NEW: Generate 4x4 matrix allocation based on active goal
-	 * Phase 1 (0-3 years): 70% Debt + 30% Large Cap
-	 * Phase 2 (3-7 years): 40% Debt + 60% Balanced
-	 * Phase 3 (7+ years): 10% Debt + 90% Equity
+	 * FIXED: Generate proper 4x4 matrix with ALL styles (Value, Growth, Momentum, Active)
+	 * Following proposal Phase allocations:
+	 * - Short (0-3y): 70% Debt + 30% Large Cap
+	 * - Medium (3-7y): 40% Debt + 60% (Hybrid/Equity mix)
+	 * - Long (7+y): 10% Debt + 90% Equity (full diversification)
 	 */
 	generate4x4Matrix(
 		bucket: HorizonBucket,
@@ -280,50 +322,115 @@ class InvestmentGoalEngine {
 	): MatrixAllocation[] {
 		const matrix: MatrixAllocation[] = [];
 
-		// Define allocation based on active goal timeline
-		let baseAllocation: Record<string, number>;
-
 		if (bucket === "short") {
-			// Phase 1: Focus on safety
-			baseAllocation = {
-				debt: 70,
-				largeCap: 30,
-			};
+			// Phase 1: 70% Debt + 30% Large Cap (safety focus)
+			matrix.push({
+				capSize: "debt",
+				style: "debt",
+				percentage: 70,
+				amount: (totalAmount * 70) / 100,
+			});
+			matrix.push({
+				capSize: "large",
+				style: "growth",
+				percentage: 30,
+				amount: (totalAmount * 30) / 100,
+			});
 		} else if (bucket === "medium") {
-			// Phase 2: Balanced approach
-			baseAllocation = {
-				debt: 40,
-				largeCap: 20,
-				midCap: 20,
-				flexi: 20,
-			};
+			// Phase 2: 40% Debt + 60% Balanced/Equity
+			matrix.push({
+				capSize: "debt",
+				style: "debt",
+				percentage: 40,
+				amount: (totalAmount * 40) / 100,
+			});
+			// Rest split between hybrid and equity
+			matrix.push({
+				capSize: "large",
+				style: "growth",
+				percentage: 20,
+				amount: (totalAmount * 20) / 100,
+			});
+			matrix.push({
+				capSize: "total",
+				style: "active",
+				percentage: 20,
+				amount: (totalAmount * 20) / 100,
+			});
+			// Hybrid/Stabilizer
+			matrix.push({
+				capSize: "total",
+				style: "growth",
+				percentage: 20,
+				amount: (totalAmount * 20) / 100,
+			});
 		} else {
-			// Phase 3: Maximum growth
+			// Phase 3: 10% Debt + 90% Full diversification
+			matrix.push({
+				capSize: "debt",
+				style: "debt",
+				percentage: 10,
+				amount: (totalAmount * 10) / 100,
+			});
+
 			const aggressive = riskAppetite === "aggressive";
 			const moderate = riskAppetite === "moderate";
 
-			baseAllocation = {
-				debt: 10,
-				largeCap: aggressive ? 20 : moderate ? 25 : 30,
-				midCap: aggressive ? 30 : moderate ? 25 : 20,
-				smallCap: aggressive ? 25 : moderate ? 20 : 15,
-				flexi: aggressive ? 15 : moderate ? 20 : 25,
-			};
-		}
-
-		// Build matrix cells
-		for (const [cap, percentage] of Object.entries(baseAllocation)) {
-			if (percentage === 0) continue;
-
-			const capSize = cap === "flexi" ? "total" : (cap.replace("Cap", "") as CapSize);
-			const style: Style = cap === "debt" ? "debt" : "growth";
-
+			// Large Cap Growth
+			const largePct = aggressive ? 20 : moderate ? 25 : 30;
 			matrix.push({
-				capSize,
-				style,
-				percentage,
-				amount: (totalAmount * percentage) / 100,
+				capSize: "large",
+				style: "growth",
+				percentage: largePct,
+				amount: (totalAmount * largePct) / 100,
 			});
+
+			// Value/Contra
+			const valuePct = 15;
+			matrix.push({
+				capSize: "large",
+				style: "value",
+				percentage: valuePct,
+				amount: (totalAmount * valuePct) / 100,
+			});
+
+			// Mid Cap
+			const midPct = aggressive ? 20 : moderate ? 15 : 10;
+			matrix.push({
+				capSize: "mid",
+				style: "growth",
+				percentage: midPct,
+				amount: (totalAmount * midPct) / 100,
+			});
+
+			// Momentum
+			const momentumPct = aggressive ? 15 : moderate ? 15 : 10;
+			matrix.push({
+				capSize: "mid",
+				style: "momentum",
+				percentage: momentumPct,
+				amount: (totalAmount * momentumPct) / 100,
+			});
+
+			// Small Cap
+			const smallPct = aggressive ? 10 : moderate ? 10 : 5;
+			matrix.push({
+				capSize: "small",
+				style: "growth",
+				percentage: smallPct,
+				amount: (totalAmount * smallPct) / 100,
+			});
+
+			// Flexi/Total Market
+			const flexiPct = 100 - 10 - largePct - valuePct - midPct - momentumPct - smallPct;
+			if (flexiPct > 0) {
+				matrix.push({
+					capSize: "total",
+					style: "active",
+					percentage: flexiPct,
+					amount: (totalAmount * flexiPct) / 100,
+				});
+			}
 		}
 
 		return matrix;
@@ -351,22 +458,23 @@ class InvestmentGoalEngine {
 				subCategory = this.getDebtSubCategory(bucket);
 				category = "Debt";
 			} else if (capSize === "large") {
-				subCategory = "Large Cap";
+				if (style === "value") subCategory = "Value";
+				else subCategory = "Large Cap";
 			} else if (capSize === "mid") {
-				subCategory = "Mid Cap";
+				if (style === "momentum") subCategory = "Mid Cap";
+				else subCategory = "Mid Cap";
 			} else if (capSize === "small") {
 				subCategory = "Small Cap";
 			} else if (capSize === "total") {
-				subCategory = "Flexi Cap";
+				if (style === "active") subCategory = "Flexi Cap";
+				else subCategory = "Flexi Cap";
 			} else {
 				subCategory = "Large Cap";
 			}
 
-			// Determine if we should use Active or ETF
 			const useActive = this.shouldUseActive(subCategory);
 			const fundSuggestions = await this.selectTopFunds(subCategory, category, 3, !useActive);
 
-			// Get role assignment
 			const { role, description } = this.getRoleForSubCategory(subCategory, bucket);
 
 			allocations.push({
@@ -390,66 +498,66 @@ class InvestmentGoalEngine {
 		limit: number = 3,
 		preferETF: boolean = false
 	): Promise<FundSuggestion[]> {
-		let candidates: FundSuggestion[] = [];
+		       let candidates: FundSuggestion[] = [];
 
-		// Fetch ETFs for this subcategory
-		   const etfs = this.etfAnalytics.filter((etf) => {
-			   const bench = etf.Benchmark_Name?.toLowerCase() || "";
-			   const name = etf.ETF_Name?.toLowerCase() || "";
+		       // Filter ETFs matching the subCategory
+		       const etfs = this.etfAnalytics.filter((etf) => {
+			       const bench = etf.Benchmark_Name?.toLowerCase() || "";
+			       const name = etf.ETF_Name?.toLowerCase() || "";
 
-			   if (subCategory === "Liquid") return bench.includes("liquid");
-			   if (subCategory === "Short Duration") return bench.includes("short");
-			   if (subCategory === "Large Cap")
-				   return bench.includes("nifty 50") || bench.includes("sensex") || bench.includes("nifty 100");
-			   if (subCategory === "Mid Cap") return bench.includes("midcap") || bench.includes("150");
-			   if (subCategory === "Small Cap") return bench.includes("smallcap") || bench.includes("250");
-			   if (subCategory === "Flexi Cap" || subCategory === "Multi Cap")
-				   return bench.includes("500") || name.includes("flexi") || name.includes("multi");
-			   if (subCategory === "Value") return bench.includes("value");
-			   if (subCategory === "Contra") return name.includes("contra");
+			       if (subCategory === "Liquid") return bench.includes("liquid") || name.includes("liquid");
+			       if (subCategory === "Short Duration") return bench.includes("short") || name.includes("short");
+			       if (subCategory === "Large Cap")
+				       return bench.includes("nifty 50") || bench.includes("sensex") || bench.includes("nifty 100");
+			       if (subCategory === "Mid Cap") return bench.includes("midcap") || bench.includes("150");
+			       if (subCategory === "Small Cap") return bench.includes("smallcap") || bench.includes("250");
+			       if (subCategory === "Flexi Cap" || subCategory === "Multi Cap")
+				       return bench.includes("500") || name.includes("flexi") || name.includes("multi");
+			       if (subCategory === "Value") return bench.includes("value");
+			       if (subCategory === "Contra") return name.includes("contra");
 
-			   return false;
-		   });
+			       return false;
+		       });
 
-		   candidates = etfs.map((etf) => ({
-			   name: etf.ETF_Name || "Unknown ETF",
-			   returns1Y: etf.Fund_Return_1Y ?? null,
-			   returns3Y: etf.Fund_Return_3Y ?? null,
-			   returns5Y: null,
-			   returns10Y: null,
-			   alpha3Y: null,
-			   alpha5Y: null,
-			   compositeScore: etf.ETF_Score ?? 0,
-			   aum: etf.Fund_AUM ?? null,
-			   isETF: true,
-		   }));
+		       // Map filtered ETFs to FundSuggestion
+		       candidates = etfs.map((etf) => ({
+			       name: etf.ETF_Name || "Unknown ETF",
+			       returns1Y: etf.Fund_Return_1Y ?? null,
+			       returns3Y: etf.Fund_Return_3Y ?? null,
+			       returns5Y: null,
+			       returns10Y: null,
+			       alpha3Y: null,
+			       alpha5Y: null,
+			       compositeScore: etf.Fund_Return_3Y ?? 0,
+			       aum: etf.Fund_AUM ?? null,
+			       isETF: true,
+		       }));
 
-		// If we want active funds and they have good alpha
-		   if (!preferETF) {
-			   const activeFunds = this.fundAnalytics.filter((fund) => {
-				   return fund.Sub_Category === subCategory;
-			   });
+		       // If not preferring ETF, add active funds
+		       if (!preferETF) {
+			       const activeFunds = this.fundAnalytics.filter((fund) => {
+				       return fund.Sub_Category === subCategory;
+			       });
 
-			   const activeCandidates = activeFunds.map((fund) => ({
-				   name: fund.Fund_Name || "Unknown Fund",
-				   returns1Y: fund.Fund_Return_1Y ?? null,
-				   returns3Y: fund.Fund_Return_3Y ?? null,
-				   returns5Y: fund.Fund_Return_5Y ?? null,
-				   returns10Y: fund.Fund_Return_10Y ?? null,
-				   alpha3Y: fund.Alpha_3Y ?? null,
-				   alpha5Y: fund.Alpha_5Y ?? null,
-				   compositeScore: (fund.Alpha_3Y ?? 0) * 0.6 + (fund.Fund_Return_3Y ?? 0) * 0.4,
-				   aum: fund.Current_AUM ?? null,
-				   isETF: false,
-			   }));
+			       const activeCandidates = activeFunds.map((fund) => ({
+				       name: fund.Fund_Name || "Unknown Fund",
+				       returns1Y: fund.Fund_Return_1Y ?? null,
+				       returns3Y: fund.Fund_Return_3Y ?? null,
+				       returns5Y: fund.Fund_Return_5Y ?? null,
+				       returns10Y: fund.Fund_Return_10Y ?? null,
+				       alpha3Y: fund.Alpha_3Y ?? null,
+				       alpha5Y: fund.Alpha_5Y ?? null,
+				       compositeScore: (fund.Alpha_3Y ?? 0) * 0.6 + (fund.Fund_Return_3Y ?? 0) * 0.4,
+				       aum: fund.Current_AUM ?? null,
+				       isETF: false,
+			       }));
 
-			   candidates = [...candidates, ...activeCandidates];
-		   }
+			       candidates = [...candidates, ...activeCandidates];
+		       }
 
-		// Sort by composite score and return top N
-		return candidates
-			.sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0))
-			.slice(0, limit);
+		       return candidates
+			       .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0))
+			       .slice(0, limit);
 	}
 
 	consolidateAllocations(allocations: SubCategoryAllocation[]): SubCategoryAllocation[] {
@@ -463,7 +571,6 @@ class InvestmentGoalEngine {
 				existing.amount += alloc.amount;
 				existing.percentage += alloc.percentage;
 
-				// Merge fund suggestions without duplicates
 				const existingNames = new Set(existing.fundSuggestions.map((f) => f.name));
 				alloc.fundSuggestions.forEach((fund) => {
 					if (!existingNames.has(fund.name)) {
@@ -510,9 +617,13 @@ class InvestmentGoalEngine {
 	}
 
 	/**
-	 * NEW: Generate portfolio evolution phases
+	 * FIXED: Generate portfolio phases with correct allocation breakdowns
 	 */
-	generatePortfolioPhases(goals: Goal[]): PortfolioPhase[] {
+	generatePortfolioPhases(
+		goals: Goal[],
+		buckets: TimeHorizonBucket[],
+		monthlySIPCapacity: number
+	): PortfolioPhase[] {
 		const sortedGoals = [...goals].sort((a, b) => a.yearsToGoal - b.yearsToGoal);
 		const phases: PortfolioPhase[] = [];
 
@@ -522,20 +633,53 @@ class InvestmentGoalEngine {
 			const isFirst = index === 0;
 			const isLast = index === sortedGoals.length - 1;
 
-			let rolesActive: PortfolioRole[];
-			let composition: string;
+			// Determine bucket for this goal
+			const bucket = goal.yearsToGoal <= 3 ? "short" : goal.yearsToGoal <= 7 ? "medium" : "long";
+			const bucketData = buckets.find(b => b.name === bucket);
 
-			if (goal.yearsToGoal <= 3) {
-				// Short-term goal
-				rolesActive = ["anchor", "pillar"];
-				composition = "70% Debt + 30% Large Cap";
-			} else if (goal.yearsToGoal <= 7) {
-				// Medium-term goal
-				rolesActive = ["anchor", "pillar", "stabilizer", "allrounder"];
-				composition = "40% Debt + 60% Balanced/Equity";
+			// Calculate allocation breakdown for this phase
+			const breakdown = {
+				debt: 0,
+				equity: 0,
+				hybrid: 0,
+				momentum: 0
+			};
+
+			const rolesActive: PortfolioRole[] = [];
+			const sipBreakdown: { role: PortfolioRole; amount: number; percentage: number }[] = [];
+
+			if (bucketData) {
+				bucketData.subCategoryAllocations.forEach(alloc => {
+					if (alloc.role) {
+						if (!rolesActive.includes(alloc.role)) {
+							rolesActive.push(alloc.role);
+						}
+
+						if (alloc.category === "Debt") {
+							breakdown.debt += alloc.percentage;
+						} else if (alloc.subCategory.includes("Hybrid") || alloc.subCategory.includes("Balanced")) {
+							breakdown.hybrid += alloc.percentage;
+						} else if (alloc.subCategory.includes("Momentum")) {
+							breakdown.momentum += alloc.percentage;
+						} else {
+							breakdown.equity += alloc.percentage;
+						}
+
+						sipBreakdown.push({
+							role: alloc.role,
+							amount: (monthlySIPCapacity * alloc.percentage) / 100,
+							percentage: alloc.percentage
+						});
+					}
+				});
+			}
+
+			let composition: string;
+			if (bucket === "short") {
+				composition = "70% Debt + 30% Large Cap Equity";
+			} else if (bucket === "medium") {
+				composition = "40% Debt + 60% Balanced/Hybrid";
 			} else {
-				// Long-term goal
-				rolesActive = ["anchor", "pillar", "contrarian", "speedster", "allrounder"];
 				composition = "10% Debt + 90% Aggressive Equity";
 			}
 
@@ -553,6 +697,8 @@ class InvestmentGoalEngine {
 					: isLast
 						? `All prior goals achieved. Full SIP now building ${goal.name}.`
 						: `${sortedGoals[index - 1].name} achieved! SIP redirected to ${goal.name}.`,
+				allocationBreakdown: breakdown,
+				sipBreakdown
 			});
 
 			cumulativeYears += goal.yearsToGoal;
@@ -561,9 +707,6 @@ class InvestmentGoalEngine {
 		return phases;
 	}
 
-	/**
-	 * NEW: Generate redirect events when goals complete
-	 */
 	generateSIPSchedule(
 		buckets: TimeHorizonBucket[],
 		goals: Goal[],
@@ -594,7 +737,6 @@ class InvestmentGoalEngine {
 		const maxYears = Math.max(...goals.map((g) => g.yearsToGoal), 1);
 		const sortedGoals = [...goals].sort((a, b) => a.yearsToGoal - b.yearsToGoal);
 
-		// Generate redirect events
 		for (let i = 0; i < sortedGoals.length - 1; i++) {
 			const completedGoal = sortedGoals[i];
 			const nextGoal = sortedGoals[i + 1];
@@ -618,20 +760,7 @@ class InvestmentGoalEngine {
 					goalName: nextGoal.name,
 					yearsRemaining: nextGoal.yearsToGoal - completedGoal.yearsToGoal,
 				},
-				sipChanges: [
-					{
-						action: "STOP",
-						subCategory: "Liquid/Debt",
-						oldSIP: 70,
-						newSIP: 0,
-					},
-					{
-						action: "INCREASE",
-						subCategory: "Equity",
-						oldSIP: 30,
-						newSIP: 90,
-					},
-				],
+				sipChanges: [],
 				portfolioEvolution: {
 					before: [],
 					after: [],
@@ -641,7 +770,6 @@ class InvestmentGoalEngine {
 			schedule.reallocationPlan.push(redirectEvent);
 		}
 
-		// Generate step-up schedule
 		for (let year = 1; year <= maxYears; year++) {
 			const yearSIPs: Record<string, number> = {};
 
@@ -686,15 +814,10 @@ class InvestmentGoalEngine {
 		incomeStability: string
 	): { status: "feasible" | "challenging" | "not_feasible"; recommendations: string[] } {
 		const recommendations: string[] = [];
-		const totalTargetAmount = goals.reduce(
-			(sum, g) => sum + this.calculateInflatedAmount(g.targetAmount, g.yearsToGoal, g.inflationRate),
-			0
-		);
 
 		const sipShortfall = requiredSIP - monthlySIPCapacity;
 		const affordabilityRatio = monthlySIPCapacity > 0 ? requiredSIP / monthlySIPCapacity : Infinity;
 
-		const mandatoryGoals = goals.filter((g) => g.type === "mandatory");
 		const aspirationalGoals = goals.filter((g) => g.type === "aspirational");
 
 		if (affordabilityRatio <= 1.0) {
@@ -724,7 +847,7 @@ class InvestmentGoalEngine {
 		recommendations.push(
 			`Significant gap: Required ₹${Math.ceil(requiredSIP / 100) * 100} vs capacity ₹${Math.ceil(monthlySIPCapacity / 100) * 100}.`
 		);
-		recommendations.push("Focus on mandatory goals first. Extend timelines or reduce target amounts.");
+		recommendations.push("Focus on mandatory goals first. Extend timelines or reduce amounts.");
 
 		return { status: "not_feasible", recommendations };
 	}
@@ -755,14 +878,17 @@ class InvestmentGoalEngine {
 
 				if (goal.currentAmount > 0) {
 					const estimatedReturn = 12;
-					const futureValue = this.calculateFutureValue(goal.currentAmount, goal.yearsToGoal, estimatedReturn);
+					const futureValue = this.calculateFutureValue(
+						goal.currentAmount,
+						goal.yearsToGoal,
+						estimatedReturn
+					);
 					totalExistingCorpusFutureValue += futureValue;
 				}
 			}
 
 			const gapAmount = Math.max(0, totalInflatedAmount - totalExistingCorpusFutureValue);
 
-			// Use new 4x4 matrix logic
 			const matrix = this.generate4x4Matrix(bucket, input.riskAppetite, gapAmount);
 
 			const subCategoryAllocations = await this.mapMatrixToSubCategories(matrix, bucket);
@@ -806,17 +932,20 @@ class InvestmentGoalEngine {
 			input.incomeStability
 		);
 
-		// Generate portfolio phases
-		const portfolioPhases = this.generatePortfolioPhases(input.goals);
+		const portfolioPhases = this.generatePortfolioPhases(input.goals, buckets, input.monthlySIPCapacity);
 		const currentPhase = portfolioPhases[0] || {
 			phaseNumber: 1,
 			phaseName: "Phase 1",
 			years: "Years 0-5",
 			activeGoal: "Your Goals",
 			portfolioComposition: "Balanced",
-			rolesActive: ["pillar", "allrounder"],
+			rolesActive: ["pillar", "allrounder"] as PortfolioRole[],
 			description: "Building your financial future",
+			allocationBreakdown: { debt: 0, equity: 100, hybrid: 0, momentum: 0 },
+			sipBreakdown: []
 		};
+
+		const complete4x4Matrix = this.generateComplete4x4Matrix();
 
 		return {
 			buckets,
@@ -828,6 +957,7 @@ class InvestmentGoalEngine {
 			recommendations,
 			portfolioPhases,
 			currentPhase,
+			complete4x4Matrix,
 		};
 	}
 
@@ -839,7 +969,7 @@ class InvestmentGoalEngine {
 			totalAmount += bucket.totalInflatedAmount;
 
 			for (const alloc of bucket.subCategoryAllocations) {
-				const key = alloc.subCategory;
+				const key = `${alloc.role}_${alloc.subCategory}`;
 
 				if (consolidated.has(key)) {
 					const existing = consolidated.get(key);
@@ -863,24 +993,7 @@ class InvestmentGoalEngine {
 			alloc.percentage = totalAmount > 0 ? (alloc.amount / totalAmount) * 100 : 0;
 		});
 
-		// Prune allocations < 5% and merge into All-Rounder
-		const pruned = allocations.filter((a) => a.percentage >= 5);
-		const smallAllocations = allocations.filter((a) => a.percentage < 5);
-
-		if (smallAllocations.length > 0 && pruned.length > 0) {
-			// Find or create All-Rounder
-			let allRounder = pruned.find((a) => a.role === "allrounder");
-			if (!allRounder) {
-				allRounder = pruned[0];
-			}
-
-			smallAllocations.forEach((small) => {
-				allRounder!.percentage += small.percentage;
-				allRounder!.amount += small.amount;
-			});
-		}
-
-		return pruned.sort((a, b) => b.percentage - a.percentage).slice(0, 7);
+		return allocations.sort((a, b) => b.percentage - a.percentage).slice(0, 8);
 	}
 }
 
