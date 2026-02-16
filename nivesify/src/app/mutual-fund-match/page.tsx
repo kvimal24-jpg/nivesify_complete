@@ -133,8 +133,12 @@ export default async function MutualFundMatchPage() {
 	function getBoxResult(funds: any[]): any {
 		const subcatGroups = groupBySubCategory(funds);
 		const candidates: any[] = [];
-			for (const [subcat, group] of Object.entries(subcatGroups) as [string, any[]][]) {
-			const insight = insights.find((i: any) => i.sub_category === subcat);
+		for (const [subcat, group] of Object.entries(subcatGroups) as [string, any[]][]) {
+			// Fix: match Sub_Category_Name in insights (case-insensitive)
+			const insight = insights.find((i: any) => {
+				const iSubcat = (i.Sub_Category_Name || i.sub_category || '').toLowerCase();
+				return iSubcat === (subcat || '').toLowerCase();
+			});
 			if (!insight) continue;
 			let alpha = null, timeframe = null, beatRate = null;
 			if (insight.avg_alpha_10y !== null && insight.funds_with_10y_data >= 3) {
