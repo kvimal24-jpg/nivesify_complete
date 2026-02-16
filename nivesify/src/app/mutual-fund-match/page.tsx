@@ -1,9 +1,209 @@
+// Type guards for fund types
+function isFundAnalytics(fund: FundAnalytics | ETFAnalytics | null | undefined): fund is FundAnalytics {
+	return !!fund && 'Fund_Name' in fund;
+}
+function isETFAnalytics(fund: FundAnalytics | ETFAnalytics | null | undefined): fund is ETFAnalytics {
+	return !!fund && 'ETF_Name' in fund;
+}
 
 import Link from "next/link";
 import AnalysisTabs from "@/components/AnalysisTabs";
 import { FaRegLightbulb } from "react-icons/fa";
+import React, { useState } from "react";
 
-export default function MutualFundMatchPage() {
+// Types for grid box and fund
+type FundAnalytics = {
+	Fund_Name: string;
+	Sub_Category: string;
+	AMC: string;
+	Composite_Score?: number;
+	Alpha_5Y?: number;
+	Fund_AUM?: number;
+	Expense_Ratio?: number;
+};
+type ETFAnalytics = {
+	ETF_Name: string;
+	Benchmark_Name: string;
+	Fund_AUM?: number;
+	Expense_Ratio?: number;
+};
+type BoxResult = {
+	empty: boolean;
+	candidates: any[];
+	winner?: any;
+	decision?: string;
+	selectedFund?: FundAnalytics | ETFAnalytics | null;
+	alternatives?: (FundAnalytics | ETFAnalytics)[];
+};
+
+export default async function MutualFundMatchPage() {
+	// Modal state for audit trail
+	const [modal, setModal] = useState<{row: number, col: number} | null>(null);
+	// Fetch all required R2 data for the grid
+	const baseUrl = typeof window === 'undefined' ? process.env.NEXT_PUBLIC_BASE_URL || '' : '';
+	const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
+		fetch(`${baseUrl}/api/amfi-raw`).then(r => r.json()),
+		fetch(`${baseUrl}/api/funds`).then(r => r.json()),
+		fetch(`${baseUrl}/api/etfs`).then(r => r.json()),
+		fetch(`${baseUrl}/api/insights`).then(r => r.json()),
+	]);
+
+	// --- CLASSIFICATION LOGIC ---
+	// Grid: 4 rows (size) x 4 columns (style)
+	const ROWS = [
+		{ key: "large", label: "Large Cap" },
+		{ key: "mid", label: "Mid Cap" },
+		{ key: "small", label: "Small Cap" },
+		{ key: "flexi", label: "Flexi/Multi Cap" },
+	];
+	const COLS = [
+		{ key: "value", label: "Value/Contra" },
+		{ key: "growth", label: "Growth/Core" },
+		{ key: "momentum", label: "Momentum" },
+		{ key: "active", label: "Pure Active" },
+	];
+
+	// Helper: classify a fund into grid position
+	function classifyFund(fund: any) {
+		// --- Style (column) ---
+		const subcat = (fund.Sub_Category || "").toLowerCase();
+		const scheme = (fund.Scheme_Name || "").toLowerCase();
+		const bench = (fund.Benchmark || "").toLowerCase();
+		// 1. Value/Contra
+		if (subcat.includes("value") || subcat.includes("contra") || subcat.includes("dividend")) return { col: 0 };
+		// 2. Momentum
+		if (scheme.includes("momentum") || scheme.includes("alpha") || bench.includes("momentum") || bench.includes("alpha")) return { col: 2 };
+		// 3. Growth/Core (default for index funds)
+		if (subcat.includes("index") || subcat.includes("etf")) return { col: 1 };
+		// 4. Pure Active (size-based, no style)
+		if (["large cap","mid cap","small cap","flexi cap","multi cap","large & mid cap"].some(s => subcat === s)) return { col: 3 };
+		// fallback: Growth/Core
+		return { col: 1 };
+	}
+
+	// Helper: classify size (row)
+	function classifySize(fund: any) {
+		const subcat = (fund.Sub_Category || "").toLowerCase();
+		const scheme = (fund.Scheme_Name || "").toLowerCase();
+		const bench = (fund.Benchmark || "").toLowerCase();
+		// 1. Large Cap
+		if (bench.match(/nifty 50|sensex|nifty 100|bse 100/)) return { row: 0 };
+		if (subcat === "large cap") return { row: 0 };
+		// 2. Mid Cap
+		if (bench.match(/midcap 150|midcap 100|nifty midcap/)) return { row: 1 };
+		if (subcat === "mid cap") return { row: 1 };
+		// 3. Small Cap
+		if (bench.match(/smallcap 250|smallcap 100|nifty smallcap/)) return { row: 2 };
+		if (subcat === "small cap") return { row: 2 };
+		// 4. Flexi/Multi Cap
+		if (bench.includes("nifty 500")) return { row: 3 };
+		if (["flexi cap","multi cap","elss"].includes(subcat)) return { row: 3 };
+		// fallback: null
+		return { row: null };
+	}
+
+	// Exclusion logic
+	function isExcluded(fund: any) {
+		const subcat = (fund.Sub_Category || "").toLowerCase();
+		if (subcat.includes("sectoral") || subcat.includes("thematic") || subcat.includes("hybrid") || subcat.includes("balanced") || subcat.includes("debt") || subcat.includes("liquid") || subcat.includes("bond") || subcat.includes("gilt") || subcat.includes("fmp") || subcat.includes("arbitrage") || subcat.includes("equity savings") || subcat.includes("overseas")) return true;
+		return false;
+	}
+
+	// Group funds by grid position
+	const gridMap: any[][] = Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => []));
+	for (const fund of amfiRaw as any[]) {
+		if (isExcluded(fund)) continue;
+		const style = classifyFund(fund);
+		const size = classifySize(fund);
+		if (style.col !== undefined && size.row !== null) {
+			gridMap[size.row][style.col].push(fund);
+		}
+	}
+
+	// For each box, group by sub-category
+	function groupBySubCategory(funds: any[]): { [key: string]: any[] } {
+		const map: { [key: string]: any[] } = {};
+		for (const fund of funds) {
+			const subcat = fund.Sub_Category;
+			if (!map[subcat]) map[subcat] = [];
+			map[subcat].push(fund);
+		}
+		return map;
+	}
+
+	// For each box, select best sub-category and decide active vs index
+	function getBoxResult(funds: any[]): any {
+		const subcatGroups = groupBySubCategory(funds);
+		const candidates: any[] = [];
+			for (const [subcat, group] of Object.entries(subcatGroups) as [string, any[]][]) {
+			const insight = insights.find((i: any) => i.sub_category === subcat);
+			if (!insight) continue;
+			let alpha = null, timeframe = null, beatRate = null;
+			if (insight.avg_alpha_10y !== null && insight.funds_with_10y_data >= 3) {
+				alpha = insight.avg_alpha_10y;
+				timeframe = '10-year';
+				beatRate = insight.beat_rate_10y;
+			} else if (insight.avg_alpha_5y !== null && insight.funds_with_5y_data >= 5) {
+				alpha = insight.avg_alpha_5y;
+				timeframe = '5-year';
+				beatRate = insight.beat_rate_5y;
+			} else if (insight.avg_alpha_3y !== null && insight.funds_with_3y_data >= 5) {
+				alpha = insight.avg_alpha_3y;
+				timeframe = '3-year';
+				beatRate = insight.beat_rate_3y;
+			} else {
+				continue;
+			}
+			const score = alpha * 0.7 + beatRate * 0.3;
+			candidates.push({
+				name: subcat,
+				fundCount: group.length,
+				timeframeUsed: timeframe,
+				avgAlpha: alpha,
+				beatRate,
+				score,
+				winner: false,
+				funds: group,
+				insight
+			});
+		}
+		if (!candidates.length) return { empty: true, candidates: [] };
+		candidates.sort((a, b) => b.score - a.score);
+		candidates[0].winner = true;
+		const winner = candidates[0];
+		// Decide active vs index
+		let decision = 'INDEX';
+		if (winner.avgAlpha > 0.5 && winner.beatRate > 50) decision = 'ACTIVE';
+		return { empty: false, candidates, winner, decision };
+	}
+
+	// Build grid results
+	const gridResults: BoxResult[][] = Array.from({ length: 4 }, (_, row) => Array.from({ length: 4 }, (_, col) => {
+		const box = getBoxResult(gridMap[row][col]);
+		if (box.empty) return { ...box };
+		// Final fund selection
+		let selectedFund: FundAnalytics | ETFAnalytics | null = null;
+		let alternatives: (FundAnalytics | ETFAnalytics)[] = [];
+		if (box.decision === 'ACTIVE') {
+			const fundsInAnalytics = fundAnalytics.filter((f: FundAnalytics) => f.Sub_Category === box.winner.name);
+			const sorted = [...fundsInAnalytics].sort((a, b) => (b.Composite_Score ?? 0) - (a.Composite_Score ?? 0));
+			selectedFund = sorted[0] || null;
+			alternatives = sorted.slice(1, 3);
+		} else if (box.decision === 'INDEX') {
+			const etfs = etfAnalytics.filter((e: ETFAnalytics) => {
+				const bench = (e.Benchmark_Name || '').toLowerCase();
+				if (row === 0 && bench.match(/nifty 50|sensex|nifty 100|bse 100/)) return true;
+				if (row === 1 && bench.match(/midcap 150|midcap 100|nifty midcap/)) return true;
+				if (row === 2 && bench.match(/smallcap 250|smallcap 100|nifty smallcap/)) return true;
+				if (row === 3 && bench.includes('nifty 500')) return true;
+				return false;
+			});
+			const sorted = [...etfs].sort((a, b) => (a.Expense_Ratio ?? 999) - (b.Expense_Ratio ?? 999) || (b.Fund_AUM ?? 0) - (a.Fund_AUM ?? 0));
+			selectedFund = sorted[0] || null;
+			alternatives = sorted.slice(1, 3);
+		}
+		return { ...box, selectedFund, alternatives };
+	}));
 	return (
 		<div className="bg-[#F5F8FF] text-[#1F2937] min-h-screen">
 			<section className="relative min-h-[50vh] flex items-center justify-center overflow-hidden px-6 pt-14 pb-8">
@@ -47,6 +247,140 @@ export default function MutualFundMatchPage() {
 				<div className="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-6xl z-20">
 					<AnalysisTabs />
 				</div>
+			</section>
+
+			{/* Fund Selection Grid Section */}
+			<section className="relative max-w-6xl mx-auto px-4 py-12">
+				<h2 className="text-2xl md:text-3xl font-serif font-bold mb-2 text-[#2F5D7C]">Systematic, Data-Driven Fund Recommendation Matrix</h2>
+				<p className="text-md md:text-lg font-serif text-[#4A5D4E] mb-8 max-w-2xl">
+					Discover the single best mutual fund for every investment style and company size. This 4×4 grid is built from real data, not opinions—so you can invest with confidence, knowing every pick is backed by performance, not hype.
+				</p>
+				{/* Render the 4x4 grid with real data */}
+				<div className="grid grid-cols-5 grid-rows-5 gap-4 bg-white rounded-3xl border border-[#DDE6F3] shadow-[0_18px_40px_-30px_rgba(31,41,55,0.10)] p-6">
+					{/* Top-left empty cell */}
+					<div></div>
+					{/* Column headers */}
+					{COLS.map(col => (
+						<div key={col.key} className="font-bold text-center text-[#2F5D7C]">{col.label}</div>
+					))}
+					{ROWS.map((row, rowIdx) => [
+						<div key={row.key} className="font-bold text-center text-[#2F5D7C]">{row.label}</div>,
+						...COLS.map((col, colIdx) => {
+							const box = gridResults[rowIdx][colIdx] as BoxResult;
+							if (box.empty) {
+								return (
+									<div key={col.key} className="bg-[#F5F8FF] rounded-2xl min-h-[140px] flex flex-col items-center justify-center text-xs text-[#6B7C70] relative shadow-sm border border-[#E6E8E1]">
+										<button className="absolute top-2 right-2 cursor-pointer text-lg" title="Audit trail available" onClick={() => setModal({row: rowIdx, col: colIdx})}>ℹ️</button>
+										<div className="font-bold mb-1">No funds match</div>
+										<div>{row.label} × {col.label}</div>
+										<div className="mt-2">0 funds found in R2 data</div>
+									</div>
+								);
+							}
+							const badge = box.decision === 'ACTIVE' ? <span className="inline-block bg-[#2F6B45] text-white text-xs rounded-full px-2 py-0.5 mr-2">🎯 Active Pick</span> : <span className="inline-block bg-[#3F5E83] text-white text-xs rounded-full px-2 py-0.5 mr-2">📊 Index Pick</span>;
+							return (
+								<div key={col.key} className="bg-[#F5F8FF] rounded-2xl min-h-[140px] flex flex-col items-center justify-between p-4 relative shadow-sm border border-[#E6E8E1]">
+									<button className="absolute top-2 right-2 cursor-pointer text-lg" title="Audit trail available" onClick={() => setModal({row: rowIdx, col: colIdx})}>ℹ️</button>
+									{/* Fund Card */}
+									{box.selectedFund ? (
+										<div className="w-full text-center">
+											<div className="flex items-center justify-center mb-2">{badge}</div>
+											<div className="font-bold text-[#1F2937] text-base mb-1">
+												{isFundAnalytics(box.selectedFund) && box.selectedFund.Fund_Name}
+												{isETFAnalytics(box.selectedFund) && box.selectedFund.ETF_Name}
+											</div>
+											<div className="text-xs text-[#6B7C70] mb-1">
+												{isFundAnalytics(box.selectedFund) && `${box.selectedFund.Sub_Category} | ${box.selectedFund.AMC}`}
+												{isETFAnalytics(box.selectedFund) && box.selectedFund.Benchmark_Name}
+											</div>
+											<div className="flex flex-wrap justify-center gap-2 text-xs text-[#2F5D7C] mb-1">
+												{isFundAnalytics(box.selectedFund) && box.selectedFund.Composite_Score && <span>Composite: <b>{box.selectedFund.Composite_Score}</b></span>}
+												{isETFAnalytics(box.selectedFund) && box.selectedFund.Expense_Ratio && <span>Expense: <b>{box.selectedFund.Expense_Ratio}%</b></span>}
+												{isFundAnalytics(box.selectedFund) && box.selectedFund.Alpha_5Y && <span>5Y Alpha: <b>{box.selectedFund.Alpha_5Y}%</b></span>}
+												{isETFAnalytics(box.selectedFund) && box.selectedFund.Fund_AUM && <span>AUM: <b>₹{box.selectedFund.Fund_AUM}</b></span>}
+											</div>
+										</div>
+									) : (
+										<div className="w-full text-center text-[#8B3A3A] font-bold">No fund found</div>
+									)}
+									<button className="mt-2 text-xs text-[#2F5D7C] underline" onClick={() => setModal({row: rowIdx, col: colIdx})}>Full breakdown →</button>
+								</div>
+							);
+						})
+					])}
+				</div>
+
+				{/* Audit Modal */}
+				{modal && (() => {
+					const { row, col } = modal;
+					const box = gridResults[row][col] as BoxResult;
+					return (
+						<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+							<div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 relative">
+								<button className="absolute top-3 right-3 text-2xl text-[#6B7C70] hover:text-[#2F5D7C]" onClick={() => setModal(null)}>&times;</button>
+								<h3 className="text-xl font-serif font-bold mb-2 text-[#2F5D7C]">Audit Trail</h3>
+								<div className="space-y-4 text-sm">
+									<div>
+										<div className="font-bold text-[#1F2937] mb-1">1. How we identified this category</div>
+										<div className="text-[#4A5D4E]">Style: <b>{COLS[col].label}</b> | Size: <b>{ROWS[row].label}</b></div>
+									</div>
+									<div>
+										<div className="font-bold text-[#1F2937] mb-1">2. Which sub-category won this position</div>
+										<div className="text-[#4A5D4E]">Winner: <b>{box.winner?.name}</b> ({box.winner?.fundCount} funds, {box.winner?.timeframeUsed}, Alpha: {box.winner?.avgAlpha}%, Beat Rate: {box.winner?.beatRate}%)</div>
+										<details className="mt-1">
+											<summary className="cursor-pointer text-xs text-[#6B7C70]">Show all competitors</summary>
+											<ul className="list-disc ml-5">
+												{box.candidates?.map((c, i) => (
+													<li key={i} className={c.winner ? "font-bold text-[#2F6B45]" : undefined}>
+														{c.name}: {c.avgAlpha}% alpha, {c.beatRate}% beat, score {c.score.toFixed(2)} {c.winner ? '✓' : ''}
+													</li>
+												))}
+											</ul>
+										</details>
+									</div>
+									<div>
+										<div className="font-bold text-[#1F2937] mb-1">3. Active vs Index decision</div>
+										<div className="text-[#4A5D4E]">Decision: <b>{box.decision}</b> ({box.winner?.avgAlpha}% alpha, {box.winner?.beatRate}% beat rate)</div>
+									</div>
+									<details>
+										<summary className="cursor-pointer font-bold text-[#1F2937]">4. The winning fund (details)</summary>
+										<div className="text-[#4A5D4E] mt-1">
+											{box.selectedFund ? (
+												<>
+													{isFundAnalytics(box.selectedFund) && (
+														<>
+															<div><b>Name:</b> {box.selectedFund.Fund_Name}</div>
+															<div><b>Composite Score:</b> {box.selectedFund.Composite_Score ?? '-'}</div>
+															<div><b>5Y Alpha:</b> {box.selectedFund.Alpha_5Y ?? '-'}</div>
+															<div><b>AUM:</b> {box.selectedFund.Fund_AUM ?? '-'}</div>
+															<div><b>Expense Ratio:</b> {box.selectedFund.Expense_Ratio ?? '-'}</div>
+															<div><b>AMC:</b> {box.selectedFund.AMC ?? '-'}</div>
+														</>
+													)}
+													{isETFAnalytics(box.selectedFund) && (
+														<>
+															<div><b>Name:</b> {box.selectedFund.ETF_Name}</div>
+															<div><b>Benchmark:</b> {box.selectedFund.Benchmark_Name}</div>
+															<div><b>AUM:</b> {box.selectedFund.Fund_AUM ?? '-'}</div>
+															<div><b>Expense Ratio:</b> {box.selectedFund.Expense_Ratio ?? '-'}</div>
+														</>
+													)}
+												</>
+											) : 'No fund found'}
+										</div>
+									</details>
+									<details>
+										<summary className="cursor-pointer font-bold text-[#1F2937]">5. Data source</summary>
+										<div className="text-[#4A5D4E] mt-1">
+											<div>Files: industry-and-category-insights.json, fund-analytics.json, amfi_raw.json, etf-analytics.json</div>
+											<div>Folder: mf-data-bucket/data/latest/</div>
+										</div>
+									</details>
+								</div>
+							</div>
+						</div>
+					);
+				})()}
 			</section>
 		</div>
 	);
