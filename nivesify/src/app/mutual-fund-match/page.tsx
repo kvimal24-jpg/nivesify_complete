@@ -41,12 +41,17 @@ export default async function MutualFundMatchPage() {
 	// Modal state for audit trail
 	const [modal, setModal] = useState<{row: number, col: number} | null>(null);
 	// Fetch all required R2 data for the grid
-	const baseUrl = typeof window === 'undefined' ? process.env.NEXT_PUBLIC_BASE_URL || '' : '';
+	const getBaseUrl = () => {
+		if (typeof window !== 'undefined') return '';
+		// Use env or fallback to production URL or localhost
+		return process.env.NEXT_PUBLIC_BASE_URL || 'https://nivesify.com' || 'http://localhost:3000';
+	};
+	const baseUrl = getBaseUrl();
 	const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-		fetch(`${baseUrl}/api/amfi-raw`).then(r => r.json()),
-		fetch(`${baseUrl}/api/funds`).then(r => r.json()),
-		fetch(`${baseUrl}/api/etfs`).then(r => r.json()),
-		fetch(`${baseUrl}/api/insights`).then(r => r.json()),
+			fetch(`${baseUrl}/api/amfi-raw`).then(r => r.json()),
+			fetch(`${baseUrl}/api/funds`).then(r => r.json()),
+			fetch(`${baseUrl}/api/etfs`).then(r => r.json()),
+			fetch(`${baseUrl}/api/insights`).then(r => r.json()),
 	]);
 
 	// --- CLASSIFICATION LOGIC ---
