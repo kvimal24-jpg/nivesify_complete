@@ -72,8 +72,9 @@ export default async function MutualFundMatchPage() {
 	// Robust: classify a fund into grid position (style/col and size/row)
 	function classifyFund(fund: any) {
 		const subcat = (fund.Sub_Category || "").toLowerCase();
-		const scheme = (fund.Scheme_Name || fund.Fund_Name || "").toLowerCase();
-		const bench = (fund.Benchmark || fund.Benchmark_Name || "").toLowerCase();
+		// Use correct field names from data
+		const scheme = (fund.schemeName || fund.Fund_Name || "").toLowerCase();
+		const bench = (fund.benchmark || fund.Benchmark_Name || "").toLowerCase();
 
 		// Style (column)
 		if (subcat.includes("value") || scheme.includes("value") || bench.includes("value") || subcat.includes("contra") || scheme.includes("contra") || bench.includes("contra") || subcat.includes("dividend") || scheme.includes("dividend")) return { col: 0 }; // Value/Contra
@@ -85,8 +86,8 @@ export default async function MutualFundMatchPage() {
 
 	function classifySize(fund: any) {
 		const subcat = (fund.Sub_Category || "").toLowerCase();
-		const scheme = (fund.Scheme_Name || fund.Fund_Name || "").toLowerCase();
-		const bench = (fund.Benchmark || fund.Benchmark_Name || "").toLowerCase();
+		const scheme = (fund.schemeName || fund.Fund_Name || "").toLowerCase();
+		const bench = (fund.benchmark || fund.Benchmark_Name || "").toLowerCase();
 
 		// Large Cap
 		if (subcat.includes("large") || scheme.includes("large") || bench.match(/nifty 50|sensex|nifty 100|bse 100/)) return { row: 0 };
