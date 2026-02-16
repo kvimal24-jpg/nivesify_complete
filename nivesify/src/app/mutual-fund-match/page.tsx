@@ -180,28 +180,38 @@ export default async function MutualFundMatchPage() {
 		return { empty: false, candidates, winner, decision };
 	}
 
-	// Build grid results
+	// Build grid results with robust sub-category and name matching
 	const gridResults: BoxResult[][] = Array.from({ length: 4 }, (_, row) => Array.from({ length: 4 }, (_, col) => {
 		const box = getBoxResult(gridMap[row][col]);
 		if (box.empty) return { ...box };
 		// Final fund selection
-		let selectedFund: FundAnalytics | ETFAnalytics | null = null;
-		let alternatives: (FundAnalytics | ETFAnalytics)[] = [];
+		let selectedFund: FundAnalytics | ETFAnalytics | any | null = null;
+		let alternatives: (FundAnalytics | ETFAnalytics | any)[] = [];
+		// Normalize sub-category for matching
+		const winnerSubcat = (box.winner?.name || '').toLowerCase();
 		if (box.decision === 'ACTIVE') {
-			const fundsInAnalytics = fundAnalytics.filter((f: FundAnalytics) => f.Sub_Category === box.winner.name);
-			const sorted = [...fundsInAnalytics].sort((a, b) => (b.Composite_Score ?? 0) - (a.Composite_Score ?? 0));
+			// Try fundAnalytics first
+			let fundsInAnalytics = fundAnalytics.filter((f: any) => (f.Sub_Category || '').toLowerCase() === winnerSubcat);
+			// If not found, fallback to amfiRaw
+			if (!fundsInAnalytics.length) {
+				fundsInAnalytics = gridMap[row][col].filter((f: any) => (f.Sub_Category || '').toLowerCase() === winnerSubcat);
+			}
+			// Sort by Composite_Score or Alpha_5Y if available
+			const sorted = [...fundsInAnalytics].sort((a, b) => ((b.Composite_Score ?? b.Alpha_5Y ?? 0) - (a.Composite_Score ?? a.Alpha_5Y ?? 0)));
 			selectedFund = sorted[0] || null;
 			alternatives = sorted.slice(1, 3);
 		} else if (box.decision === 'INDEX') {
-			const etfs = etfAnalytics.filter((e: ETFAnalytics) => {
-				const bench = (e.Benchmark_Name || '').toLowerCase();
+			// Use ETF analytics, robust benchmark matching
+			const etfs = etfAnalytics.filter((e: any) => {
+				const bench = (e.Benchmark_Name || e.benchmark || '').toLowerCase();
 				if (row === 0 && bench.match(/nifty 50|sensex|nifty 100|bse 100/)) return true;
 				if (row === 1 && bench.match(/midcap 150|midcap 100|nifty midcap/)) return true;
 				if (row === 2 && bench.match(/smallcap 250|smallcap 100|nifty smallcap/)) return true;
 				if (row === 3 && bench.includes('nifty 500')) return true;
 				return false;
 			});
-			const sorted = [...etfs].sort((a, b) => (a.Expense_Ratio ?? 999) - (b.Expense_Ratio ?? 999) || (b.Fund_AUM ?? 0) - (a.Fund_AUM ?? 0));
+			// Sort by Expense_Ratio or ETF_Score if available
+			const sorted = [...etfs].sort((a, b) => ((a.Expense_Ratio ?? a.ETF_Score ?? 999) - (b.Expense_Ratio ?? b.ETF_Score ?? 999)) || ((b.Fund_AUM ?? 0) - (a.Fund_AUM ?? 0)));
 			selectedFund = sorted[0] || null;
 			alternatives = sorted.slice(1, 3);
 		}
