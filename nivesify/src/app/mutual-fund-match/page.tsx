@@ -69,41 +69,33 @@ export default async function MutualFundMatchPage() {
 		{ key: "active", label: "Pure Active" },
 	];
 
-	// Helper: classify a fund into grid position
+	// Robust: classify a fund into grid position (style/col and size/row)
 	function classifyFund(fund: any) {
-		// --- Style (column) ---
 		const subcat = (fund.Sub_Category || "").toLowerCase();
-		const scheme = (fund.Scheme_Name || "").toLowerCase();
-		const bench = (fund.Benchmark || "").toLowerCase();
-		// 1. Value/Contra
-		if (subcat.includes("value") || subcat.includes("contra") || subcat.includes("dividend")) return { col: 0 };
-		// 2. Momentum
-		if (scheme.includes("momentum") || scheme.includes("alpha") || bench.includes("momentum") || bench.includes("alpha")) return { col: 2 };
-		// 3. Growth/Core (default for index funds)
-		if (subcat.includes("index") || subcat.includes("etf")) return { col: 1 };
-		// 4. Pure Active (size-based, no style)
-		if (["large cap","mid cap","small cap","flexi cap","multi cap","large & mid cap"].some(s => subcat === s)) return { col: 3 };
-		// fallback: Growth/Core
+		const scheme = (fund.Scheme_Name || fund.Fund_Name || "").toLowerCase();
+		const bench = (fund.Benchmark || fund.Benchmark_Name || "").toLowerCase();
+
+		// Style (column)
+		if (subcat.includes("value") || scheme.includes("value") || bench.includes("value") || subcat.includes("contra") || scheme.includes("contra") || bench.includes("contra") || subcat.includes("dividend") || scheme.includes("dividend")) return { col: 0 }; // Value/Contra
+		if (subcat.includes("momentum") || scheme.includes("momentum") || bench.includes("momentum") || subcat.includes("alpha") || scheme.includes("alpha") || bench.includes("alpha")) return { col: 2 }; // Momentum
+		if (subcat.includes("active") || scheme.includes("active")) return { col: 3 }; // Pure Active
+		// Default: Growth/Core for all others
 		return { col: 1 };
 	}
 
-	// Helper: classify size (row)
 	function classifySize(fund: any) {
 		const subcat = (fund.Sub_Category || "").toLowerCase();
-		const scheme = (fund.Scheme_Name || "").toLowerCase();
-		const bench = (fund.Benchmark || "").toLowerCase();
-		// 1. Large Cap
-		if (bench.match(/nifty 50|sensex|nifty 100|bse 100/)) return { row: 0 };
-		if (subcat === "large cap") return { row: 0 };
-		// 2. Mid Cap
-		if (bench.match(/midcap 150|midcap 100|nifty midcap/)) return { row: 1 };
-		if (subcat === "mid cap") return { row: 1 };
-		// 3. Small Cap
-		if (bench.match(/smallcap 250|smallcap 100|nifty smallcap/)) return { row: 2 };
-		if (subcat === "small cap") return { row: 2 };
-		// 4. Flexi/Multi Cap
-		if (bench.includes("nifty 500")) return { row: 3 };
-		if (["flexi cap","multi cap","elss"].includes(subcat)) return { row: 3 };
+		const scheme = (fund.Scheme_Name || fund.Fund_Name || "").toLowerCase();
+		const bench = (fund.Benchmark || fund.Benchmark_Name || "").toLowerCase();
+
+		// Large Cap
+		if (subcat.includes("large") || scheme.includes("large") || bench.match(/nifty 50|sensex|nifty 100|bse 100/)) return { row: 0 };
+		// Mid Cap
+		if (subcat.includes("mid") || scheme.includes("mid") || bench.match(/midcap 150|midcap 100|nifty midcap/)) return { row: 1 };
+		// Small Cap
+		if (subcat.includes("small") || scheme.includes("small") || bench.match(/smallcap 250|smallcap 100|nifty smallcap/)) return { row: 2 };
+		// Flexi/Multi Cap
+		if (subcat.includes("flexi") || subcat.includes("multi") || scheme.includes("flexi") || scheme.includes("multi") || subcat.includes("elss") || scheme.includes("elss") || bench.includes("nifty 500")) return { row: 3 };
 		// fallback: null
 		return { row: null };
 	}
