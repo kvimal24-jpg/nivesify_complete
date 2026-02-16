@@ -1,3 +1,4 @@
+"use client";
 // Type guards for fund types
 function isFundAnalytics(fund: FundAnalytics | ETFAnalytics | null | undefined): fund is FundAnalytics {
 	return !!fund && 'Fund_Name' in fund;
