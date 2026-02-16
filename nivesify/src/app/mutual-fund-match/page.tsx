@@ -44,7 +44,7 @@ export default function MutualFundMatchPage() {
 					</Link>
 				</div>
 				{/* Navigation Tabs */}
-				<div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl z-20">
+				<div className="absolute top-8 left-1/2 -translate-x-1/2 w-full max-w-6xl z-20">
 					<AnalysisTabs />
 				</div>
 			</section>
