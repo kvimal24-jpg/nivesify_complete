@@ -30,6 +30,7 @@
 		"pdfjs-dist": "^4.2.67",
 		"react": "^19.1.5",
 		"react-dom": "^19.1.5",
+		"react-icons": "^5.5.0",
 		"recharts": "^3.7.0",
 		"tailwind-merge": "^3.4.0"
 	},
