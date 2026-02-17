@@ -924,84 +924,51 @@ export default function FindMyFundPage() {
       {/* MODAL */}
       {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
 
-      {/* MATRIX: HYBRID (Dynamic, Data-Driven) */}
-      <HybridMatrixSection reportDate={reportDate} />
+      {/* MATRIX: HYBRID (Single Column, Data-Driven) */}
+      <HybridMatrixSectionSimple reportDate={reportDate} />
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────────
-// HYBRID MATRIX SECTION (DYNAMIC, DATA-DRIVEN)
+// HYBRID MATRIX SECTION (SINGLE COLUMN, BENCHMARKS)
 // ──────────────────────────────────────────────────────────────
 
-function HybridMatrixSection({ reportDate }: { reportDate: string }) {
+function HybridMatrixSectionSimple({ reportDate }: { reportDate: string }) {
   const [loading, setLoading] = React.useState(true);
-  const [hybridBoxes, setHybridBoxes] = React.useState<BoxResult[][]>([]);
-  const [modalBox, setModalBox] = React.useState<BoxResult | null>(null);
-  const [rowDefs, setRowDefs] = React.useState<GridDef>([]);
-  const [colDefs, setColDefs] = React.useState<GridDef>([]);
+  const [rows, setRows] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     async function load() {
       setLoading(true);
-      // Fetch all data (same as equity, but filter for Hybrid only)
-      const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
+      const [amfiRaw] = await Promise.all([
         fetch("/api/amfi-raw").then(r => r.json()),
-        fetch("/api/funds").then(r => r.json()),
-        fetch("/api/etfs").then(r => r.json()),
-        fetch("/api/insights").then(r => r.json()),
       ]);
-
-      // Identify all unique hybrid sub-categories
-      const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
-      const subCategories = Array.from(new Set(hybridFunds.map((f: AMFIFund) => f.Sub_Category)));
-
-      // Dynamically build row/col definitions based on sub-categories present
-      // For demo: Use a fixed 3x3 grid, but map only present sub-categories
-      // In production: You can use more advanced logic to bucket by equity allocation, etc.
-      const rowDefs: GridDef = [
-        { label: "Aggressive Hybrid", subtitle: "High equity, static allocation" },
-        { label: "Conservative Hybrid", subtitle: "Low equity, static allocation" },
-        { label: "Balanced Advantage", subtitle: "Dynamic allocation" },
-        { label: "Equity Savings", subtitle: "Low beta blend" },
-        { label: "Arbitrage", subtitle: "Arbitrage/low beta" },
-        { label: "Multi Asset Allocation", subtitle: "Multi-asset, gold, etc." },
-      ].filter(row => subCategories.includes(row.label));
-
-      const colDefs: GridDef = [
-        { label: "Static", subtitle: "Static Allocation" },
-        { label: "Dynamic", subtitle: "Dynamic Allocation" },
-        { label: "Low Beta", subtitle: "Risk-Managed/Arbitrage" },
+      // Only these sub-categories, in this order
+      const hybridOrder = [
+        "Aggressive Hybrid",
+        "Conservative Hybrid",
+        "Equity Savings",
+        "Arbitrage",
+        "Multi Asset Allocation",
+        "Balanced Advantage",
+        "Balanced Hybrid"
       ];
-
-      // Map sub-categories to grid cells (simple mapping for demo)
-      // In production, use actual fund characteristics for mapping
-      const gridMap: AMFIFund[][][] = Array.from({ length: rowDefs.length }, () =>
-        Array.from({ length: colDefs.length }, () => [])
-      );
-      hybridFunds.forEach((fund: AMFIFund) => {
-        const rowIdx = rowDefs.findIndex(r => r.label === fund.Sub_Category);
-        let colIdx = 0;
-        if (fund.Sub_Category === "Balanced Advantage") colIdx = 1;
-        else if (fund.Sub_Category === "Arbitrage" || fund.Sub_Category === "Equity Savings") colIdx = 2;
-        // Multi Asset Allocation can be mapped to Static for now
-        if (fund.Sub_Category === "Multi Asset Allocation") colIdx = 0;
-        if (rowIdx >= 0) gridMap[rowIdx][colIdx].push(fund);
+      // Group by sub-category and collect unique benchmarks
+      const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
+      const bySubCat: Record<string, Set<string>> = {};
+      hybridFunds.forEach((f: AMFIFund) => {
+        if (!bySubCat[f.Sub_Category]) bySubCat[f.Sub_Category] = new Set();
+        if (f.benchmark) bySubCat[f.Sub_Category].add(f.benchmark);
       });
-
-      // Build boxes for each cell
-      const newBoxes: BoxResult[][] = [];
-      for (let r = 0; r < rowDefs.length; r++) {
-        const rowBoxes: BoxResult[] = [];
-        for (let c = 0; c < colDefs.length; c++) {
-          const box = buildBox(r, c, gridMap[r][c], fundAnalytics, etfAnalytics, insights);
-          rowBoxes.push(box);
-        }
-        newBoxes.push(rowBoxes);
-      }
-      setHybridBoxes(newBoxes);
-      setRowDefs(rowDefs);
-      setColDefs(colDefs);
+      // Build rows in order, only if present in data
+      const rows = hybridOrder
+        .filter(subCat => bySubCat[subCat])
+        .map(subCat => ({
+          subCategory: subCat,
+          benchmarks: Array.from(bySubCat[subCat])
+        }));
+      setRows(rows);
       setLoading(false);
     }
     load();
@@ -1020,19 +987,32 @@ function HybridMatrixSection({ reportDate }: { reportDate: string }) {
             )}
           </div>
           <p className="text-sm text-[#6B7280] mb-6">
-            Discover the best hybrid fund strategies, dynamically mapped from live data. Each cell shows the leading sub-category and best fund, with a full audit trail.
+            Explore all hybrid fund categories present in the market, with their official benchmark indices. This list is always live and data-driven.
           </p>
-          {loading ? (
-            <PlaceholderGrid rows={rowDefs} cols={colDefs} />
-          ) : (
-            <SectionPanel
-              rows={rowDefs}
-              cols={colDefs}
-              boxes={hybridBoxes}
-              onCellClick={box => setModalBox(box)}
-            />
-          )}
-          {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[480px] text-xs">
+              <thead>
+                <tr>
+                  <th className="p-3 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white text-left w-64">Hybrid Category</th>
+                  <th className="p-3 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-left">Benchmarks (live)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={2} className="p-6 text-center text-[#9CA3AF]">Loading…</td></tr>
+                ) : rows.length === 0 ? (
+                  <tr><td colSpan={2} className="p-6 text-center text-[#9CA3AF]">No hybrid categories found in data.</td></tr>
+                ) : rows.map(row => (
+                  <tr key={row.subCategory} className="bg-white border-b border-[#E5E7EB]">
+                    <td className="p-3 font-bold text-[#1F2937]">{row.subCategory}</td>
+                    <td className="p-3 text-[#2563EB]">
+                      {row.benchmarks.length === 0 ? <span className="text-[#9CA3AF]">—</span> : row.benchmarks.map((b: string) => <span key={b} className="inline-block bg-[#EFF6FF] rounded px-2 py-1 mr-2 mb-1 text-xs border border-[#DDE6F3]">{b}</span>)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
