@@ -923,6 +923,118 @@ export default function FindMyFundPage() {
 
       {/* MODAL */}
       {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
+
+      {/* MATRIX: HYBRID (Dynamic, Data-Driven) */}
+      <HybridMatrixSection reportDate={reportDate} />
     </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// HYBRID MATRIX SECTION (DYNAMIC, DATA-DRIVEN)
+// ──────────────────────────────────────────────────────────────
+
+function HybridMatrixSection({ reportDate }: { reportDate: string }) {
+  const [loading, setLoading] = React.useState(true);
+  const [hybridBoxes, setHybridBoxes] = React.useState<BoxResult[][]>([]);
+  const [modalBox, setModalBox] = React.useState<BoxResult | null>(null);
+  const [rowDefs, setRowDefs] = React.useState<GridDef>([]);
+  const [colDefs, setColDefs] = React.useState<GridDef>([]);
+
+  React.useEffect(() => {
+    async function load() {
+      setLoading(true);
+      // Fetch all data (same as equity, but filter for Hybrid only)
+      const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
+        fetch("/api/amfi-raw").then(r => r.json()),
+        fetch("/api/funds").then(r => r.json()),
+        fetch("/api/etfs").then(r => r.json()),
+        fetch("/api/insights").then(r => r.json()),
+      ]);
+
+      // Identify all unique hybrid sub-categories
+      const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
+      const subCategories = Array.from(new Set(hybridFunds.map((f: AMFIFund) => f.Sub_Category)));
+
+      // Dynamically build row/col definitions based on sub-categories present
+      // For demo: Use a fixed 3x3 grid, but map only present sub-categories
+      // In production: You can use more advanced logic to bucket by equity allocation, etc.
+      const rowDefs: GridDef = [
+        { label: "Aggressive Hybrid", subtitle: "High equity, static allocation" },
+        { label: "Conservative Hybrid", subtitle: "Low equity, static allocation" },
+        { label: "Balanced Advantage", subtitle: "Dynamic allocation" },
+        { label: "Equity Savings", subtitle: "Low beta blend" },
+        { label: "Arbitrage", subtitle: "Arbitrage/low beta" },
+        { label: "Multi Asset Allocation", subtitle: "Multi-asset, gold, etc." },
+      ].filter(row => subCategories.includes(row.label));
+
+      const colDefs: GridDef = [
+        { label: "Static", subtitle: "Static Allocation" },
+        { label: "Dynamic", subtitle: "Dynamic Allocation" },
+        { label: "Low Beta", subtitle: "Risk-Managed/Arbitrage" },
+      ];
+
+      // Map sub-categories to grid cells (simple mapping for demo)
+      // In production, use actual fund characteristics for mapping
+      const gridMap: AMFIFund[][][] = Array.from({ length: rowDefs.length }, () =>
+        Array.from({ length: colDefs.length }, () => [])
+      );
+      hybridFunds.forEach((fund: AMFIFund) => {
+        const rowIdx = rowDefs.findIndex(r => r.label === fund.Sub_Category);
+        let colIdx = 0;
+        if (fund.Sub_Category === "Balanced Advantage") colIdx = 1;
+        else if (fund.Sub_Category === "Arbitrage" || fund.Sub_Category === "Equity Savings") colIdx = 2;
+        // Multi Asset Allocation can be mapped to Static for now
+        if (fund.Sub_Category === "Multi Asset Allocation") colIdx = 0;
+        if (rowIdx >= 0) gridMap[rowIdx][colIdx].push(fund);
+      });
+
+      // Build boxes for each cell
+      const newBoxes: BoxResult[][] = [];
+      for (let r = 0; r < rowDefs.length; r++) {
+        const rowBoxes: BoxResult[] = [];
+        for (let c = 0; c < colDefs.length; c++) {
+          const box = buildBox(r, c, gridMap[r][c], fundAnalytics, etfAnalytics, insights);
+          rowBoxes.push(box);
+        }
+        newBoxes.push(rowBoxes);
+      }
+      setHybridBoxes(newBoxes);
+      setRowDefs(rowDefs);
+      setColDefs(colDefs);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return (
+    <section className="px-6 pb-16">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex items-center justify-between mb-4">
+            <SectionNum num="2" label="Hybrid Mutual Funds" />
+            {reportDate && (
+              <span className="text-xs text-[#6B7280] bg-[#EFF6FF] px-3 py-1.5 rounded-full border border-[#DDE6F3]">
+                Data as of <strong className="text-[#3B82F6]">{reportDate}</strong>
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-[#6B7280] mb-6">
+            Discover the best hybrid fund strategies, dynamically mapped from live data. Each cell shows the leading sub-category and best fund, with a full audit trail.
+          </p>
+          {loading ? (
+            <PlaceholderGrid rows={rowDefs} cols={colDefs} />
+          ) : (
+            <SectionPanel
+              rows={rowDefs}
+              cols={colDefs}
+              boxes={hybridBoxes}
+              onCellClick={box => setModalBox(box)}
+            />
+          )}
+          {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
+        </div>
+      </div>
+    </section>
   );
 }
