@@ -1,4 +1,0 @@
-{
-  "forwardPorts": [3000],
-  "postCreateCommand": "npm install"
-}
