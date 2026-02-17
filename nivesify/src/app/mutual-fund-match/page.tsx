@@ -939,7 +939,6 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
   const [hybridBoxes, setHybridBoxes] = React.useState<BoxResult[]>([]);
   const [rowDefs, setRowDefs] = React.useState<GridDef>([]);
   const [modalBox, setModalBox] = React.useState<BoxResult | null>(null);
-  const [benchmarks, setBenchmarks] = React.useState<Record<string, string[]>>({});
 
   React.useEffect(() => {
     async function load() {
@@ -960,20 +959,19 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
         "Balanced Advantage",
         "Balanced Hybrid"
       ];
-      // Group by sub-category and collect unique benchmarks
+      // Group by sub-category
       const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
-      const bySubCat: Record<string, Set<string>> = {};
+      const bySubCat: Record<string, AMFIFund[]> = {};
       hybridFunds.forEach((f: AMFIFund) => {
-        if (!bySubCat[f.Sub_Category]) bySubCat[f.Sub_Category] = new Set();
-        if (f.benchmark) bySubCat[f.Sub_Category].add(f.benchmark);
+        if (!bySubCat[f.Sub_Category]) bySubCat[f.Sub_Category] = [];
+        bySubCat[f.Sub_Category].push(f);
       });
       // Build rows in order, only if present in data
       const presentRows = hybridOrder.filter(subCat => bySubCat[subCat]);
       setRowDefs(presentRows.map(label => ({ label, subtitle: "" })));
-      setBenchmarks(Object.fromEntries(presentRows.map(subCat => [subCat, Array.from(bySubCat[subCat])] )));
       // Build boxes (one per row)
       const boxes: BoxResult[] = presentRows.map((subCat, rowIdx) => {
-        const funds = hybridFunds.filter((f: AMFIFund) => f.Sub_Category === subCat);
+        const funds = bySubCat[subCat];
         return buildBox(rowIdx, 0, funds, fundAnalytics, etfAnalytics, insights);
       });
       setHybridBoxes(boxes);
@@ -994,15 +992,15 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
               </span>
             )}
           </div>
-          <p className="text-sm text-[#6B7280] mb-6">
-            Discover the best hybrid fund in each live category, with a full audit trail. Benchmarks are shown via the <span className="inline-block align-middle text-[#2563EB] font-bold">i</span> icon.
+          <p className="text-sm text-[#6B7280] mb-6 text-center">
+            Discover the best hybrid fund in each live category, with a full audit trail. Benchmarks are available in the audit modal.
           </p>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[480px] text-xs">
+            <table className="w-full border-collapse min-w-[480px] text-xs text-center">
               <thead>
                 <tr>
-                  <th className="p-3 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white text-left w-64">Hybrid Category</th>
-                  <th className="p-3 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-left">Best Fund</th>
+                  <th className="p-3 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white text-center w-64">Hybrid Category</th>
+                  <th className="p-3 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-center">Best Fund</th>
                 </tr>
               </thead>
               <tbody>
@@ -1012,22 +1010,9 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
                   <tr><td colSpan={2} className="p-6 text-center text-[#9CA3AF]">No hybrid categories found in data.</td></tr>
                 ) : rowDefs.map((row, idx) => (
                   <tr key={row.label} className="bg-white border-b border-[#E5E7EB]">
-                    <td className="p-3 font-bold text-[#1F2937] flex items-center gap-2">
-                      {row.label}
-                      {benchmarks[row.label] && benchmarks[row.label].length > 0 && (
-                        <span className="relative group cursor-pointer">
-                          <span className="inline-block w-4 h-4 rounded-full bg-[#EFF6FF] border border-[#2563EB] text-[#2563EB] text-xs font-bold flex items-center justify-center">i</span>
-                          <span className="absolute left-6 top-1 z-10 hidden group-hover:block bg-white border border-[#DDE6F3] rounded shadow-lg px-3 py-2 text-xs text-[#1F2937] min-w-[180px]">
-                            <div className="font-semibold mb-1">Benchmarks:</div>
-                            {benchmarks[row.label].map((b: string) => (
-                              <div key={b} className="mb-1">{b}</div>
-                            ))}
-                          </span>
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <GridCell box={hybridBoxes[idx]} onClick={() => setModalBox(hybridBoxes[idx])} />
+                    <td className="p-3 font-bold text-[#1F2937] text-center">{row.label}</td>
+                    <td className="p-3 cursor-pointer" onClick={() => setModalBox(hybridBoxes[idx])}>
+                      <HybridFundCell box={hybridBoxes[idx]} />
                     </td>
                   </tr>
                 ))}
@@ -1038,5 +1023,32 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// Custom cell for hybrid fund: no sub-category name, bigger fund name
+function HybridFundCell({ box }: { box: BoxResult }) {
+  if (box.empty || !box.selectedFund) {
+    return (
+      <div className="text-center text-[#9CA3AF] py-4">
+        <div className="text-2xl mb-1">📋</div>
+        <div className="text-[10px]">No matching funds</div>
+      </div>
+    );
+  }
+  const fund = box.selectedFund;
+  const fundName = 'Fund_Name' in fund ? fund.Fund_Name : fund.ETF_Name;
+  const stats = box.fundStats;
+  return (
+    <div className="text-center">
+      <div className="font-extrabold text-[#1F2937] text-base mb-1" style={{ fontSize: '1.1rem' }}>{fundName}</div>
+      {stats && (
+        <div className="text-[10px] text-[#9CA3AF] space-y-0.5">
+          <div>3Y: {stats.return3Y?.toFixed(1)}% · α {stats.alpha3Y?.toFixed(1)}%</div>
+          {stats.return5Y && <div>5Y: {stats.return5Y.toFixed(1)}%</div>}
+          <div>Rank #{stats.rank} · ₹{(stats.aum / 1000).toFixed(1)}K Cr</div>
+        </div>
+      )}
+    </div>
   );
 }
