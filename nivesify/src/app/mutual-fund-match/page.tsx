@@ -924,25 +924,31 @@ export default function FindMyFundPage() {
       {/* MODAL */}
       {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
 
-      {/* MATRIX: HYBRID (Single Column, Data-Driven) */}
-      <HybridMatrixSectionSimple reportDate={reportDate} />
+      {/* MATRIX: HYBRID (Single Column, Data-Driven, Equity Table Style) */}
+      <HybridMatrixSectionSingleCol reportDate={reportDate} />
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────────
-// HYBRID MATRIX SECTION (SINGLE COLUMN, BENCHMARKS)
+// HYBRID MATRIX SECTION (SINGLE COLUMN, EQUITY TABLE STYLE)
 // ──────────────────────────────────────────────────────────────
 
-function HybridMatrixSectionSimple({ reportDate }: { reportDate: string }) {
+function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
   const [loading, setLoading] = React.useState(true);
-  const [rows, setRows] = React.useState<any[]>([]);
+  const [hybridBoxes, setHybridBoxes] = React.useState<BoxResult[]>([]);
+  const [rowDefs, setRowDefs] = React.useState<GridDef>([]);
+  const [modalBox, setModalBox] = React.useState<BoxResult | null>(null);
+  const [benchmarks, setBenchmarks] = React.useState<Record<string, string[]>>({});
 
   React.useEffect(() => {
     async function load() {
       setLoading(true);
-      const [amfiRaw] = await Promise.all([
+      const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
         fetch("/api/amfi-raw").then(r => r.json()),
+        fetch("/api/funds").then(r => r.json()),
+        fetch("/api/etfs").then(r => r.json()),
+        fetch("/api/insights").then(r => r.json()),
       ]);
       // Only these sub-categories, in this order
       const hybridOrder = [
@@ -962,13 +968,15 @@ function HybridMatrixSectionSimple({ reportDate }: { reportDate: string }) {
         if (f.benchmark) bySubCat[f.Sub_Category].add(f.benchmark);
       });
       // Build rows in order, only if present in data
-      const rows = hybridOrder
-        .filter(subCat => bySubCat[subCat])
-        .map(subCat => ({
-          subCategory: subCat,
-          benchmarks: Array.from(bySubCat[subCat])
-        }));
-      setRows(rows);
+      const presentRows = hybridOrder.filter(subCat => bySubCat[subCat]);
+      setRowDefs(presentRows.map(label => ({ label, subtitle: "" })));
+      setBenchmarks(Object.fromEntries(presentRows.map(subCat => [subCat, Array.from(bySubCat[subCat])] )));
+      // Build boxes (one per row)
+      const boxes: BoxResult[] = presentRows.map((subCat, rowIdx) => {
+        const funds = hybridFunds.filter((f: AMFIFund) => f.Sub_Category === subCat);
+        return buildBox(rowIdx, 0, funds, fundAnalytics, etfAnalytics, insights);
+      });
+      setHybridBoxes(boxes);
       setLoading(false);
     }
     load();
@@ -987,32 +995,46 @@ function HybridMatrixSectionSimple({ reportDate }: { reportDate: string }) {
             )}
           </div>
           <p className="text-sm text-[#6B7280] mb-6">
-            Explore all hybrid fund categories present in the market, with their official benchmark indices. This list is always live and data-driven.
+            Discover the best hybrid fund in each live category, with a full audit trail. Benchmarks are shown via the <span className="inline-block align-middle text-[#2563EB] font-bold">i</span> icon.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse min-w-[480px] text-xs">
               <thead>
                 <tr>
                   <th className="p-3 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white text-left w-64">Hybrid Category</th>
-                  <th className="p-3 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-left">Benchmarks (live)</th>
+                  <th className="p-3 bg-gradient-to-r from-[#10B981] to-[#059669] text-white text-left">Best Fund</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr><td colSpan={2} className="p-6 text-center text-[#9CA3AF]">Loading…</td></tr>
-                ) : rows.length === 0 ? (
+                ) : rowDefs.length === 0 ? (
                   <tr><td colSpan={2} className="p-6 text-center text-[#9CA3AF]">No hybrid categories found in data.</td></tr>
-                ) : rows.map(row => (
-                  <tr key={row.subCategory} className="bg-white border-b border-[#E5E7EB]">
-                    <td className="p-3 font-bold text-[#1F2937]">{row.subCategory}</td>
-                    <td className="p-3 text-[#2563EB]">
-                      {row.benchmarks.length === 0 ? <span className="text-[#9CA3AF]">—</span> : row.benchmarks.map((b: string) => <span key={b} className="inline-block bg-[#EFF6FF] rounded px-2 py-1 mr-2 mb-1 text-xs border border-[#DDE6F3]">{b}</span>)}
+                ) : rowDefs.map((row, idx) => (
+                  <tr key={row.label} className="bg-white border-b border-[#E5E7EB]">
+                    <td className="p-3 font-bold text-[#1F2937] flex items-center gap-2">
+                      {row.label}
+                      {benchmarks[row.label] && benchmarks[row.label].length > 0 && (
+                        <span className="relative group cursor-pointer">
+                          <span className="inline-block w-4 h-4 rounded-full bg-[#EFF6FF] border border-[#2563EB] text-[#2563EB] text-xs font-bold flex items-center justify-center">i</span>
+                          <span className="absolute left-6 top-1 z-10 hidden group-hover:block bg-white border border-[#DDE6F3] rounded shadow-lg px-3 py-2 text-xs text-[#1F2937] min-w-[180px]">
+                            <div className="font-semibold mb-1">Benchmarks:</div>
+                            {benchmarks[row.label].map((b: string) => (
+                              <div key={b} className="mb-1">{b}</div>
+                            ))}
+                          </span>
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <GridCell box={hybridBoxes[idx]} onClick={() => setModalBox(hybridBoxes[idx])} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
         </div>
       </div>
     </section>
