@@ -119,12 +119,17 @@ function getSize(fund: AMFIFund): number | null {
   const sub   = (fund.Sub_Category || "").toLowerCase();
   const bench = (fund.benchmark    || "").toLowerCase();
 
+  // Direct sub-category match (highest priority for size-specific funds)
   if (sub === "large cap" || sub === "large & mid cap" || sub === "focused") return 0;
   if (sub === "mid cap") return 1;
   if (sub === "small cap") return 2;
   if (sub === "flexi cap" || sub === "multi cap" || sub === "elss") return 3;
 
-  // Benchmark-based detection
+  // SPECIAL CASE: Value/Contra/Dividend Yield funds are typically large-cap focused
+  // even though they use Nifty 500/BSE 500 benchmarks
+  if (sub === "value" || sub === "contra" || sub === "dividend yield") return 0;
+
+  // Benchmark-based detection for Index/ETF funds
   if (/\bnifty 50\b|sensex|\bnifty 100\b|bse 100/.test(bench)) return 0;
   if (/nifty200 |nifty 200 |nifty200momentum|nifty 200 momentum/.test(bench)) return 0;
   if (/midcap 150|midcap 100|nifty midcap/.test(bench)) return 1;
@@ -418,12 +423,13 @@ function PlaceholderGrid({ rows, cols }: { rows: GridDef; cols: GridDef }) {
   );
 }
 
-function GridCell({ box }: { box: BoxResult }) {
+function GridCell({ box, onClick }: { box: BoxResult; onClick: () => void }) {
   if (box.empty) {
     return (
-      <div className="text-center text-[#9CA3AF] py-4">
+      <div className="text-center text-[#9CA3AF] py-4 cursor-pointer hover:bg-[#F9FAFB]" onClick={onClick}>
         <div className="text-2xl mb-1">📋</div>
         <div className="text-[10px]">No matching funds</div>
+        <div className="text-[9px] text-[#3B82F6] mt-1">Click for details</div>
       </div>
     );
   }
@@ -474,7 +480,56 @@ function GridCell({ box }: { box: BoxResult }) {
 }
 
 function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) {
-  if (box.empty) return null;
+  // Show explanation even for empty cells
+  if (box.empty) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="p-6 border-b border-[#E5E7EB]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-[#1F2937]">Why No Funds Here?</h2>
+              <button onClick={onClose} className="text-[#9CA3AF] hover:text-[#6B7280] text-3xl leading-none">×</button>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="bg-[#FEF3C7] border border-[#FCD34D] p-6 rounded-lg">
+              <div className="flex items-start gap-3">
+                <span className="text-3xl">ℹ️</span>
+                <div>
+                  <h3 className="font-semibold text-[#1F2937] mb-2">No Funds Match This Criteria</h3>
+                  <p className="text-sm text-[#6B7280] mb-3">
+                    This combination doesn't have any funds that meet our selection requirements:
+                  </p>
+                  <ul className="text-sm text-[#6B7280] space-y-1 ml-4">
+                    <li>• Must have 3+ years of performance history</li>
+                    <li>• Must match both the size and investment style</li>
+                    <li>• Must have sufficient track record for reliable analysis</li>
+                  </ul>
+                  {box.allConsideredSubCategories.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-[#FCD34D]">
+                      <p className="text-sm text-[#1F2937] font-semibold mb-2">
+                        We evaluated {box.allConsideredSubCategories.length} categories for this cell:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {box.allConsideredSubCategories.map((cat, idx) => (
+                          <span key={idx} className="text-xs px-2 py-1 bg-white rounded border border-[#E5E7EB] text-[#6B7280]">
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-[#6B7280] mt-3">
+                        None of these categories had funds with 3+ year performance data.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -682,7 +737,7 @@ function SectionPanel({ rows, cols, boxes, onCellClick }: {
                   className="p-3 border border-[#E5E7EB] cursor-pointer hover:bg-[#EFF6FF] transition-colors"
                   onClick={() => onCellClick(boxes[rowIdx][colIdx])}
                 >
-                  <GridCell box={boxes[rowIdx][colIdx]} />
+                  <GridCell box={boxes[rowIdx][colIdx]} onClick={() => onCellClick(boxes[rowIdx][colIdx])} />
                 </td>
               ))}
             </tr>
@@ -784,20 +839,15 @@ export default function FindMyFundPage() {
     <div className="min-h-screen bg-[#F5F8FF] text-[#1F2937]">
 
       {/* NAV */}
-      <div className="sticky top-0 z-30 bg-[#F5F8FF]/95 backdrop-blur-md border-b border-[#DDE6F3]">
-        <div className="max-w-7xl mx-auto">
-          <AnalysisTabs />
+      <div className="relative z-30 bg-[#F5F8FF]/95 border-b border-[#DDE6F3]">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-center">
+            <div className="mt-8">
+              <AnalysisTabs />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* REQUIREMENT 7: Data Date Badge */}
-      {reportDate && (
-        <div className="text-center py-2 bg-[#EFF6FF] border-b border-[#DDE6F3]">
-          <span className="text-xs text-[#6B7280]">
-            Data updated as of <strong className="text-[#3B82F6]">{reportDate}</strong>
-          </span>
-        </div>
-      )}
 
       {/* HERO */}
       <section className="relative overflow-hidden px-6 pt-14 pb-10">
@@ -829,7 +879,15 @@ export default function FindMyFundPage() {
       <section className="px-6 pb-16">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white rounded-2xl shadow-xl p-8">
-            <SectionNum num="1" label="Smart Fund Matrix" />
+            <div className="flex items-center justify-between mb-4">
+              <SectionNum num="1" label="Equity Mutual Funds" />
+              {/* Date badge inline with header */}
+              {reportDate && (
+                <span className="text-xs text-[#6B7280] bg-[#EFF6FF] px-3 py-1.5 rounded-full border border-[#DDE6F3]">
+                  Data as of <strong className="text-[#3B82F6]">{reportDate}</strong>
+                </span>
+              )}
+            </div>
             <p className="text-sm text-[#6B7280] mb-6">
               Click any cell to see how we selected the fund • Each recommendation is based on category-wide performance analysis
             </p>
