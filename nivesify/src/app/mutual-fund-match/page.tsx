@@ -1,6 +1,7 @@
 "use client";
 
 import AnalysisTabs from "@/components/AnalysisTabs";
+import FindMyFundTabs from "@/components/FindMyFundTabs";
 import React, { useState, useEffect } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -836,8 +837,8 @@ export default function FindMyFundPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F5F8FF] text-[#1F2937]">
 
+    <div className="min-h-screen bg-[#F5F8FF] text-[#1F2937]">
       {/* NAV */}
       <div className="relative z-30 bg-[#F5F8FF]/95 border-b border-[#DDE6F3]">
         <div className="max-w-6xl mx-auto">
@@ -848,30 +849,48 @@ export default function FindMyFundPage() {
           </div>
         </div>
       </div>
-
-      {/* HERO */}
-      <section className="relative overflow-hidden px-6 pt-14 pb-10">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/4 top-0 h-[360px] w-[560px] rounded-full bg-gradient-to-br from-[#3B82F6]/20 to-[#2563EB]/10 blur-3xl" />
-          <div className="absolute right-1/4 top-1/2 h-[300px] w-[400px] rounded-full bg-gradient-to-br from-[#10B981]/15 to-[#059669]/10 blur-3xl" />
+      {/* HERO - ENGINE EXPLANATION */}
+      <section className="relative overflow-hidden px-5 pt-14 pb-10">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/3 w-[520px] h-[520px] bg-[#2F5D7C]/10 rounded-full blur-[160px]" />
+          <div className="absolute bottom-1/3 right-1/4 w-[420px] h-[420px] bg-[#9BB4D6]/20 rounded-full blur-[140px]" />
         </div>
-
-        <div className="relative max-w-5xl mx-auto text-center">
-          <h1 className="text-5xl font-extrabold text-[#1F2937] mb-4 tracking-tight">
-            Find My Fund
-          </h1>
-          <p className="text-lg text-[#6B7280] max-w-3xl mx-auto leading-relaxed">
-            Discover the best equity fund strategies across market cap sizes and investment styles. 
-            Our intelligent two-tier analysis evaluates <strong>{stats.subCategories}+ fund categories</strong> to identify 
-            <strong> top performers</strong> with proven 3+ year track records.
-          </p>
-
-          {/* REQUIREMENT 4: Dynamic Stats */}
-          <div className="mt-10 flex flex-wrap justify-center gap-8">
-            <Stat label="Funds Analyzed" value={stats.fundsAnalyzed.toString()} />
-            <Stat label="Categories Evaluated" value={stats.subCategories.toString()} />
-            <Stat label="Selection Criteria" value="2-Tier" />
+        <div className="relative max-w-6xl mx-auto">
+          <div className="bg-white/80 rounded-2xl shadow-lg p-6 md:p-10 mb-8 flex flex-col md:flex-row items-center gap-8">
+            <div className="flex-1 min-w-[260px]">
+              <h1 className="text-3xl md:text-5xl font-serif font-bold mb-3 text-[#2563EB]">How Our Smart Fund Engine Works</h1>
+              <p className="text-base md:text-lg text-[#374151] mb-4">We’ve built a scientific, data-driven engine that divides the entire mutual fund universe into logical matrices—by asset class, risk, and investment style. For each cell, we identify the best-fit category and then select the top-performing funds, using only live, unbiased data. No guesswork. No bias. Just clarity.</p>
+              <ul className="list-disc pl-5 text-[#2563EB] text-base space-y-2 mb-4">
+                <li><span className="text-[#1F2937]">Step 1:</span> We map every fund into a matrix based on risk, style, and duration.</li>
+                <li><span className="text-[#1F2937]">Step 2:</span> For each cell, we use real data to find the best-fit category.</li>
+                <li><span className="text-[#1F2937]">Step 3:</span> We select the best fund in each cell, with a full audit trail.</li>
+              </ul>
+              <div className="flex gap-4 mt-4">
+                <div className="flex flex-col items-center">
+                  <span className="text-4xl">🔬</span>
+                  <span className="text-xs text-[#6B7280]">Scientific</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-4xl">📊</span>
+                  <span className="text-xs text-[#6B7280]">Data-Driven</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-4xl">🧩</span>
+                  <span className="text-xs text-[#6B7280]">Logical Matrices</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-4xl">🏆</span>
+                  <span className="text-xs text-[#6B7280]">Best Funds</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col items-center">
+              <img src="/engine-visual.png" alt="Fund Engine Visual" className="w-64 h-64 object-contain mb-4" />
+              <p className="text-xs text-[#6B7280] text-center max-w-xs">Visual: Every fund is mapped into a matrix, and the best are picked for you. (Illustrative only)</p>
+            </div>
           </div>
+          {/* SUB-TABS BELOW HERO */}
+          <FindMyFundTabs />
         </div>
       </section>
 
