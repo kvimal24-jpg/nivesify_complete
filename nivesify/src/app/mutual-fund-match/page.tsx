@@ -926,6 +926,7 @@ export default function FindMyFundPage() {
 
       {/* MATRIX: HYBRID (Single Column, Data-Driven, Equity Table Style) */}
       <HybridMatrixSectionSingleCol reportDate={reportDate} />
+      <DebtMatrixSection reportDate={reportDate} />
     </div>
   );
 }
@@ -1050,5 +1051,110 @@ function HybridFundCell({ box }: { box: BoxResult }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// DEBT MATRIX SECTION (Interest Rate Risk × Credit Risk)
+// ──────────────────────────────────────────────────────────────
+function DebtMatrixSection({ reportDate }: { reportDate: string }) {
+  // Define the grid: rows = Interest Rate Risk, cols = Credit Risk
+  const rowDefs: GridDef = [
+    { label: "Ultra Short (0–1Y)", subtitle: "Overnight, Liquid, Ultra Short, Money Market" },
+    { label: "Short Duration (1–3Y)", subtitle: "Low Duration, Short Duration, Banking & PSU (Short Bias), Corporate Bond (Short Bias)" },
+    { label: "Medium Duration (3–5Y)", subtitle: "Corporate Bond, Banking & PSU, Gilt (Medium Term)" },
+    { label: "Long Duration (5Y+)", subtitle: "Gilt, Long Duration, Dynamic Bond" }
+  ];
+  const colDefs: GridDef = [
+    { label: "High Credit Quality", subtitle: "AAA, Gilt, PSU" },
+    { label: "Medium Credit Risk", subtitle: "AA Mix, Medium Duration" },
+    { label: "Yield / Credit Strategy", subtitle: "Credit Risk, Long Tenor Credit" }
+  ];
+
+  const [loading, setLoading] = React.useState(true);
+  const [debtBoxes, setDebtBoxes] = React.useState<BoxResult[][]>([]);
+  const [modalBox, setModalBox] = React.useState<BoxResult | null>(null);
+
+  React.useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
+        fetch("/api/amfi-raw").then(r => r.json()),
+        fetch("/api/funds").then(r => r.json()),
+        fetch("/api/etfs").then(r => r.json()),
+        fetch("/api/insights").then(r => r.json()),
+      ]);
+      // Map sub-categories to grid cells
+      const cellMap: Record<string, [number, number][]> = {
+        "Overnight": [[0,0]],
+        "Liquid": [[0,0]],
+        "Ultra Short Duration": [[0,0]],
+        "Money Market": [[0,0]],
+        "Low Duration": [[1,0]],
+        "Short Duration": [[1,0]],
+        "Banking & PSU": [[1,0],[2,0]],
+        "Corporate Bond": [[1,0],[2,0]],
+        "Medium Duration": [[2,1]],
+        "Gilt": [[2,0],[3,0]],
+        "Long Duration": [[3,0]],
+        "Dynamic Bond": [[3,0]],
+        "Credit Risk": [[1,2],[2,2],[3,2]],
+        "Medium to Long Duration": [[3,1]]
+      };
+      // Build grid: 4 rows × 3 cols
+      const gridMap: AMFIFund[][][] = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => []));
+      for (const fund of amfiRaw as AMFIFund[]) {
+        if (fund.Category !== "Debt") continue;
+        const subCat = fund.Sub_Category;
+        if (cellMap[subCat]) {
+          for (const [row, col] of cellMap[subCat]) {
+            gridMap[row][col].push(fund);
+          }
+        }
+      }
+      // Build boxes
+      const newBoxes: BoxResult[][] = [];
+      for (let r = 0; r < 4; r++) {
+        const rowBoxes: BoxResult[] = [];
+        for (let c = 0; c < 3; c++) {
+          rowBoxes.push(buildBox(r, c, gridMap[r][c], fundAnalytics, etfAnalytics, insights));
+        }
+        newBoxes.push(rowBoxes);
+      }
+      setDebtBoxes(newBoxes);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return (
+    <section className="px-6 pb-16">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex items-center justify-between mb-4">
+            <SectionNum num="3" label="Debt Mutual Funds" />
+            {reportDate && (
+              <span className="text-xs text-[#6B7280] bg-[#EFF6FF] px-3 py-1.5 rounded-full border border-[#DDE6F3]">
+                Data as of <strong className="text-[#3B82F6]">{reportDate}</strong>
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-[#6B7280] mb-6 text-center">
+            Discover the best debt fund in each strategy cell, with a full audit trail. Click any cell for details and methodology.
+          </p>
+          {loading ? (
+            <PlaceholderGrid rows={rowDefs} cols={colDefs} />
+          ) : (
+            <SectionPanel 
+              rows={rowDefs} 
+              cols={colDefs} 
+              boxes={debtBoxes}
+              onCellClick={setModalBox}
+            />
+          )}
+          {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
+        </div>
+      </div>
+    </section>
   );
 }
