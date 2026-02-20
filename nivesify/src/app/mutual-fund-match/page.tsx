@@ -237,9 +237,10 @@ function SectionHeader({ num, title, subtitle, reportDate }: { num: string; titl
         <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #3B82F6, #2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '16px', flexShrink: 0, boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }}>
           {num}
         </div>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: 0, lineHeight: 1.2 }}>{title}</h2>
+          <p style={{ fontSize: '12px', color: '#94A3B8', margin: '2px 0 0', fontWeight: 500 }}>{subtitle}</p>
         </div>
-      </SectionPanel>
-    </section>
       </div>
       {reportDate && <LiveBadge date={reportDate} />}
     </div>
