@@ -856,37 +856,37 @@ export default function FindMyFundPage() {
           <div className="absolute bottom-1/3 right-1/4 w-[420px] h-[420px] bg-[#9BB4D6]/20 rounded-full blur-[140px]" />
         </div>
         <div className="relative max-w-6xl mx-auto">
-          <div className="bg-white/80 rounded-2xl shadow-lg p-6 md:p-10 mb-8 flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1 min-w-[260px]">
-              <h1 className="text-3xl md:text-5xl font-serif font-bold mb-3 text-[#2563EB]">How Our Smart Fund Engine Works</h1>
-              <p className="text-base md:text-lg text-[#374151] mb-4">We’ve built a scientific, data-driven engine that divides the entire mutual fund universe into logical matrices—by asset class, risk, and investment style. For each cell, we identify the best-fit category and then select the top-performing funds, using only live, unbiased data. No guesswork. No bias. Just clarity.</p>
-              <ul className="list-disc pl-5 text-[#2563EB] text-base space-y-2 mb-4">
-                <li><span className="text-[#1F2937]">Step 1:</span> We map every fund into a matrix based on risk, style, and duration.</li>
-                <li><span className="text-[#1F2937]">Step 2:</span> For each cell, we use real data to find the best-fit category.</li>
-                <li><span className="text-[#1F2937]">Step 3:</span> We select the best fund in each cell, with a full audit trail.</li>
-              </ul>
-              <div className="flex gap-4 mt-4">
-                <div className="flex flex-col items-center">
-                  <span className="text-4xl">🔬</span>
-                  <span className="text-xs text-[#6B7280]">Scientific</span>
+          <div className="flex flex-col md:flex-row gap-8 mb-8">
+            {/* Visual Steps */}
+            <div className="flex-1 flex flex-col gap-6 justify-center">
+              <div className="flex items-center gap-4 bg-white rounded-xl shadow-md p-4">
+                <span className="text-4xl">🗂️</span>
+                <div>
+                  <div className="text-lg font-bold text-[#2563EB]">Step 1</div>
+                  <div className="text-sm text-[#374151]">All funds grouped by risk, style, and asset class</div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-4xl">📊</span>
-                  <span className="text-xs text-[#6B7280]">Data-Driven</span>
+              </div>
+              <div className="flex items-center gap-4 bg-white rounded-xl shadow-md p-4">
+                <span className="text-4xl">🔎</span>
+                <div>
+                  <div className="text-lg font-bold text-[#2563EB]">Step 2</div>
+                  <div className="text-sm text-[#374151]">Best-fit category found for each cell using real data</div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-4xl">🧩</span>
-                  <span className="text-xs text-[#6B7280]">Logical Matrices</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-4xl">🏆</span>
-                  <span className="text-xs text-[#6B7280]">Best Funds</span>
+              </div>
+              <div className="flex items-center gap-4 bg-white rounded-xl shadow-md p-4">
+                <span className="text-4xl">🏆</span>
+                <div>
+                  <div className="text-lg font-bold text-[#2563EB]">Step 3</div>
+                  <div className="text-sm text-[#374151]">Top fund selected for every cell—fully transparent</div>
                 </div>
               </div>
             </div>
-            <div className="flex-1 flex flex-col items-center">
-              <img src="/engine-visual.png" alt="Fund Engine Visual" className="w-64 h-64 object-contain mb-4" />
-              <p className="text-xs text-[#6B7280] text-center max-w-xs">Visual: Every fund is mapped into a matrix, and the best are picked for you. (Illustrative only)</p>
+            {/* Matrix Visual */}
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="bg-gradient-to-br from-[#2563EB]/10 to-[#10B981]/10 rounded-2xl shadow-lg p-6 flex flex-col items-center">
+                <img src="/matrix-visual.png" alt="Fund Matrix Visual" className="w-56 h-56 object-contain mb-2" />
+                <div className="text-xs text-[#6B7280] text-center">Visual: Funds mapped into a matrix, best picked for you</div>
+              </div>
             </div>
           </div>
           {/* SUB-TABS BELOW HERO */}
