@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { label: "Find Your Fund", href: "/mutual-fund-match" },
+  { label: "Why Mutual Fund", href: "/why-mutual-fund" },
+  { label: "Smart Fund Finder", href: "/mutual-fund-match" },
   { label: "MF Industry Analysis", href: "/mutual-fund-analysis" },
   { label: "Active Funds", href: "/active-funds" },
   { label: "Passive Funds", href: "/index-funds" },
