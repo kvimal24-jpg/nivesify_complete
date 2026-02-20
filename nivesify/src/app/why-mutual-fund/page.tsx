@@ -4,57 +4,18 @@ import AnalysisTabs from "@/components/AnalysisTabs";
 import React, { useState, useEffect, useRef } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ANIMATED COUNTER
-// ─────────────────────────────────────────────────────────────────────────────
-function AnimatedCounter({ target, suffix = "", prefix = "", duration = 2000 }: { target: number; suffix?: string; prefix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !started.current) {
-        started.current = true;
-        const start = Date.now();
-        const animate = () => {
-          const elapsed = Date.now() - start;
-          const progress = Math.min(elapsed / duration, 1);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          setCount(Math.round(eased * target));
-          if (progress < 1) requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
-      }
-    }, { threshold: 0.5 });
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [target, duration]);
-
-  return <span ref={ref}>{prefix}{count.toLocaleString('en-IN')}{suffix}</span>;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SCROLL REVEAL WRAPPER
+// SCROLL REVEAL
 // ─────────────────────────────────────────────────────────────────────────────
 function Reveal({ children, delay = 0, style = {} }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-
   useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { setVisible(true); observer.disconnect(); }
-    }, { threshold: 0.1 });
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } }, { threshold: 0.08 });
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
-
   return (
-    <div ref={ref} style={{
-      opacity: visible ? 1 : 0,
-      transform: visible ? 'translateY(0)' : 'translateY(32px)',
-      transition: `opacity 0.7s ease ${delay}ms, transform 0.7s ease ${delay}ms`,
-      ...style
-    }}>
+    <div ref={ref} style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(28px)", transition: `opacity 0.65s ease ${delay}ms, transform 0.65s ease ${delay}ms`, ...style }}>
       {children}
     </div>
   );
@@ -63,44 +24,38 @@ function Reveal({ children, delay = 0, style = {} }: { children: React.ReactNode
 // ─────────────────────────────────────────────────────────────────────────────
 // PILLAR CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function PillarCard({ number, icon, title, subtitle, points, color, bg, border }: {
-  number: string; icon: string; title: string; subtitle: string;
-  points: { icon: string; title: string; body: string }[];
-  color: string; bg: string; border: string;
-}) {
+function PillarCard({ number, icon, title, subtitle, points, color, bg, border }: { number: string; icon: string; title: string; subtitle: string; points: { icon: string; title: string; body: string }[]; color: string; bg: string; border: string; }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div style={{ background: 'white', borderRadius: '24px', border: `1.5px solid ${border}`, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.05)', transition: 'box-shadow 0.3s, transform 0.3s' }}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 48px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.05)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
-      {/* Header */}
-      <div style={{ background: bg, padding: '24px 24px 20px', borderBottom: `1px solid ${border}`, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -20, right: -20, fontSize: '100px', opacity: 0.06, lineHeight: 1 }}>{number}</div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'white', border: `1.5px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>{icon}</div>
+    <div style={{ background: "white", borderRadius: "24px", border: `1.5px solid ${border}`, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.05)", transition: "box-shadow 0.3s, transform 0.3s", display: "flex", flexDirection: "column" }}
+      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 12px 48px rgba(0,0,0,0.10)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.05)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}>
+      <div style={{ background: bg, padding: "22px 22px 18px", borderBottom: `1px solid ${border}`, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -16, right: -12, fontSize: "88px", opacity: 0.06, lineHeight: 1 }}>{number}</div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+          <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "white", border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>{icon}</div>
           <div>
-            <div style={{ fontSize: '10px', fontWeight: 800, color: color, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '4px' }}>Pillar {number}</div>
-            <h3 style={{ fontSize: 'clamp(16px,2.5vw,20px)', fontWeight: 800, color: '#0F172A', margin: 0, lineHeight: 1.2 }}>{title}</h3>
-            <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0', lineHeight: 1.5 }}>{subtitle}</p>
+            <div style={{ fontSize: "10px", fontWeight: 800, color, letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "3px" }}>Pillar {number}</div>
+            <h3 style={{ fontSize: "clamp(15px,2.5vw,18px)", fontWeight: 800, color: "#0F172A", margin: 0, lineHeight: 1.2 }}>{title}</h3>
+            <p style={{ fontSize: "11.5px", color: "#64748B", margin: "3px 0 0", lineHeight: 1.5 }}>{subtitle}</p>
           </div>
         </div>
       </div>
-      {/* Points */}
-      <div style={{ padding: '20px 24px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div style={{ padding: "18px 22px", flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {points.slice(0, expanded ? points.length : 2).map((p, i) => (
-            <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>{p.icon}</div>
+            <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+              <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: bg, border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{p.icon}</div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: color, marginBottom: '3px' }}>{p.title}</div>
-                <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.65 }}>{p.body}</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color, marginBottom: "2px" }}>{p.title}</div>
+                <div style={{ fontSize: "11.5px", color: "#475569", lineHeight: 1.6 }}>{p.body}</div>
               </div>
             </div>
           ))}
         </div>
         {points.length > 2 && (
-          <button onClick={() => setExpanded(!expanded)} style={{ marginTop: '14px', width: '100%', background: bg, border: `1px solid ${border}`, borderRadius: '10px', padding: '8px', fontSize: '12px', fontWeight: 700, color: color, cursor: 'pointer', fontFamily: 'inherit', transition: 'opacity 0.2s' }}>
-            {expanded ? '▲ Show less' : `▼ Show ${points.length - 2} more insights`}
+          <button onClick={() => setExpanded(!expanded)} style={{ marginTop: "12px", width: "100%", background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "7px", fontSize: "11px", fontWeight: 700, color, cursor: "pointer", fontFamily: "inherit" }}>
+            {expanded ? "▲ Show less" : `▼ ${points.length - 2} more insights`}
           </button>
         )}
       </div>
@@ -109,44 +64,27 @@ function PillarCard({ number, icon, title, subtitle, points, color, bg, border }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPARISON TABLE ROW
-// ─────────────────────────────────────────────────────────────────────────────
-function CompRow({ feature, mf, fd, stocks, gold }: { feature: string; mf: string; fd: string; stocks: string; gold: string }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr 1fr 1fr', gap: '0', borderBottom: '1px solid #F1F5F9' }}>
-      <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center' }}>{feature}</div>
-      <div style={{ padding: '12px 10px', fontSize: '12px', fontWeight: 700, color: '#059669', background: 'rgba(16,185,129,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: '1px solid #F1F5F9' }}>{mf}</div>
-      <div style={{ padding: '12px 10px', fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: '1px solid #F1F5F9' }}>{fd}</div>
-      <div style={{ padding: '12px 10px', fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: '1px solid #F1F5F9' }}>{stocks}</div>
-      <div style={{ padding: '12px 10px', fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', borderLeft: '1px solid #F1F5F9' }}>{gold}</div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MYTH BUSTER CARD
+// MYTH BUSTER CARD (flip)
 // ─────────────────────────────────────────────────────────────────────────────
 function MythCard({ myth, truth, delay }: { myth: string; truth: string; delay: number }) {
   const [flipped, setFlipped] = useState(false);
   return (
     <Reveal delay={delay}>
-      <div onClick={() => setFlipped(!flipped)} style={{ cursor: 'pointer', height: '160px', perspective: '1000px' }}>
-        <div style={{ position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', transition: 'transform 0.6s ease', transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
-          {/* Front — Myth */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'linear-gradient(135deg, #FEF2F2, #FFF5F5)', border: '1.5px solid #FECACA', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div onClick={() => setFlipped(!flipped)} style={{ cursor: "pointer", height: "148px", perspective: "1000px" }}>
+        <div style={{ position: "relative", width: "100%", height: "100%", transformStyle: "preserve-3d", transition: "transform 0.6s ease", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}>
+          <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden" as const, background: "linear-gradient(135deg, #FEF2F2, #FFF5F5)", border: "1.5px solid #FECACA", borderRadius: "16px", padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#DC2626', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px' }}>❌ Common Myth</div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#7F1D1D', lineHeight: 1.4 }}>{myth}</div>
+              <div style={{ fontSize: "10px", fontWeight: 800, color: "#DC2626", letterSpacing: "0.09em", textTransform: "uppercase" as const, marginBottom: "7px" }}>❌ Common Myth</div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#7F1D1D", lineHeight: 1.4 }}>{myth}</div>
             </div>
-            <div style={{ fontSize: '10px', color: '#DC2626', fontWeight: 600 }}>Tap to see the truth →</div>
+            <div style={{ fontSize: "10px", color: "#DC2626", fontWeight: 600 }}>Tap to see the truth →</div>
           </div>
-          {/* Back — Truth */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'linear-gradient(135deg, #ECFDF5, #F0FFF4)', border: '1.5px solid #A7F3D0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden" as const, transform: "rotateY(180deg)", background: "linear-gradient(135deg, #ECFDF5, #F0FFF4)", border: "1.5px solid #A7F3D0", borderRadius: "16px", padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#059669', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px' }}>✅ The Truth</div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#064E3B', lineHeight: 1.5 }}>{truth}</div>
+              <div style={{ fontSize: "10px", fontWeight: 800, color: "#059669", letterSpacing: "0.09em", textTransform: "uppercase" as const, marginBottom: "7px" }}>✅ The Truth</div>
+              <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#064E3B", lineHeight: 1.55 }}>{truth}</div>
             </div>
-            <div style={{ fontSize: '10px', color: '#059669', fontWeight: 600 }}>Tap to flip back →</div>
+            <div style={{ fontSize: "10px", color: "#059669", fontWeight: 600 }}>Tap to flip back →</div>
           </div>
         </div>
       </div>
@@ -155,97 +93,192 @@ function MythCard({ myth, truth, delay }: { myth: string; truth: string; delay: 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPOUNDING VISUALIZER
+// SVG VISUALS
 // ─────────────────────────────────────────────────────────────────────────────
-function CompoundingViz() {
-  const [monthly, setMonthly] = useState(5000);
-  const [years, setYears] = useState(20);
-  const rate = 12;
-  const r = rate / 100 / 12;
-  const n = years * 12;
-  const fv = monthly * ((Math.pow(1 + r, n) - 1) / r) * (1 + r);
-  const invested = monthly * n;
-  const gain = fv - invested;
-  const gainPct = Math.round((gain / invested) * 100);
 
-  const barMax = fv;
-  const investedW = Math.round((invested / barMax) * 100);
-  const gainW = Math.round((gain / barMax) * 100);
-
-  function fmtL(n: number) {
-    if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)} Cr`;
-    if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-    return `₹${Math.round(n / 1000)}K`;
-  }
-
-  return (
-    <div style={{ background: 'white', borderRadius: '24px', border: '1.5px solid #E2E8F0', padding: 'clamp(20px,3vw,32px)', boxShadow: '0 4px 32px rgba(0,0,0,0.06)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-        <span style={{ fontSize: '24px' }}>🧮</span>
-        <h3 style={{ fontSize: 'clamp(16px,2.5vw,20px)', fontWeight: 800, color: '#0F172A', margin: 0 }}>The Compounding Magic — See It Yourself</h3>
-      </div>
-      <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '24px', lineHeight: 1.6 }}>Move the sliders. Watch what disciplined investing does to your wealth over time.</p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-        {[
-          { label: 'Monthly SIP', value: monthly, setter: setMonthly, min: 500, max: 50000, step: 500, fmt: (v: number) => `₹${v.toLocaleString('en-IN')}` },
-          { label: 'Investment Horizon', value: years, setter: setYears, min: 3, max: 40, step: 1, fmt: (v: number) => `${v} years` },
-        ].map((s, i) => (
-          <div key={i}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>{s.label}</label>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#2563EB' }}>{s.fmt(s.value)}</span>
-            </div>
-            <input type="range" min={s.min} max={s.max} step={s.step} value={s.value} onChange={e => s.setter(parseInt(e.target.value))}
-              style={{ width: '100%', height: '6px', borderRadius: '100px', cursor: 'pointer', accentColor: '#2563EB' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94A3B8', marginTop: '4px' }}>
-              <span>{s.fmt(s.min)}</span><span>{s.fmt(s.max)}</span>
-            </div>
+const TaxFreeViz = ({ color }: { color: string }) => (
+  <div style={{ display: "flex", gap: "12px", alignItems: "flex-end", justifyContent: "center", width: "100%", paddingBottom: "4px" }}>
+    <div style={{ flex: 1, textAlign: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", marginBottom: "8px" }}>
+        {[55, 70, 52, 65, 60].map((w, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: "4px", width: "100%" }}>
+            <div style={{ width: `${w}%`, height: "12px", borderRadius: "4px", background: i === 1 || i === 3 ? "#FECACA" : "#E2E8F0", position: "relative", transition: "width 0.4s" }} />
+            {(i === 1 || i === 3) && <span style={{ fontSize: "9px", color: "#DC2626", fontWeight: 700, whiteSpace: "nowrap" }}>💸 tax hit</span>}
           </div>
         ))}
       </div>
-
-      {/* Visual bar */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', borderRadius: '12px', overflow: 'hidden', height: '40px', marginBottom: '8px' }}>
-          <div style={{ width: `${investedW}%`, background: '#BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#1E40AF', transition: 'width 0.5s ease', minWidth: investedW > 15 ? '60px' : '0' }}>
-            {investedW > 20 ? 'Invested' : ''}
-          </div>
-          <div style={{ width: `${gainW}%`, background: 'linear-gradient(90deg, #34D399, #10B981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: 'white', transition: 'width 0.5s ease' }}>
-            {gainW > 15 ? 'Market Magic ✨' : ''}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '10px', height: '10px', background: '#BFDBFE', borderRadius: '2px' }} />
-            <span style={{ fontSize: '11px', color: '#64748B' }}>Your money in: <strong style={{ color: '#1E40AF' }}>{fmtL(invested)}</strong></span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '10px', height: '10px', background: '#10B981', borderRadius: '2px' }} />
-            <span style={{ fontSize: '11px', color: '#64748B' }}>Market's gift: <strong style={{ color: '#059669' }}>{fmtL(gain)}</strong></span>
-          </div>
-        </div>
-      </div>
-
-      {/* Big numbers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-        {[
-          { label: 'You Invest', value: fmtL(invested), color: '#1E40AF', bg: '#EFF6FF', bd: '#BFDBFE' },
-          { label: 'Market Adds', value: fmtL(gain), color: '#059669', bg: '#ECFDF5', bd: '#A7F3D0' },
-          { label: 'Total Wealth', value: fmtL(fv), color: '#7C3AED', bg: '#F5F3FF', bd: '#DDD6FE' },
-        ].map((k, i) => (
-          <div key={i} style={{ background: k.bg, border: `1.5px solid ${k.bd}`, borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 600, marginBottom: '4px' }}>{k.label}</div>
-            <div style={{ fontSize: 'clamp(16px,3vw,22px)', fontWeight: 900, color: k.color, lineHeight: 1 }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
-      {gainPct > 0 && (
-        <div style={{ marginTop: '14px', background: 'linear-gradient(90deg, #ECFDF5, #EFF6FF)', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#065F46', fontWeight: 600, textAlign: 'center' }}>
-          🎯 The market creates {gainPct}% extra wealth on top of your own savings — for free, just for staying invested!
-        </div>
-      )}
+      <div style={{ fontSize: "10px", fontWeight: 700, color: "#94A3B8" }}>Direct Stocks</div>
+      <div style={{ fontSize: "9px", color: "#DC2626", fontWeight: 600, marginTop: "2px" }}>Tax on every switch</div>
     </div>
+    <div style={{ fontSize: "16px", fontWeight: 900, color: "#CBD5E1", flexShrink: 0, paddingBottom: "28px" }}>VS</div>
+    <div style={{ flex: 1, textAlign: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", marginBottom: "8px" }}>
+        {[55, 72, 80, 88, 96].map((w, i) => (
+          <div key={i} style={{ width: `${Math.min(w, 100)}%`, height: "12px", borderRadius: "4px", background: `${color}${["40","66","88","BB","FF"][i]}` }} />
+        ))}
+      </div>
+      <div style={{ fontSize: "10px", fontWeight: 700, color: "#374151" }}>Mutual Fund</div>
+      <div style={{ fontSize: "9px", color, fontWeight: 600, marginTop: "2px" }}>Zero tax internally ✓</div>
+    </div>
+  </div>
+);
+
+const PricingViz = ({ color }: { color: string }) => (
+  <div style={{ display: "flex", gap: "16px", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontSize: "36px", marginBottom: "5px" }}>🐟</div>
+      <div style={{ fontSize: "9px", fontWeight: 700, color: "#94A3B8", marginBottom: "4px" }}>Retail Investor</div>
+      <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "8px", padding: "3px 8px", fontSize: "9px", fontWeight: 700, color: "#DC2626" }}>+0.5–1% impact cost</div>
+    </div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+      <div style={{ width: "1px", height: "24px", background: "#E2E8F0" }} />
+      <div style={{ fontSize: "9px", fontWeight: 800, color: "#374151", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "6px", padding: "3px 6px", whiteSpace: "nowrap" }}>SAME STOCK</div>
+      <div style={{ width: "1px", height: "24px", background: "#E2E8F0" }} />
+    </div>
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontSize: "36px", marginBottom: "5px" }}>🐋</div>
+      <div style={{ fontSize: "9px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>Mutual Fund (QIB)</div>
+      <div style={{ background: `${color}18`, border: `1px solid ${color}40`, borderRadius: "8px", padding: "3px 8px", fontSize: "9px", fontWeight: 700, color }}>~0% impact cost</div>
+    </div>
+  </div>
+);
+
+const TrustViz = ({ color }: { color: string }) => (
+  <div style={{ textAlign: "center" }}>
+    <div style={{ width: "110px", height: "110px", borderRadius: "50%", border: `2px dashed ${color}40`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", position: "relative" }}>
+      <div style={{ position: "absolute", top: "-9px", left: "50%", transform: "translateX(-50%)", background: "white", border: `1px solid ${color}30`, borderRadius: "100px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color, whiteSpace: "nowrap" }}>SEBI Custodian Trust</div>
+      <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: `${color}12`, border: `2px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "2px" }}>
+        <div style={{ fontSize: "26px" }}>🛡️</div>
+        <div style={{ fontSize: "8px", fontWeight: 800, color, lineHeight: 1.2, textAlign: "center" }}>YOUR UNITS</div>
+      </div>
+    </div>
+    <div style={{ fontSize: "10px", color: "#059669", fontWeight: 700, marginTop: "8px" }}>✅ AMC bankruptcy cannot touch your units</div>
+  </div>
+);
+
+const SIPViz = ({ color }: { color: string }) => (
+  <div style={{ width: "100%" }}>
+    <div style={{ position: "relative", height: "64px", marginBottom: "8px" }}>
+      <svg viewBox="0 0 280 64" style={{ width: "100%", height: "100%" }}>
+        <polyline points="0,42 36,36 60,50 88,18 118,52 150,28 180,46 212,14 244,34 280,20" fill="none" stroke="#E2E8F0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points="0,42 36,36 60,50 88,18 118,52 150,28 180,46 212,14 244,34 280,20" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+        {[[60,50],[118,52],[180,46]].map(([x,y],i) => (
+          <g key={i}>
+            <circle cx={x} cy={y} r="6" fill={color} opacity="0.95" />
+            <text x={x} y={y-10} textAnchor="middle" fontSize="7.5" fill={color} fontWeight="800">SIP ↓</text>
+          </g>
+        ))}
+        <circle cx={88} cy={18} r="6" fill="#EF4444" opacity="0.9" />
+        <text x={88} y={10} textAnchor="middle" fontSize="7.5" fill="#EF4444" fontWeight="800">😱 sell</text>
+      </svg>
+    </div>
+    <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "9px", fontWeight: 700, color }}>
+        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: color }} /> SIP auto-buys on dips
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "9px", fontWeight: 700, color: "#EF4444" }}>
+        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#EF4444" }} /> Panic exit = locked loss
+      </div>
+    </div>
+  </div>
+);
+
+const BetaFloorViz = ({ color }: { color: string }) => (
+  <div style={{ width: "100%", textAlign: "center" }}>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "8px", height: "80px", marginBottom: "6px" }}>
+      {[{ h: 100, label: "Top", c: color }, { h: 78, label: "Good", c: `${color}BB` }, { h: 58, label: "Avg", c: `${color}77` }, { h: 42, label: "Poor", c: `${color}44` }].map((b, i) => (
+        <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", flex: 1 }}>
+          <div style={{ fontSize: "8px", fontWeight: 700, color: i === 0 ? color : "#94A3B8" }}>{b.label}</div>
+          <div style={{ width: "100%", height: `${b.h * 0.72}px`, background: b.c, borderRadius: "6px 6px 0 0", minHeight: "4px" }} />
+        </div>
+      ))}
+    </div>
+    <div style={{ height: "2px", background: "#EF4444", borderRadius: "1px", marginBottom: "6px" }} />
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "100px", padding: "3px 10px" }}>
+      <div style={{ width: "8px", height: "2px", background: "#EF4444", borderRadius: "1px" }} />
+      <span style={{ fontSize: "9px", fontWeight: 700, color: "#DC2626" }}>Beta Floor — worst fund still captures market growth</span>
+    </div>
+  </div>
+);
+
+const ElasticityViz = ({ color }: { color: string }) => (
+  <div style={{ width: "100%" }}>
+    <div style={{ display: "flex", gap: "4px", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+      {[{ emoji: "📈", label: "Equity", bg: "#EFF6FF", bd: "#BFDBFE", tc: "#2563EB" }, { emoji: "→", label: "", bg: "transparent", bd: "transparent", tc: "#059669" }, { emoji: "🏦", label: "Debt", bg: "#FFFBEB", bd: "#FDE68A", tc: "#D97706" }, { emoji: "→", label: "", bg: "transparent", bd: "transparent", tc: "#059669" }, { emoji: "🥇", label: "Gold", bg: "#FEF2F2", bd: "#FECACA", tc: "#DC2626" }].map((item, i) => (
+        item.label === "" ? (
+          <div key={i} style={{ fontSize: "16px", color: "#059669", fontWeight: 900 }}>{item.emoji}</div>
+        ) : (
+          <div key={i} style={{ textAlign: "center", background: item.bg, border: `1.5px solid ${item.bd}`, borderRadius: "10px", padding: "8px 6px", minWidth: "52px" }}>
+            <div style={{ fontSize: "20px" }}>{item.emoji}</div>
+            <div style={{ fontSize: "8px", fontWeight: 700, color: item.tc, marginTop: "2px" }}>{item.label}</div>
+          </div>
+        )
+      ))}
+    </div>
+    <div style={{ textAlign: "center", marginTop: "10px" }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: `${color}14`, border: `1px solid ${color}35`, borderRadius: "100px", padding: "4px 12px", fontSize: "10px", fontWeight: 700, color }}>
+        💸 Zero capital gains tax on every shift
+      </div>
+    </div>
+  </div>
+);
+
+const DividendViz = ({ color }: { color: string }) => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "14px" }}>
+    <div style={{ position: "relative", width: "100px", height: "100px", flexShrink: 0 }}>
+      <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}>
+        <circle cx="50" cy="50" r="42" fill="none" stroke={`${color}22`} strokeWidth="7" />
+        <circle cx="50" cy="50" r="42" fill="none" stroke={color} strokeWidth="7" strokeDasharray="176 88" strokeLinecap="round" strokeDashoffset="0" />
+        <polygon points="50,4 46,13 54,13" fill={color} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: "22px" }}>🔄</div>
+        <div style={{ fontSize: "8px", fontWeight: 800, color, textAlign: "center", lineHeight: 1.2 }}>100%<br/>Reinvested</div>
+      </div>
+    </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+      {["Dividend earned", "→ Reinvested at NAV", "→ More units held", "→ More dividend ✨"].map((step, i) => (
+        <div key={i} style={{ fontSize: "10px", fontWeight: i === 3 ? 700 : 500, color: i === 3 ? color : "#475569" }}>{step}</div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRUCTURE CARD — visual-first design
+// ─────────────────────────────────────────────────────────────────────────────
+function StructureCard({ icon, bigStat, statLabel, title, body, color, bg, border, accentGradient, visual, delay }: {
+  icon: string; bigStat: string; statLabel: string; title: string; body: string;
+  color: string; bg: string; border: string; accentGradient: string; visual: React.ReactNode; delay: number;
+}) {
+  return (
+    <Reveal delay={delay}>
+      <div style={{ background: "white", borderRadius: "24px", border: `1.5px solid ${border}`, overflow: "hidden", boxShadow: "0 4px 28px rgba(0,0,0,0.06)", transition: "box-shadow 0.3s, transform 0.3s", display: "flex", flexDirection: "column", height: "100%" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 16px 56px rgba(0,0,0,0.12)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-5px)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 28px rgba(0,0,0,0.06)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}>
+        {/* Accent bar */}
+        <div style={{ height: "4px", background: accentGradient }} />
+        {/* Visual panel */}
+        <div style={{ background: bg, padding: "24px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "148px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle at 70% 50%, ${color}10 0%, transparent 60%)` }} />
+          <div style={{ position: "relative", zIndex: 1, width: "100%" }}>{visual}</div>
+        </div>
+        {/* Text */}
+        <div style={{ padding: "18px 20px 20px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "9px" }}>
+            <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: bg, border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{icon}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "12.5px", fontWeight: 800, color, lineHeight: 1.2, marginBottom: "2px" }}>{title}</div>
+              {bigStat && <div style={{ fontSize: "10px", fontWeight: 600, color: "#94A3B8" }}>{statLabel}</div>}
+            </div>
+            {bigStat && (
+              <div style={{ background: accentGradient, borderRadius: "8px", padding: "3px 9px", fontSize: "12px", fontWeight: 900, color: "white", whiteSpace: "nowrap", flexShrink: 0 }}>{bigStat}</div>
+            )}
+          </div>
+          <p style={{ fontSize: "11.5px", color: "#475569", lineHeight: 1.7, margin: 0 }}>{body}</p>
+        </div>
+      </div>
+    </Reveal>
   );
 }
 
@@ -254,165 +287,164 @@ function CompoundingViz() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function WhyMutualFundsPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "structure" | "selection" | "exit">("overview");
+
+  const structureCards = [
+    {
+      icon: "⚡", bigStat: "~1.5%", statLabel: "saved annually vs direct stocks",
+      title: "Frictionless Compounding — Internal Tax Neutrality",
+      body: "When a fund manager switches stocks inside a mutual fund, you pay zero capital gains tax. Do the same yourself with direct stocks and you're hit with 12.5–20% tax every time — a silent drag that destroys compounding over decades.",
+      color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
+      accentGradient: "linear-gradient(90deg, #2563EB, #7C3AED)",
+      visual: <TaxFreeViz color="#2563EB" />,
+    },
+    {
+      icon: "🐋", bigStat: "~0%", statLabel: "market impact cost at QIB scale",
+      title: "Institutional Wholesale Pricing",
+      body: "Mutual funds buy stocks in hundreds of crores as Qualified Institutional Buyers — near-zero market impact cost. A retail investor buying the same stock individually pays 0.5–1% slippage per trade. The fund gives you whale-scale buying power on a fish-scale budget.",
+      color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",
+      accentGradient: "linear-gradient(90deg, #7C3AED, #2563EB)",
+      visual: <PricingViz color="#7C3AED" />,
+    },
+    {
+      icon: "🔒", bigStat: "100%", statLabel: "safe even if AMC goes bankrupt",
+      title: "Fiduciary Trust Structure — Legal Asset Separation",
+      body: "Your money is held in a legally separate custodian trust — completely isolated from the AMC's own balance sheet. If your AMC shuts down tomorrow, your units are untouched. SEBI mandates this. No bank FD offers this protection beyond ₹5 Lakh.",
+      color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
+      accentGradient: "linear-gradient(90deg, #059669, #0891B2)",
+      visual: <TrustViz color="#059669" />,
+    },
+    {
+      icon: "🤖", bigStat: "1–3%", statLabel: "extra returns from behavioral discipline",
+      title: "Automated Behavioral Guardrails — The SIP Superpower",
+      body: "SIPs remove the biggest wealth destroyer: your own emotions. Auto-debit on the 5th of every month means you buy more units when markets crash — automatically. This 'behavioral alpha' is estimated to add meaningful extra returns vs investors who try to time markets manually.",
+      color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",
+      accentGradient: "linear-gradient(90deg, #D97706, #DC2626)",
+      visual: <SIPViz color="#D97706" />,
+    },
+    {
+      icon: "🛡️", bigStat: "Even bad picks", statLabel: "still capture market growth",
+      title: "The Beta Floor — The Wrong Selection Safety Net",
+      body: "Even if you pick a below-average fund, you still capture the market's underlying economic growth. SEBI mandates category-appropriate investing, preventing catastrophic benchmark divergence. The structure ensures you don't need to be perfect — just invested.",
+      color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",
+      accentGradient: "linear-gradient(90deg, #DC2626, #D97706)",
+      visual: <BetaFloorViz color="#DC2626" />,
+    },
+    {
+      icon: "🔄", bigStat: "Zero tax", statLabel: "on internal asset-class shifts",
+      title: "Asset-Class Elasticity — Tax-Free Rebalancing",
+      body: "Move between equity, debt, and gold inside a multi-asset fund — zero capital gains tax triggered. Do the same with direct investments and every shift is a taxable event. This frictionless rebalancing saves roughly 1% per year in friction costs, staying fully compounded.",
+      color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC",
+      accentGradient: "linear-gradient(90deg, #0891B2, #059669)",
+      visual: <ElasticityViz color="#0891B2" />,
+    },
+  ];
 
   const pillars = [
     {
-      number: "1",
-      icon: "🗂️",
-      title: "Strategic Diversification & Style Balance",
-      subtitle: "True diversification is about different return drivers — not just different fund names",
-      color: "#2563EB",
-      bg: "#EFF6FF",
-      border: "#BFDBFE",
+      number: "1", icon: "🗂️", title: "Strategic Diversification & Style Balance", subtitle: "Different return drivers — not just different fund names",
+      color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
       points: [
-        { icon: "⚠️", title: "The Overlap Trap", body: "Owning 5 large-cap funds sounds diversified but they all hold the same 30 stocks — HDFC Bank, Reliance, Infosys. You're paying 5x fees for 1x exposure. Always check portfolio overlap before adding a new fund." },
-        { icon: "🔺", title: "Core & Satellite Architecture (The 90% Rule)", body: "90% of your returns come from asset allocation — not stock selection. Build a Passive Core (~70%) for market returns at near-zero cost. Add Active Satellites (~30%) for potential alpha in areas where managers genuinely add value." },
-        { icon: "📊", title: "The Style Box Matrix", body: "Real diversification means covering different styles — Value, Core, Momentum — and different sizes — Large, Mid, Small. Each style performs well in different market cycles. A proper portfolio has exposure across the style box." },
-        { icon: "🌐", title: "The Passive Spectrum", body: "Beyond plain vanilla Nifty 50, there are smart-beta strategies — Low Volatility, Quality, Value 20 — that target specific outcomes mechanically at low cost. These are rule-based satellites that don't depend on a fund manager's skill." },
-        { icon: "🏆", title: "The All-Weather Portfolio Example", body: "A 35-year wealth-building portfolio needs: 40% Passive Broad Market (Anchor), 25% Active Flexi-Cap (Stable Growth), 15% Active Mid-Cap (Growth Booster), 10% Active Small-Cap (High Growth), 10% Factor ETF (Smart Satellite). This is genuinely diversified." },
+        { icon: "⚠️", title: "The Overlap Trap", body: "Owning 5 large-cap funds sounds diversified — but they hold the same 30 stocks. You pay 5× fees for 1× exposure. Always check portfolio overlap first." },
+        { icon: "🔺", title: "Core & Satellite (The 90% Rule)", body: "90% of returns come from asset allocation. Build a Passive Core (~70%) for low-cost market returns. Add Active Satellites (~30%) for alpha in areas managers genuinely add value." },
+        { icon: "📊", title: "The Style Box Matrix", body: "Real diversification means covering Value, Core, and Momentum styles across Large, Mid, and Small cap sizes — each thriving in different market cycles." },
+        { icon: "🏆", title: "The All-Weather Portfolio", body: "Broad Market Passive (Anchor) + Active Flexi-Cap (Stable) + Active Mid-Cap (Growth) + Small-Cap (High Growth) + Factor ETF (Smart Satellite)." },
       ],
     },
     {
-      number: "2",
-      icon: "🔬",
-      title: "The Selection Framework & Quality Filters",
-      subtitle: "How to pick funds that win by skill, not just luck",
-      color: "#059669",
-      bg: "#ECFDF5",
-      border: "#A7F3D0",
+      number: "2", icon: "🔬", title: "The Selection Framework & Quality Filters", subtitle: "Pick funds by skill — not by recent performance",
+      color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
       points: [
-        { icon: "📐", title: "Information Ratio (IR) — The Skill Metric", body: "IR = (Portfolio Return − Benchmark Return) ÷ Tracking Error. An IR above 0.5 means the manager consistently generates alpha above benchmark risk taken. This separates genuine skill from lucky one-year spikes. Don't trust 1-year returns alone." },
-        { icon: "🐟", title: "The AUM Trap for Mid/Small Cap Funds", body: "A ₹30,000 Cr small-cap fund cannot buy the same nimble stocks it bought at ₹3,000 Cr. Too much money chases too few good stocks. The fund becomes a 'closet index fund' — similar returns to the index, but you're paying active fees. Watch for AUM bloat." },
-        { icon: "🏁", title: "Tracking Difference (TD) — The True Cost of Passive Funds", body: "For index funds, the real cost isn't the expense ratio — it's the Tracking Difference. TD = Fund Return − Index Return. A Nifty 50 fund with 0.2% expense ratio but -0.4% TD is worse than a fund with 0.1% expense ratio and -0.1% TD. Lower TD = better." },
-        { icon: "🛤️", title: "Tracking Error (TE) — The Consistency Check", body: "TE measures daily volatility of the fund vs its index. Low TE means the fund smoothly mirrors the index day-by-day. High TE in a passive fund signals operational issues. Goal: choose index funds with both low TD and low TE." },
-        { icon: "👨‍🍳", title: "Skin in the Game — The DNA Check", body: "Does the fund manager invest their own wealth in the scheme they manage? SEBI now requires AMCs to disclose this. A manager who has their own money at stake thinks and acts differently. Always check if the fund manager has meaningful personal investment in their fund." },
+        { icon: "📐", title: "Information Ratio — The Skill Metric", body: "IR = (Fund Return − Benchmark) ÷ Tracking Error. An IR above 0.5 signals consistent alpha — not lucky spikes. Never trust 1-year returns alone." },
+        { icon: "🐟", title: "The AUM Trap for Mid/Small Cap", body: "A bloated small-cap fund can't buy nimble stocks anymore. Too much AUM forces it to become a 'closet index fund' — active fees, passive returns." },
+        { icon: "🏁", title: "Tracking Difference — True Passive Cost", body: "For index funds, the real cost is TD = Fund Return − Index Return. Lower TD means genuinely better performance — regardless of headline expense ratio." },
+        { icon: "👨‍🍳", title: "Skin in the Game", body: "Does the fund manager invest their own wealth in their scheme? SEBI now mandates disclosure. A manager with personal stakes thinks like an owner, not a salesperson." },
       ],
     },
     {
-      number: "3",
-      icon: "🚪",
-      title: "The Exit Protocol & Discipline Filter",
-      subtitle: "Exit with a plan — not an emotion. This is where most investors lose.",
-      color: "#D97706",
-      bg: "#FFFBEB",
-      border: "#FDE68A",
+      number: "3", icon: "🚪", title: "The Exit Protocol & Discipline Filter", subtitle: "Exit by plan — not by panic. This is where most investors fail.",
+      color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",
       points: [
-        { icon: "📅", title: "Goal-Based Exit (The Right Reason to Sell)", body: "Your life milestones should dictate sell orders — not news headlines. A 10% market dip is completely irrelevant for a 20-year retirement goal. The right time to gradually sell equity is 2–3 years before you actually need the money — move into safer debt funds then." },
-        { icon: "📰", title: "Market-Based Exit (The Wrong Reason)", body: "Selling because markets fell 15%, or because some TV anchor said 'correction coming', or because your neighbour panicked — this is guaranteed wealth destruction. Reactive selling locks in losses and means you miss the recovery. Markets always recover. Panic never helps." },
-        { icon: "⚖️", title: "The Rebalancing Trigger — Sell High, Stay Balanced", body: "If equity markets run hard and your equity grows from 60% to 75% of your portfolio, that 15% excess should be sold and moved to debt. This automatically 'locks in profits' and reduces risk. This is disciplined rebalancing — not emotional selling. Do this annually." },
-        { icon: "🚦", title: "Underperformance vs Style Drift — The Traffic Light", body: "WAIT (Yellow Light): Fund underperforms because Value style is out of fashion right now. Style-driven underperformance is normal and will rotate back. Stay. EXIT (Red Light): Fund consistently lags benchmark AND peers for 18+ months, OR the manager has changed core strategy. This is style drift — now exit." },
-        { icon: "🌉", title: "The Exit Rule — Plan Beats Emotion Every Time", body: "A successful exit is a pre-determined bridge to a real-world goal. If the goal hasn't arrived and the fund's DNA hasn't changed, stay the course. Don't let short-term taxes or market noise derail 20+ years of compounding. The bridge is your plan — follow it." },
+        { icon: "📅", title: "Goal-Based Exit (The Right Reason)", body: "Life milestones dictate sell orders — not news. A 10% dip is irrelevant for a 20-year goal. Start moving to safer debt 2–3 years before you need the money." },
+        { icon: "📰", title: "Never Exit on Market Noise", body: "Selling because markets fell or a TV anchor panicked guarantees wealth destruction. Reactive selling locks in losses and misses the recovery that always follows." },
+        { icon: "⚖️", title: "Rebalancing — Sell High Automatically", body: "If equity grows from 60% to 75% of portfolio, sell the 15% excess into debt. This mechanically locks profits and reduces risk — not emotionally." },
+        { icon: "🚦", title: "Underperformance vs Style Drift", body: "WAIT if Value style is just out of fashion. EXIT only if the fund lags peers for 18+ months or the manager changes core strategy. Know the difference." },
       ],
     },
   ];
 
   const myths = [
-    { myth: "Mutual funds are only for rich people or market experts.", truth: "You can start with ₹100/month via SIP. Professionals manage the portfolio — you just invest. SEBI regulates everything strictly." },
-    { myth: "Mutual funds are like gambling — you can lose everything.", truth: "A diversified equity fund holds 50–100 stocks across sectors. No single company collapse can destroy your portfolio. The Beta Floor always holds." },
-    { myth: "FD is safer — at least it gives guaranteed returns.", truth: "FD at 7% after 30% tax = 4.9%. Inflation at 6% = you're losing real wealth every year. Equity MFs have given 12–14% CAGR over 15+ years." },
-    { myth: "I need to time the market to make money in mutual funds.", truth: "SIPs automate 'buy low' behavior. When markets fall, your SIP buys more units. When they rise, your NAV increases. Time in market beats timing the market." },
-    { myth: "High NAV funds are expensive — low NAV ones are better value.", truth: "NAV is just a price label. A fund at NAV ₹500 is not more expensive than one at ₹10 — what matters is future growth percentage, not the starting number." },
-    { myth: "Mutual funds have too many hidden charges.", truth: "SEBI caps expense ratios — 1.05% max for large active funds, 0.1-0.5% for index funds. All costs are disclosed daily. Compare this to PMS (2%+ flat) or stocks (brokerage + STT + GST per trade)." },
-  ];
-
-  const advantages = [
-    { icon: "⚡", title: "Frictionless Compounding", body: "Internal portfolio rebalancing inside a mutual fund is TAX-FREE. When the fund manager switches stocks, you pay zero capital gains tax. This saves ~1.5% annually vs doing the same yourself with individual stocks.", color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
-    { icon: "💸", title: "Institutional Wholesale Pricing", body: "Mutual funds buy stocks in crores — they get QIB (Qualified Institutional Buyer) status with near-zero market impact costs. A retail investor buying the same stocks individually pays 0.5–1% per transaction in slippage alone.", color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE" },
-    { icon: "🔄", title: "Asset-Class Elasticity", body: "Move between equity, debt, and gold inside a multi-asset fund — ZERO tax event, zero exit load. Doing this yourself means triggering capital gains tax every time. The mutual fund wrapper makes tax-efficient shifting effortless.", color: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
-    { icon: "🔒", title: "Fiduciary Trust Structure", body: "Your money is legally separate from the AMC's money. Even if HDFC AMC or SBI Mutual Fund goes bankrupt, your units are 100% safe — held in a separate custodian trust. SEBI mandates this separation. You cannot lose money to AMC bankruptcy.", color: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
-    { icon: "🤖", title: "Automated Behavioral Guardrails (SIP)", body: "SIPs eliminate the biggest wealth destroyer — your own emotions. Auto-debiting ₹5,000 on the 5th of every month means you automatically buy more units when markets crash and fewer when they're expensive. This 'behavioral alpha' is worth 1–3% extra annual returns vs manual investing.", color: "#DC2626", bg: "#FEF2F2", bd: "#FECACA" },
-    { icon: "🛡️", title: "The Beta Floor — Even a Bad Fund Wins", body: "Even if you pick a below-average fund, you still capture the market's underlying growth (GDP + corporate earnings growth). SEBI mandates category-appropriate investing, preventing catastrophic divergence from benchmarks. The structure saves you from your own fund selection mistakes.", color: "#0891B2", bg: "#ECFEFF", bd: "#A5F3FC" },
+    { myth: "Mutual funds are only for market experts or the wealthy.", truth: "You can start with ₹100/month via SIP. Professionals manage the portfolio. No expertise needed — just a bank account and a goal." },
+    { myth: "Mutual funds are like gambling. You can lose everything.", truth: "A diversified fund holds 50–100 stocks across sectors. No single stock collapse can destroy your portfolio. The Beta Floor always holds." },
+    { myth: "FD is safer. At least returns are guaranteed.", truth: "FD interest is taxed as income. After tax and inflation, real returns are often negative. Equity MFs have consistently beaten inflation over 10+ year periods." },
+    { myth: "You need to time the market to profit from mutual funds.", truth: "SIPs automate the 'buy more when cheap' behavior. Time in the market always beats timing the market. Discipline is your only required skill." },
+    { myth: "High NAV funds are expensive — low NAV ones are better.", truth: "NAV is just a price label. What matters is future growth percentage — not the starting number. A ₹500 NAV fund can grow faster than a ₹10 one." },
+    { myth: "Mutual funds have too many hidden charges.", truth: "SEBI caps expense ratios and mandates full daily disclosure. Index funds cost as little as 0.1%. Compare this to direct stock trading: brokerage + STT + GST on every trade." },
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", color: '#1F2937' }}>
+    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", color: "#1F2937" }}>
 
       {/* NAV */}
-      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', zIndex: 30, position: 'sticky', top: 0 }}>
-        <div style={{ maxWidth: '1152px', margin: '0 auto' }}>
+      <div style={{ background: "white", borderBottom: "1px solid #E2E8F0", zIndex: 30, position: "sticky", top: 0 }}>
+        <div style={{ maxWidth: "1152px", margin: "0 auto" }}>
           <AnalysisTabs />
         </div>
       </div>
 
       {/* ── HERO ── */}
-      <section style={{ background: 'linear-gradient(155deg, #F0FDF4 0%, #EFF6FF 55%, #FFF7ED 100%)', borderBottom: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
-        {/* Grid texture */}
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(16,185,129,0.07) 1px, transparent 0)', backgroundSize: '32px 32px', pointerEvents: 'none' }} />
-        {/* Glow orbs */}
-        <div style={{ position: 'absolute', top: -100, right: -60, width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 65%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -60, left: -60, width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 65%)', pointerEvents: 'none' }} />
-
-        <div style={{ position: 'relative', maxWidth: '1100px', margin: '0 auto', padding: 'clamp(40px,6vw,72px) clamp(16px,4vw,32px) clamp(40px,6vw,64px)' }}>
+      <section style={{ background: "linear-gradient(155deg, #F0FDF4 0%, #EFF6FF 55%, #FFF7ED 100%)", borderBottom: "1px solid #E2E8F0", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 1px 1px, rgba(16,185,129,0.07) 1px, transparent 0)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: -100, right: -60, width: "500px", height: "500px", background: "radial-gradient(circle, rgba(59,130,246,0.09) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -60, left: -60, width: "400px", height: "400px", background: "radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative", maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,6vw,72px) clamp(16px,4vw,32px) clamp(40px,6vw,64px)" }}>
           <Reveal>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '100px', padding: '5px 16px', marginBottom: '20px' }}>
-              <span style={{ width: '7px', height: '7px', background: '#10B981', borderRadius: '50%', animation: 'pulse 2s infinite' }} />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#065F46', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Iron-Clad Framework · For Every Indian Investor</span>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: "100px", padding: "5px 16px", marginBottom: "20px" }}>
+              <span style={{ width: "7px", height: "7px", background: "#10B981", borderRadius: "50%" }} />
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#065F46", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>The Iron-Clad Framework · For Every Indian Investor</span>
             </div>
           </Reveal>
-
           <Reveal delay={100}>
-            <h1 style={{ fontSize: 'clamp(2rem,6vw,3.8rem)', fontWeight: 900, color: '#0F172A', lineHeight: 1.05, letterSpacing: '-0.04em', marginBottom: '20px', maxWidth: '800px' }}>
+            <h1 style={{ fontSize: "clamp(2rem,6vw,3.8rem)", fontWeight: 900, color: "#0F172A", lineHeight: 1.05, letterSpacing: "-0.04em", marginBottom: "20px", maxWidth: "800px" }}>
               Why Mutual Funds?<br />
-              <span style={{ background: 'linear-gradient(90deg, #059669 0%, #2563EB 60%, #7C3AED 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'block' }}>
+              <span style={{ background: "linear-gradient(90deg, #059669 0%, #2563EB 60%, #7C3AED 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "block" }}>
                 The Smartest Financial Vehicle Ever Built.
               </span>
             </h1>
           </Reveal>
-
           <Reveal delay={200}>
-            <p style={{ fontSize: 'clamp(14px,2vw,17px)', color: '#475569', lineHeight: 1.8, maxWidth: '600px', marginBottom: '36px' }}>
-              Not because of SEBI ads. Not because your bank told you to. But because of <strong>structural advantages</strong> built into the very DNA of mutual funds — advantages that protect, compound, and grow your wealth even when you're asleep.
+            <p style={{ fontSize: "clamp(14px,2vw,17px)", color: "#475569", lineHeight: 1.8, maxWidth: "560px" }}>
+              Not because SEBI told you to. Because of <strong>structural advantages</strong> built into the DNA of mutual funds — advantages that protect, compound, and grow your wealth even while you sleep.
             </p>
-          </Reveal>
-
-          {/* Stat strip */}
-          <Reveal delay={300}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', maxWidth: '700px' }}>
-              {[
-                { value: 10, suffix: 'Cr+', label: 'Indian SIP investors', color: '#2563EB', bg: '#EFF6FF', bd: '#BFDBFE' },
-                { value: 68, suffix: 'L Cr', label: 'Total MF AUM in India', color: '#059669', bg: '#ECFDF5', bd: '#A7F3D0' },
-                { value: 100, suffix: '', prefix: '₹', label: 'Minimum to start SIP', color: '#D97706', bg: '#FFFBEB', bd: '#FDE68A' },
-                { value: 14, suffix: '%', label: 'Avg 15Y equity MF CAGR', color: '#7C3AED', bg: '#F5F3FF', bd: '#DDD6FE' },
-              ].map((s, i) => (
-                <div key={i} style={{ background: s.bg, border: `1.5px solid ${s.bd}`, borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 'clamp(22px,4vw,30px)', fontWeight: 900, color: s.color, lineHeight: 1 }}>
-                    <AnimatedCounter target={s.value} suffix={s.suffix} prefix={s.prefix || ''} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px', lineHeight: 1.3 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ── THE STORY SECTION ── */}
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: 'clamp(32px,5vw,60px) clamp(16px,4vw,32px)' }}>
+      {/* ── BODY ── */}
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(32px,5vw,60px) clamp(16px,4vw,32px)" }}>
 
-        {/* The Problem First */}
+        {/* ── PROBLEM BLOCK ── */}
         <Reveal>
-          <div style={{ background: 'linear-gradient(135deg, #FFF7ED, #FEF2F2)', border: '1.5px solid #FDE68A', borderRadius: '24px', padding: 'clamp(24px,4vw,40px)', marginBottom: '40px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -30, right: -30, fontSize: '120px', opacity: 0.06 }}>🤔</div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '14px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#DC2626', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Problem Every Indian Faces</span>
+          <div style={{ background: "linear-gradient(135deg, #FFF7ED, #FEF2F2)", border: "1.5px solid #FDE68A", borderRadius: "24px", padding: "clamp(20px,4vw,34px)", marginBottom: "52px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: -20, right: -16, fontSize: "90px", opacity: 0.06 }}>🤔</div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: "100px", padding: "4px 12px", marginBottom: "12px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#DC2626", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>The Problem Every Indian Faces</span>
             </div>
-            <h2 style={{ fontSize: 'clamp(18px,3vw,26px)', fontWeight: 800, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.2 }}>Your money is slowly dying in your savings account.</h2>
-            <p style={{ fontSize: 'clamp(13px,2vw,15px)', color: '#475569', lineHeight: 1.8, marginBottom: '20px', maxWidth: '700px' }}>
-              A savings account gives you 3.5%. Your bank FD gives you 7%. But inflation in India runs at 5–6%. After paying 30% income tax on your FD interest, your <strong>real post-inflation, post-tax return is barely positive — or even negative.</strong> Your money is losing purchasing power every single year, silently.
+            <h2 style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: 800, color: "#0F172A", margin: "0 0 10px", lineHeight: 1.2 }}>Your money is quietly losing value — even in an FD.</h2>
+            <p style={{ fontSize: "clamp(12px,1.8vw,13.5px)", color: "#475569", lineHeight: 1.8, marginBottom: "20px", maxWidth: "660px" }}>
+              A savings account gives ~3.5%. FDs give ~7% — but after 30% income tax, that's ~4.9%. With inflation at 5–6%, your <strong>real post-tax return is barely positive or even negative.</strong> You're saving diligently and still falling behind. Equity mutual funds, held patiently, have been the answer for millions who figured this out.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" }}>
               {[
-                { icon: '🏦', label: 'Savings A/C at 3.5%', sub: 'After 6% inflation: -2.5% real return', bad: true },
-                { icon: '📜', label: 'FD at 7% (30% tax)', sub: 'After tax: 4.9%. After inflation: -1.1%', bad: true },
-                { icon: '🥇', label: 'Gold — volatile', sub: 'Zero cash flow, storage costs, no compounding', bad: true },
-                { icon: '📈', label: 'Equity MF at 12–14%', sub: 'After inflation: 6–8% real wealth growth', bad: false },
+                { icon: "🏦", label: "Savings Account", sub: "After inflation: real wealth declines", bad: true },
+                { icon: "📜", label: "FD (post-tax)", sub: "After tax + inflation: barely positive", bad: true },
+                { icon: "🥇", label: "Gold", sub: "Volatile, no cash flow, storage costs", bad: true },
+                { icon: "📈", label: "Equity Mutual Fund", sub: "Real wealth creation over 10+ years", bad: false },
               ].map((s, i) => (
-                <div key={i} style={{ background: s.bad ? '#FEF2F2' : '#ECFDF5', border: `1px solid ${s.bad ? '#FECACA' : '#A7F3D0'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '20px', flexShrink: 0 }}>{s.icon}</span>
+                <div key={i} style={{ background: s.bad ? "#FEF2F2" : "#ECFDF5", border: `1px solid ${s.bad ? "#FECACA" : "#A7F3D0"}`, borderRadius: "12px", padding: "12px 13px", display: "flex", gap: "9px", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "18px", flexShrink: 0 }}>{s.icon}</span>
                   <div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: s.bad ? '#991B1B' : '#065F46' }}>{s.label}</div>
-                    <div style={{ fontSize: '11px', color: s.bad ? '#DC2626' : '#059669', marginTop: '2px', lineHeight: 1.4 }}>{s.sub}</div>
+                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: s.bad ? "#991B1B" : "#065F46" }}>{s.label}</div>
+                    <div style={{ fontSize: "10.5px", color: s.bad ? "#DC2626" : "#059669", marginTop: "2px", lineHeight: 1.4 }}>{s.sub}</div>
                   </div>
                 </div>
               ))}
@@ -420,88 +452,80 @@ export default function WhyMutualFundsPage() {
           </div>
         </Reveal>
 
-        {/* Comparison Table */}
-        <Reveal delay={100}>
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '10px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#1D4ED8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Head-to-Head Comparison</span>
-              </div>
-              <h2 style={{ fontSize: 'clamp(18px,3vw,26px)', fontWeight: 800, color: '#0F172A', margin: 0 }}>Mutual Funds vs Everything Else</h2>
-            </div>
-            <div style={{ background: 'white', borderRadius: '20px', border: '1.5px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-              {/* Header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr 1fr 1fr', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
-                <div style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase' }}>Feature</div>
-                {['🏆 Mutual Funds', '🏦 FD', '📊 Direct Stocks', '🥇 Gold'].map((h, i) => (
-                  <div key={i} style={{ padding: '12px 10px', fontSize: '11px', fontWeight: 800, color: i === 0 ? '#059669' : '#64748B', textAlign: 'center', borderLeft: '1px solid #E2E8F0', background: i === 0 ? 'rgba(16,185,129,0.05)' : 'transparent' }}>{h}</div>
-                ))}
-              </div>
-              <CompRow feature="Min. investment" mf="₹100 SIP" fd="₹1,000–10,000" stocks="1 share price" gold="~₹5,000/gm" />
-              <CompRow feature="Professional management" mf="✅ Expert team" fd="❌ None" stocks="❌ DIY only" gold="❌ None" />
-              <CompRow feature="Diversification" mf="✅ 50–100 stocks" fd="❌ Zero" stocks="⚠️ Limited by capital" gold="❌ Single asset" />
-              <CompRow feature="Liquidity (exit in)" mf="✅ 1–3 working days" fd="❌ Penalty on early exit" stocks="✅ Same day" gold="⚠️ Days to weeks" />
-              <CompRow feature="Tax efficiency (LTCG)" mf="✅ 12.5% after 1Y" fd="❌ 30% slab rate always" stocks="✅ 12.5% after 1Y" gold="⚠️ 20% after 3Y" />
-              <CompRow feature="Inflation-beating history" mf="✅ Yes (12–14% 15Y avg)" fd="❌ No (4.9% post-tax)" stocks="✅ Yes (but risky)" gold="⚠️ Partially" />
-              <CompRow feature="Regulatory protection" mf="✅ SEBI + Custodian" fd="✅ DICGC up to ₹5L" stocks="⚠️ Limited" gold="⚠️ Storage risk" />
-              <CompRow feature="Auto-investment (SIP)" mf="✅ Monthly auto-debit" fd="❌ Not possible" stocks="❌ Manual only" gold="⚠️ Gold MF only" />
-            </div>
-          </div>
-        </Reveal>
-
-        {/* Compounding Calculator */}
-        <Reveal delay={100}>
-          <div style={{ marginBottom: '48px' }}>
-            <CompoundingViz />
-          </div>
-        </Reveal>
-
-        {/* ── STRUCTURAL ADVANTAGES ── */}
+        {/* ── IRON-CLAD STRUCTURE ── */}
         <Reveal>
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#7C3AED', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Built-in Advantages</span>
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: "100px", padding: "4px 12px", marginBottom: "10px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#7C3AED", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Why the Vehicle Wins</span>
             </div>
-            <h2 style={{ fontSize: 'clamp(18px,3vw,28px)', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>The Iron-Clad Structure: Engineered to Win</h2>
-            <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.7, maxWidth: '600px', margin: '0 0 24px' }}>Mutual funds aren't just a product — they're a vehicle with structural advantages baked into their DNA by SEBI regulation, that individual investors cannot replicate.</p>
+            <h2 style={{ fontSize: "clamp(18px,3vw,30px)", fontWeight: 900, color: "#0F172A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
+              The Iron-Clad Structure:{" "}
+              <span style={{ background: "linear-gradient(90deg, #7C3AED, #059669)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Engineered to Win</span>
+            </h2>
+            <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 24px" }}>
+              Mutual funds aren't just a product — the <strong>vehicle itself</strong> has structural advantages baked in by design and SEBI regulation. Even if you pick an average fund, the structure keeps compounding in your favour.
+            </p>
           </div>
         </Reveal>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px', marginBottom: '48px' }}>
-          {advantages.map((a, i) => (
-            <Reveal key={i} delay={i * 60}>
-              <div style={{ background: 'white', border: `1.5px solid ${a.bd}`, borderRadius: '20px', padding: '22px', height: '100%', boxSizing: 'border-box', transition: 'box-shadow 0.25s, transform 0.25s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.09)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: a.bg, border: `1px solid ${a.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>{a.icon}</div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: a.color, marginBottom: '5px' }}>{a.title}</div>
-                    <p style={{ fontSize: '12px', color: '#475569', lineHeight: 1.7, margin: 0 }}>{a.body}</p>
-                  </div>
-                </div>
+        {/* Dark intro banner */}
+        <Reveal delay={80}>
+          <div style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #065F46 100%)", borderRadius: "24px", padding: "clamp(22px,4vw,38px)", marginBottom: "18px", position: "relative", overflow: "hidden", display: "flex", alignItems: "center", gap: "clamp(16px,4vw,40px)", flexWrap: "wrap" }}>
+            <div style={{ position: "absolute", top: -60, right: -60, width: "300px", height: "300px", background: "radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ flex: "1 1 240px", position: "relative" }}>
+              <div style={{ fontSize: "clamp(14px,2.5vw,18px)", fontWeight: 900, color: "white", lineHeight: 1.3, marginBottom: "10px" }}>
+                "Invest in the Structure,<br />Not Just the Manager."
               </div>
-            </Reveal>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", lineHeight: 1.75, margin: 0, maxWidth: "400px" }}>
+                Even an average fund selection is protected by the mutual fund wrapper — legal safeguards, SIP discipline, tax efficiency, and the market's underlying economic growth.
+              </p>
+            </div>
+            <div style={{ flex: "0 0 auto", display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+              {[{ icon: "⚡", label: "Tax Free" }, { icon: "🔒", label: "Legal Safety" }, { icon: "🤖", label: "SIP Auto" }, { icon: "🛡️", label: "Beta Floor" }, { icon: "🔄", label: "Free Rebalance" }, { icon: "🐋", label: "Wholesale" }].map((b, i) => (
+                <div key={i} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", padding: "8px 10px", textAlign: "center", minWidth: "64px" }}>
+                  <div style={{ fontSize: "17px", marginBottom: "3px" }}>{b.icon}</div>
+                  <div style={{ fontSize: "8.5px", fontWeight: 700, color: "rgba(255,255,255,0.8)", lineHeight: 1.2 }}>{b.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        {/* Structure cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "52px" }}>
+          {structureCards.map((card, i) => (
+            <StructureCard key={i} {...card} delay={i * 65} />
           ))}
         </div>
 
-        {/* ── THE 3 PILLARS ── */}
+        {/* Structure conclusion bar */}
         <Reveal>
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Iron-Clad Framework</span>
+          <div style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #EFF6FF 100%)", border: "1.5px solid #A7F3D0", borderRadius: "16px", padding: "18px 22px", marginBottom: "56px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "26px", flexShrink: 0 }}>🏗️</span>
+            <div>
+              <div style={{ fontSize: "13.5px", fontWeight: 800, color: "#0F172A", marginBottom: "2px" }}>The structure is the moat.</div>
+              <p style={{ fontSize: "12px", color: "#475569", margin: 0, lineHeight: 1.65, maxWidth: "660px" }}>
+                No other investment vehicle combines tax-free internal compounding, legal asset separation, institutional buying power, behavioral automation, and regulatory protection — all in one wrapper, starting at ₹100/month.
+              </p>
             </div>
-            <h2 style={{ fontSize: 'clamp(18px,3vw,28px)', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>3 Pillars of Long-Term Wealth Building</h2>
-            <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.7, maxWidth: '600px', margin: '0 0 28px' }}>Knowing why to invest in mutual funds is step one. These 3 pillars tell you exactly <em>how</em> to do it right — diversify smartly, pick by skill, and exit by plan.</p>
           </div>
         </Reveal>
 
-        {/* Pillar progress connector */}
-        <div style={{ display: 'none' }} />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '48px' }}>
+        {/* ── THE 3 PILLARS ── */}
+        <Reveal>
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.2)", borderRadius: "100px", padding: "4px 12px", marginBottom: "10px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#059669", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>The Iron-Clad Framework</span>
+            </div>
+            <h2 style={{ fontSize: "clamp(18px,3vw,28px)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>3 Pillars: Diversify → Select → Exit</h2>
+            <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "520px", margin: "0 0 24px" }}>
+              The vehicle wins — now these 3 pillars tell you exactly <em>how</em> to use it right.
+            </p>
+          </div>
+        </Reveal>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px", marginBottom: "52px" }}>
           {pillars.map((p, i) => (
-            <Reveal key={i} delay={i * 120}>
+            <Reveal key={i} delay={i * 110}>
               <PillarCard {...p} />
             </Reveal>
           ))}
@@ -509,71 +533,62 @@ export default function WhyMutualFundsPage() {
 
         {/* ── MYTH BUSTERS ── */}
         <Reveal>
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#DC2626', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Myth Busters</span>
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: "100px", padding: "4px 12px", marginBottom: "10px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#DC2626", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Myth Busters</span>
             </div>
-            <h2 style={{ fontSize: 'clamp(18px,3vw,28px)', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>6 Things Your Neighbour Got Wrong About Mutual Funds</h2>
-            <p style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.7, margin: '0 0 24px' }}>👆 Tap each card to flip and reveal the truth</p>
+            <h2 style={{ fontSize: "clamp(17px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>6 Things Your Neighbour Got Wrong</h2>
+            <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 20px" }}>👆 Tap each card to reveal the truth</p>
           </div>
         </Reveal>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '48px' }}>
-          {myths.map((m, i) => (
-            <MythCard key={i} myth={m.myth} truth={m.truth} delay={i * 80} />
-          ))}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "14px", marginBottom: "52px" }}>
+          {myths.map((m, i) => <MythCard key={i} myth={m.myth} truth={m.truth} delay={i * 65} />)}
         </div>
 
         {/* ── JOURNEY MAP ── */}
         <Reveal>
-          <div style={{ background: 'white', borderRadius: '24px', border: '1.5px solid #E2E8F0', padding: 'clamp(24px,4vw,40px)', marginBottom: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '14px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#1D4ED8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Your Journey</span>
+          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,34px)", marginBottom: "48px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: "100px", padding: "4px 12px", marginBottom: "12px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#1D4ED8", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Your Journey</span>
             </div>
-            <h2 style={{ fontSize: 'clamp(17px,3vw,24px)', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>The Typical Indian Investor's Path to Wealth</h2>
-            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '28px', lineHeight: 1.6 }}>A story that mirrors millions of Indians — and how the Iron-Clad Framework changes everything.</p>
-
-            <div style={{ position: 'relative' }}>
-              {/* Connector line — hidden on mobile */}
-              <div style={{ position: 'absolute', top: '28px', left: '28px', right: '28px', height: '2px', background: 'linear-gradient(90deg, #A7F3D0, #BFDBFE, #DDD6FE, #FDE68A)', borderRadius: '100px', zIndex: 0 }} />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', position: 'relative', zIndex: 1 }}>
-                {[
-                  { age: '22–25', icon: '😅', title: 'The Starter', body: 'Parks salary in savings account. Hears "mutual funds are risky". Misses 3 years of compounding.', color: '#DC2626', bg: '#FEF2F2', bd: '#FECACA' },
-                  { age: '25–30', icon: '🌱', title: 'The Awakening', body: 'Starts ₹5,000/month SIP in a large-cap fund. Panics in 2020 crash but stays invested. Portfolio grows.', color: '#D97706', bg: '#FFFBEB', bd: '#FDE68A' },
-                  { age: '30–40', icon: '📈', title: 'The Accelerator', body: 'Increases SIP to ₹25,000/month. Uses style box to diversify. Adds mid-cap and flexi-cap.', color: '#2563EB', bg: '#EFF6FF', bd: '#BFDBFE' },
-                  { age: '40–55', icon: '🏗️', title: 'The Builder', body: 'Rebalances annually. Shifts equity gains to debt as goals approach. Portfolio crosses ₹2 Cr.', color: '#7C3AED', bg: '#F5F3FF', bd: '#DDD6FE' },
-                  { age: '55+', icon: '🌴', title: 'The Harvest', body: 'Goal-based SWP (Systematic Withdrawal Plan). Tax-efficient monthly income. Financial freedom achieved.', color: '#059669', bg: '#ECFDF5', bd: '#A7F3D0' },
-                ].map((s, i) => (
-                  <div key={i} style={{ background: s.bg, border: `1.5px solid ${s.bd}`, borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'white', border: `2px solid ${s.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', margin: '0 auto 10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>{s.icon}</div>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: s.color, letterSpacing: '0.06em', marginBottom: '4px' }}>{s.age}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>{s.title}</div>
-                    <p style={{ fontSize: '11px', color: '#475569', lineHeight: 1.6, margin: 0 }}>{s.body}</p>
-                  </div>
-                ))}
-              </div>
+            <h2 style={{ fontSize: "clamp(16px,3vw,22px)", fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>The Typical Indian Investor's Path</h2>
+            <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "22px", lineHeight: 1.6 }}>A story that mirrors millions of Indians — and how the Iron-Clad Framework changes everything.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
+              {[
+                { age: "Age 22–25", icon: "😅", title: "The Starter", body: "Parks salary in savings. Misses the early compounding years.", color: "#DC2626", bg: "#FEF2F2", bd: "#FECACA" },
+                { age: "Age 25–30", icon: "🌱", title: "The Awakening", body: "Starts SIP. Panics in a correction but stays invested.", color: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
+                { age: "Age 30–40", icon: "📈", title: "The Accelerator", body: "SIP increased. Mid-cap and flexi-cap added for diversification.", color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
+                { age: "Age 40–55", icon: "🏗️", title: "The Builder", body: "Annual rebalancing. Equity gains shift to debt as goals approach.", color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE" },
+                { age: "Age 55+", icon: "🌴", title: "The Harvest", body: "SWP delivers tax-efficient monthly income. Financial freedom.", color: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
+              ].map((s, i) => (
+                <div key={i} style={{ background: s.bg, border: `1.5px solid ${s.bd}`, borderRadius: "16px", padding: "14px", textAlign: "center" }}>
+                  <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "white", border: `2px solid ${s.bd}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "19px", margin: "0 auto 7px" }}>{s.icon}</div>
+                  <div style={{ fontSize: "9px", fontWeight: 700, color: s.color, letterSpacing: "0.05em", marginBottom: "3px" }}>{s.age}</div>
+                  <div style={{ fontSize: "11.5px", fontWeight: 800, color: "#0F172A", marginBottom: "4px" }}>{s.title}</div>
+                  <p style={{ fontSize: "10.5px", color: "#475569", lineHeight: 1.5, margin: 0 }}>{s.body}</p>
+                </div>
+              ))}
             </div>
           </div>
         </Reveal>
 
         {/* ── CONCLUSION BANNER ── */}
         <Reveal>
-          <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E3A8A 60%, #065F46 100%)', borderRadius: '28px', padding: 'clamp(28px,5vw,52px)', marginBottom: '32px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -40, right: -40, width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', bottom: -40, left: -40, width: '250px', height: '250px', background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-            <div style={{ position: 'relative' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '100px', padding: '5px 14px', marginBottom: '18px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#A7F3D0', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Conclusion</span>
+          <div style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E3A8A 60%, #065F46 100%)", borderRadius: "28px", padding: "clamp(26px,5vw,48px)", marginBottom: "24px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: -50, right: -50, width: "300px", height: "300px", background: "radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "relative" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "5px 14px", marginBottom: "14px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#A7F3D0", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>The Conclusion</span>
               </div>
-              <h2 style={{ fontSize: 'clamp(20px,4vw,34px)', fontWeight: 900, color: 'white', margin: '0 0 14px', lineHeight: 1.15, maxWidth: '700px' }}>
+              <h2 style={{ fontSize: "clamp(20px,4vw,32px)", fontWeight: 900, color: "white", margin: "0 0 12px", lineHeight: 1.15, maxWidth: "600px" }}>
                 Invest in the Structure.<br />Not Just the Manager.
               </h2>
-              <p style={{ fontSize: 'clamp(13px,2vw,16px)', color: 'rgba(255,255,255,0.75)', lineHeight: 1.8, maxWidth: '600px', marginBottom: '28px' }}>
-                The Mutual Fund vehicle is engineered to survive mistakes and capitalize on time. Even if your fund selection is imperfect, the structure itself — SEBI regulation, fiduciary trust, SIP discipline, tax efficiency — provides a powerful, resilient path to long-term wealth. You don't need to be perfect. You need to stay invested.
+              <p style={{ fontSize: "clamp(12px,1.8vw,14px)", color: "rgba(255,255,255,0.72)", lineHeight: 1.8, maxWidth: "540px", marginBottom: "22px" }}>
+                Legal protection, tax efficiency, SIP discipline, and market participation — all in one wrapper. You don't need to be perfect. You just need to stay invested.
               </p>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {['✅ Start with ₹100/month', '✅ Professionals manage it', '✅ SEBI protects you', '✅ Compounding works for you'].map((point, i) => (
-                  <div key={i} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '100px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{point}</div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {["✅ Start with ₹100/month", "✅ Professionally managed", "✅ SEBI regulated", "✅ Compounding works for you"].map((point, i) => (
+                  <div key={i} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "5px 12px", fontSize: "11.5px", fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{point}</div>
                 ))}
               </div>
             </div>
@@ -582,44 +597,35 @@ export default function WhyMutualFundsPage() {
 
         {/* ── CTA ── */}
         <Reveal>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '20px' }}>
-            <a href="/find-my-fund" style={{ textDecoration: 'none', background: 'linear-gradient(90deg, #059669 0%, #2563EB 100%)', borderRadius: '20px', padding: 'clamp(20px,3vw,28px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', boxShadow: '0 8px 32px rgba(5,150,105,0.3)', transition: 'transform 0.2s, box-shadow 0.2s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 16px 48px rgba(5,150,105,0.4)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 8px 32px rgba(5,150,105,0.3)'; }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "14px", marginBottom: "22px" }}>
+            <a href="/find-my-fund" style={{ textDecoration: "none", background: "linear-gradient(90deg, #059669 0%, #2563EB 100%)", borderRadius: "20px", padding: "clamp(18px,3vw,26px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", boxShadow: "0 8px 32px rgba(5,150,105,0.3)", transition: "transform 0.2s, box-shadow 0.2s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 16px 48px rgba(5,150,105,0.4)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 8px 32px rgba(5,150,105,0.3)"; }}>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', marginBottom: '4px' }}>Ready to start?</div>
-                <div style={{ fontSize: 'clamp(16px,2.5vw,20px)', fontWeight: 900, color: 'white', lineHeight: 1.2 }}>Build My Fund Plan →</div>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginTop: '5px' }}>Goal-based · Live data · Free</div>
+                <div style={{ fontSize: "11.5px", fontWeight: 700, color: "rgba(255,255,255,0.8)", marginBottom: "4px" }}>Ready to start?</div>
+                <div style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: "white", lineHeight: 1.2 }}>Build My Fund Plan →</div>
+                <div style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.7)", marginTop: "4px" }}>Goal-based · Live data · Free</div>
               </div>
-              <span style={{ fontSize: '40px', flexShrink: 0 }}>⚡</span>
+              <span style={{ fontSize: "36px", flexShrink: 0 }}>⚡</span>
             </a>
-
-            <a href="/find-my-fund-lifetime-plan" style={{ textDecoration: 'none', background: 'linear-gradient(135deg, #FFFBEB, #F0FDF4)', border: '1.5px solid #FDE68A', borderRadius: '20px', padding: 'clamp(20px,3vw,28px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', transition: 'transform 0.2s, box-shadow 0.2s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 8px 32px rgba(217,119,6,0.15)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLAnchorElement).style.boxShadow = ''; }}>
+            <a href="/find-my-fund-lifetime-plan" style={{ textDecoration: "none", background: "linear-gradient(135deg, #FFFBEB, #F0FDF4)", border: "1.5px solid #FDE68A", borderRadius: "20px", padding: "clamp(18px,3vw,26px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", transition: "transform 0.2s, box-shadow 0.2s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 8px 32px rgba(217,119,6,0.15)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow = ""; }}>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#92400E', marginBottom: '4px' }}>Multiple goals?</div>
-                <div style={{ fontSize: 'clamp(16px,2.5vw,20px)', fontWeight: 900, color: '#0F172A', lineHeight: 1.2 }}>My Lifetime Plan →</div>
-                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '5px' }}>Car · Home · Education · Retirement</div>
+                <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#92400E", marginBottom: "4px" }}>Multiple goals?</div>
+                <div style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: "#0F172A", lineHeight: 1.2 }}>My Lifetime Plan →</div>
+                <div style={{ fontSize: "10.5px", color: "#64748B", marginTop: "4px" }}>Car · Home · Education · Retirement</div>
               </div>
-              <span style={{ fontSize: '40px', flexShrink: 0 }}>🌱</span>
+              <span style={{ fontSize: "36px", flexShrink: 0 }}>🌱</span>
             </a>
           </div>
         </Reveal>
 
         {/* Disclaimer */}
-        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 18px', fontSize: '11px', color: '#94A3B8', lineHeight: 1.6, textAlign: 'center' }}>
-          <strong style={{ color: '#64748B' }}>Important:</strong> Mutual fund investments are subject to market risks. Past performance is not indicative of future returns. Historical return figures are illustrative. Please read all scheme-related documents carefully. Consult a SEBI-registered investment advisor before investing. This page is for educational purposes only.
+        <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "12px 18px", fontSize: "10.5px", color: "#94A3B8", lineHeight: 1.6, textAlign: "center" }}>
+          <strong style={{ color: "#64748B" }}>Important:</strong> Mutual fund investments are subject to market risks. Past performance is not indicative of future returns. This page is for educational purposes only. Please consult a SEBI-registered investment advisor before investing.
         </div>
       </div>
-
-      {/* Global pulse animation */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.6; transform: scale(0.8); }
-        }
-      `}</style>
     </div>
   );
 }

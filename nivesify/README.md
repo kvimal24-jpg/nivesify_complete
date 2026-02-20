@@ -7,13 +7,24 @@ Nivesify is a Next.js app deployed on Cloudflare. It includes a full onboarding 
 - My Money Dashboard with simulations, runway analysis, and goal tracking.
 - Mutual Fund Health Check (MFHC) with CAS parsing and portfolio analytics.
 - Life Calculators for SIPs, lumpsums, withdrawals, and retirement readiness.
+- Smart Fund Finder: guided fund selection based on user context.
+- Why Mutual Fund: educational hub for mutual fund benefits.
+- Quick Picks: curated fund recommendations for easy selection.
+- Lifetime Plan: long-term planning and projections.
 
 ## Project structure
 - src/app - Next.js App Router pages
 - src/app/dashboard - onboarding and dashboard experiences
 - src/app/mutual-fund-health-check - MFHC upload and analytics pages
 - src/app/dashboard/calculators - Life Calculators page
-- src/app/api - API routes for onboarding and MFHC
+- src/app/find-my-fund-quick-picks - Quick Picks page
+- src/app/find-my-fund-lifetime-plan - Lifetime Plan page
+- src/app/why-mutual-fund - Why Mutual Fund page
+- src/app/mutual-fund-match - Smart Fund Finder page
+- src/app/mutual-fund-analysis - Mutual Fund Analysis hub
+- src/app/active-funds - Active Funds selector
+- src/app/index-funds - Passive Funds selector
+- src/app/api - API routes for onboarding, MFHC, and analytics
 - src/lib - shared logic, calculators, MFHC utilities
 - docs - product and math documentation
 
@@ -48,6 +59,10 @@ npm run deploy:staging
 - docs/life-calculators.md
 - docs/onboarding.md
 - docs/dashboard.md
+- docs/mutual-fund-analysis.md
+- docs/quick-picks.md
+- docs/lifetime-plan.md
+- docs/why-mutual-fund.md
 
 ## Notes
 - Uses Cloudflare D1 for onboarding data and MFHC storage.
