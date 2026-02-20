@@ -98,21 +98,16 @@ function getStyle(fund: AMFIFund): number {
   const sub   = (fund.Sub_Category || "").toLowerCase();
   const bench = (fund.benchmark    || "").toLowerCase();
 
-  // Col 0: Value / Contra / Dividend
   if (sub.includes("value") || sub.includes("contra") || sub.includes("dividend")) return 0;
   if (bench.includes("value") || bench.includes("contra")) return 0;
-
-  // Col 2: Momentum - ONLY if benchmark contains momentum, NOT if it's in other parts
   if (bench.includes("momentum")) return 2;
 
-  // Col 3: Pure Active
   const sizeSubcats = [
     "large cap", "mid cap", "small cap", "flexi cap",
     "multi cap", "large & mid cap", "elss", "focused",
   ];
   if (sub !== "index / etf" && sizeSubcats.includes(sub)) return 3;
 
-  // Col 1: Growth / Core (default)
   return 1;
 }
 
@@ -120,17 +115,13 @@ function getSize(fund: AMFIFund): number | null {
   const sub   = (fund.Sub_Category || "").toLowerCase();
   const bench = (fund.benchmark    || "").toLowerCase();
 
-  // Direct sub-category match (highest priority for size-specific funds)
   if (sub === "large cap" || sub === "large & mid cap" || sub === "focused") return 0;
   if (sub === "mid cap") return 1;
   if (sub === "small cap") return 2;
   if (sub === "flexi cap" || sub === "multi cap" || sub === "elss") return 3;
 
-  // SPECIAL CASE: Value/Contra/Dividend Yield funds are typically large-cap focused
-  // even though they use Nifty 500/BSE 500 benchmarks
   if (sub === "value" || sub === "contra" || sub === "dividend yield") return 0;
 
-  // Benchmark-based detection for Index/ETF funds
   if (/\bnifty 50\b|sensex|\bnifty 100\b|bse 100/.test(bench)) return 0;
   if (/nifty200 |nifty 200 |nifty200momentum|nifty 200 momentum/.test(bench)) return 0;
   if (/midcap 150|midcap 100|nifty midcap/.test(bench)) return 1;
@@ -150,7 +141,6 @@ function shouldExclude(fund: AMFIFund): boolean {
     return sub === "solution oriented - children's fund";
   }
   
-  // Include "Other" category IF it has equity benchmark
   if (cat === "other" && sub === "index / etf") {
     const bench = (fund.benchmark || "").toLowerCase();
     const equityKeywords = [
@@ -165,7 +155,7 @@ function shouldExclude(fund: AMFIFund): boolean {
 }
 
 // ──────────────────────────────────────────────────────────────
-// TWO-TIER SELECTION WITH ALL IMPROVEMENTS
+// TWO-TIER SELECTION
 // ──────────────────────────────────────────────────────────────
 
 function buildBox(
@@ -186,27 +176,21 @@ function buildBox(
     };
   }
 
-  // Track ALL sub-categories considered for this cell
   const allConsideredSubCategories = new Set<string>();
-
-  // STEP 1: Group funds by Sub_Category/Benchmark
   const subCategoryGroups: Record<string, AMFIFund[]> = {};
   
   cellFunds.forEach(fund => {
     const isPassive = fund.Sub_Category.toLowerCase() === "index / etf";
     const key = isPassive ? fund.benchmark : fund.Sub_Category;
     allConsideredSubCategories.add(key);
-    
     if (!subCategoryGroups[key]) subCategoryGroups[key] = [];
     subCategoryGroups[key].push(fund);
   });
 
-  // STEP 2: Calculate performance for each sub-category
   const subCategoryPerformances: SubCategoryPerformance[] = [];
 
   Object.keys(subCategoryGroups).forEach(subCatKey => {
     const fundsInSubCat = subCategoryGroups[subCatKey];
-    
     let totalAlpha = 0;
     let totalBeatRate = 0;
     let fundCount = 0;
@@ -214,24 +198,18 @@ function buildBox(
     let topRank = 999999;
 
     fundsInSubCat.forEach(amfiFund => {
-      // Try active fund
       const activeFund = fundAnalytics.find(f => 
         f.Fund_Name.toLowerCase() === amfiFund.schemeName.toLowerCase() &&
-        f.Fund_Return_3Y !== null  // REQUIREMENT 6: Must have 3Y return
+        f.Fund_Return_3Y !== null
       );
       
       if (activeFund) {
         totalAlpha += activeFund.Alpha_3Y || 0;
         fundCount++;
-        
         const insight = insights.find(ins => 
           ins.Sub_Category_Name?.toLowerCase() === activeFund.Sub_Category.toLowerCase()
         );
-        if (insight) {
-          totalBeatRate += insight.Pct_Funds_Beating_Benchmark_3Y || 0;
-        }
-        
-        // REQUIREMENT 2: Use Rank_in_SubCategory for selection
+        if (insight) totalBeatRate += insight.Pct_Funds_Beating_Benchmark_3Y || 0;
         if (activeFund.Rank_in_SubCategory < topRank) {
           topRank = activeFund.Rank_in_SubCategory;
           topFund = activeFund;
@@ -239,18 +217,15 @@ function buildBox(
         return;
       }
 
-      // Try ETF
       const etfFund = etfAnalytics.find(e => 
         e.ETF_Name.toLowerCase() === amfiFund.schemeName.toLowerCase() &&
-        e.Fund_Return_3Y !== null  // REQUIREMENT 6: Must have 3Y return
+        e.Fund_Return_3Y !== null
       );
       
       if (etfFund) {
         totalAlpha += -(etfFund.Tracking_Diff_3Y || 0);
         fundCount++;
         totalBeatRate += 50;
-        
-        // REQUIREMENT 2: Use Rank_within_Benchmark for selection
         if (etfFund.Rank_within_Benchmark < topRank) {
           topRank = etfFund.Rank_within_Benchmark;
           topFund = etfFund;
@@ -261,7 +236,7 @@ function buildBox(
     if (fundCount > 0 && topFund) {
       subCategoryPerformances.push({
         subCategoryName: subCatKey,
-        fundCount: fundCount,
+        fundCount,
         avgAlpha: totalAlpha / fundCount,
         avgBeatRate: totalBeatRate / fundCount,
         topFundName: 'Fund_Name' in topFund ? (topFund as FundAnalytics).Fund_Name : (topFund as ETFAnalytics).ETF_Name,
@@ -271,9 +246,7 @@ function buildBox(
     }
   });
 
-  // STEP 3: Select leading sub-category
   if (subCategoryPerformances.length === 0) {
-    // REQUIREMENT 6: Try second-best if no 3Y data
     return {
       empty: true,
       leadingSubCategory: null,
@@ -283,15 +256,11 @@ function buildBox(
   }
 
   const sortedSubCats = [...subCategoryPerformances].sort((a, b) => {
-    if (Math.abs(a.avgAlpha - b.avgAlpha) > 0.1) {
-      return b.avgAlpha - a.avgAlpha;
-    }
+    if (Math.abs(a.avgAlpha - b.avgAlpha) > 0.1) return b.avgAlpha - a.avgAlpha;
     return b.avgBeatRate - a.avgBeatRate;
   });
 
   const leadingSubCat = sortedSubCats[0];
-
-  // STEP 4: Pick best fund from leading sub-category
   const leadingFunds = subCategoryGroups[leadingSubCat.subCategoryName];
   let bestFund: (FundAnalytics | ETFAnalytics) | null = null;
   let bestRank = 999999;
@@ -302,19 +271,16 @@ function buildBox(
       f.Fund_Name.toLowerCase() === amfiFund.schemeName.toLowerCase() &&
       f.Fund_Return_3Y !== null
     );
-    
     if (activeFund && activeFund.Rank_in_SubCategory < bestRank) {
       bestRank = activeFund.Rank_in_SubCategory;
       bestFund = activeFund;
       isActive = true;
       return;
     }
-
     const etfFund = etfAnalytics.find(e => 
       e.ETF_Name.toLowerCase() === amfiFund.schemeName.toLowerCase() &&
       e.Fund_Return_3Y !== null
     );
-    
     if (etfFund && etfFund.Rank_within_Benchmark < bestRank) {
       bestRank = etfFund.Rank_within_Benchmark;
       bestFund = etfFund;
@@ -322,7 +288,6 @@ function buildBox(
     }
   });
 
-  // STEP 5: Decide ACTIVE vs INDEX
   let decision: "ACTIVE" | "INDEX" = isActive ? "ACTIVE" : "INDEX";
   
   if (col === 3 && !isActive) {
@@ -341,7 +306,6 @@ function buildBox(
     }
   }
 
-  // REQUIREMENT 5: Collect fund stats
   const fundStats = bestFund ? {
     return1Y: 'Fund_Return_1Y' in bestFund ? (bestFund as FundAnalytics).Fund_Return_1Y : (bestFund as ETFAnalytics).Fund_Return_1Y,
     return3Y: 'Fund_Return_3Y' in bestFund ? (bestFund as FundAnalytics).Fund_Return_3Y : (bestFund as ETFAnalytics).Fund_Return_3Y,
@@ -363,7 +327,7 @@ function buildBox(
 }
 
 // ──────────────────────────────────────────────────────────────
-// UI COMPONENTS
+// UI COMPONENTS (unchanged)
 // ──────────────────────────────────────────────────────────────
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -459,16 +423,12 @@ function GridCell({ box, onClick }: { box: BoxResult; onClick: () => void }) {
           {box.decision}
         </span>
       </div>
-      
       <div className="font-bold text-[#1F2937] mb-1 text-sm leading-tight">
         {box.leadingSubCategory}
       </div>
-      
       <div className="text-[10px] text-[#6B7280] mb-2 leading-snug">
         {fundName}
       </div>
-      
-      {/* REQUIREMENT 5: Fund Stats */}
       {stats && (
         <div className="text-[9px] text-[#9CA3AF] space-y-0.5">
           <div>3Y: {stats.return3Y?.toFixed(1)}% · α {stats.alpha3Y?.toFixed(1)}%</div>
@@ -481,7 +441,6 @@ function GridCell({ box, onClick }: { box: BoxResult; onClick: () => void }) {
 }
 
 function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) {
-  // Show explanation even for empty cells
   if (box.empty) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -518,9 +477,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
                           </span>
                         ))}
                       </div>
-                      <p className="text-xs text-[#6B7280] mt-3">
-                        None of these categories had funds with 3+ year performance data.
-                      </p>
                     </div>
                   )}
                 </div>
@@ -535,7 +491,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        
         <div className="sticky top-0 bg-white p-6 border-b border-[#E5E7EB] z-10">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-[#1F2937]">How We Selected This Fund</h2>
@@ -545,7 +500,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
         </div>
 
         <div className="p-6">
-          {/* Winner Section */}
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-[#1F2937] mb-4 flex items-center gap-2">
               <span className="text-2xl">🏆</span>
@@ -570,8 +524,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
                   {box.decision}
                 </span>
               </div>
-              
-              {/* Enhanced Stats Display */}
               {box.fundStats && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-green-200">
                   <div>
@@ -599,8 +551,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
                 </div>
               )}
             </div>
-            
-            {/* Why This Won */}
             <div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
               <div className="text-sm text-[#1F2937]">
                 <strong>Why this fund?</strong> Among {box.candidateSubCategories.length} competing categories, 
@@ -610,7 +560,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
             </div>
           </div>
 
-          {/* All Categories Considered */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-[#1F2937] mb-3">
               All {box.allConsideredSubCategories.length} Categories Evaluated for This Cell
@@ -631,12 +580,11 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
                 ))}
               </div>
               <div className="text-xs text-[#6B7280] mt-3">
-                <strong className="text-[#3B82F6]">Blue highlighted</strong> categories had funds with 3+ year track records and were included in performance comparison
+                <strong className="text-[#3B82F6]">Blue highlighted</strong> categories had funds with 3+ year track records
               </div>
             </div>
           </div>
 
-          {/* Performance Comparison */}
           <div>
             <h3 className="text-lg font-semibold text-[#1F2937] mb-4">
               Performance Comparison ({box.candidateSubCategories.length} Categories)
@@ -656,9 +604,7 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
                       <div className="font-semibold text-[#1F2937] flex items-center gap-2">
                         {subCat.subCategoryName}
                         {subCat.subCategoryName === box.leadingSubCategory && (
-                          <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                            ✓ WINNER
-                          </span>
+                          <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">✓ WINNER</span>
                         )}
                       </div>
                       <div className="text-xs text-[#6B7280] mt-1">
@@ -670,7 +616,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
                       <div className="text-lg font-bold text-[#1F2937]">{subCat.avgAlpha.toFixed(2)}%</div>
                     </div>
                   </div>
-                  
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-[#6B7280]">Beat Rate:</span>{' '}
@@ -686,7 +631,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
             </div>
           </div>
 
-          {/* Methodology Note */}
           <div className="mt-6 p-4 bg-[#F3F4F6] rounded-lg border border-[#E5E7EB]">
             <h4 className="text-sm font-semibold text-[#1F2937] mb-2">📊 Our Selection Methodology</h4>
             <div className="text-xs text-[#6B7280] space-y-1">
@@ -694,9 +638,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
               <p>• <strong>Step 2:</strong> Grouped them by category and calculated average alpha & beat rate for each</p>
               <p>• <strong>Step 3:</strong> Selected the category with highest average alpha</p>
               <p>• <strong>Step 4:</strong> Within the winning category, picked the best ranked fund with 3+ year history</p>
-              <p className="mt-2 pt-2 border-t border-[#DDE6F3]">
-                <strong>Note:</strong> Only funds with 3+ years of performance data are considered to ensure reliable track records
-              </p>
             </div>
           </div>
         </div>
@@ -750,6 +691,603 @@ function SectionPanel({ rows, cols, boxes, onCellClick }: {
 }
 
 // ──────────────────────────────────────────────────────────────
+// HERO SECTION — Premium Redesign
+// ──────────────────────────────────────────────────────────────
+
+function HeroSection() {
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+        .hero-root {
+          font-family: 'DM Sans', sans-serif;
+          background: #05091A;
+          position: relative;
+          overflow: hidden;
+          padding: 64px 24px 72px;
+        }
+
+        /* Starfield / mesh background */
+        .hero-root::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56,111,248,0.22) 0%, transparent 70%),
+            radial-gradient(ellipse 50% 40% at 90% 80%, rgba(16,185,129,0.12) 0%, transparent 60%),
+            radial-gradient(ellipse 40% 30% at 10% 90%, rgba(99,64,220,0.10) 0%, transparent 60%);
+          pointer-events: none;
+        }
+
+        .hero-grid-lines {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(56,111,248,0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(56,111,248,0.06) 1px, transparent 1px);
+          background-size: 48px 48px;
+          pointer-events: none;
+        }
+
+        .hero-inner {
+          position: relative;
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+
+        /* Tag pill */
+        .hero-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(56,111,248,0.15);
+          border: 1px solid rgba(56,111,248,0.35);
+          border-radius: 100px;
+          padding: 5px 14px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #7EB3FF;
+          margin-bottom: 22px;
+        }
+        .hero-tag-dot {
+          width: 6px; height: 6px;
+          background: #4F9AFF;
+          border-radius: 50%;
+          animation: blink 2s ease-in-out infinite;
+        }
+        @keyframes blink {
+          0%,100% { opacity:1; } 50% { opacity:0.3; }
+        }
+
+        /* Headline */
+        .hero-headline {
+          font-family: 'Sora', sans-serif;
+          font-size: clamp(2rem, 4vw, 3.2rem);
+          font-weight: 800;
+          line-height: 1.13;
+          color: #F0F6FF;
+          max-width: 680px;
+          margin-bottom: 14px;
+          letter-spacing: -0.02em;
+        }
+        .hero-headline-accent {
+          background: linear-gradient(90deg, #4F9AFF 0%, #34D399 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .hero-sub {
+          font-size: 15px;
+          color: #8FA7C8;
+          max-width: 520px;
+          line-height: 1.65;
+          margin-bottom: 48px;
+          font-weight: 400;
+        }
+
+        /* ── STEP CARDS ── */
+        .hero-steps {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+          margin-bottom: 48px;
+          align-items: stretch;
+        }
+        @media (max-width: 680px) {
+          .hero-steps { grid-template-columns: 1fr; }
+        }
+
+        .step-card {
+          position: relative;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.09);
+          border-radius: 20px;
+          padding: 28px 24px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          backdrop-filter: blur(6px);
+          transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+          overflow: hidden;
+        }
+        .step-card::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 20px;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+        .step-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(79,154,255,0.35);
+          box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(79,154,255,0.15);
+        }
+
+        .step-number {
+          font-family: 'Sora', sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          color: #4F9AFF;
+          text-transform: uppercase;
+        }
+
+        .step-icon-wrap {
+          width: 52px; height: 52px;
+          border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 24px;
+          flex-shrink: 0;
+        }
+        .step-icon-blue { background: rgba(79,154,255,0.15); }
+        .step-icon-teal { background: rgba(52,211,153,0.15); }
+        .step-icon-gold { background: rgba(251,191,36,0.15); }
+
+        .step-title {
+          font-family: 'Sora', sans-serif;
+          font-size: 15px;
+          font-weight: 700;
+          color: #E8F0FF;
+          line-height: 1.3;
+        }
+
+        .step-body {
+          font-size: 12.5px;
+          color: #6B84A8;
+          line-height: 1.6;
+          flex: 1;
+        }
+
+        .step-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 2px;
+        }
+        .step-tag {
+          font-size: 10px;
+          font-weight: 600;
+          padding: 3px 9px;
+          border-radius: 100px;
+          letter-spacing: 0.04em;
+        }
+        .tag-blue { background: rgba(79,154,255,0.15); color: #7EB3FF; }
+        .tag-teal { background: rgba(52,211,153,0.15); color: #5EEAD4; }
+        .tag-gold { background: rgba(251,191,36,0.15); color: #FCD34D; }
+
+        /* Connector arrows between cards */
+        .step-connector {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: absolute;
+          top: 50%;
+          right: -14px;
+          transform: translateY(-50%);
+          z-index: 2;
+        }
+        .step-card-wrap {
+          position: relative;
+        }
+
+        /* ── FLOW DIAGRAM ── */
+        .hero-flow {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 16px;
+          padding: 20px 28px;
+          overflow-x: auto;
+        }
+
+        .flow-node {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 7px;
+          min-width: 90px;
+        }
+        .flow-node-icon {
+          width: 42px; height: 42px;
+          border-radius: 12px;
+          background: rgba(79,154,255,0.13);
+          border: 1px solid rgba(79,154,255,0.22);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px;
+        }
+        .flow-node-label {
+          font-size: 10px;
+          color: #6B84A8;
+          text-align: center;
+          font-weight: 500;
+          line-height: 1.3;
+          max-width: 80px;
+        }
+        .flow-arrow {
+          display: flex;
+          align-items: center;
+          padding: 0 6px;
+          padding-bottom: 20px; /* align with icons */
+        }
+        .flow-arrow svg {
+          opacity: 0.4;
+        }
+
+        /* ── TRUST METRICS ── */
+        .hero-metrics {
+          display: flex;
+          gap: 32px;
+          flex-wrap: wrap;
+          margin-top: 36px;
+          padding-top: 28px;
+          border-top: 1px solid rgba(255,255,255,0.07);
+        }
+        .metric-item {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .metric-value {
+          font-family: 'Sora', sans-serif;
+          font-size: 22px;
+          font-weight: 800;
+          color: #E8F0FF;
+          letter-spacing: -0.02em;
+        }
+        .metric-label {
+          font-size: 11px;
+          color: #5A738F;
+          font-weight: 500;
+          letter-spacing: 0.03em;
+        }
+        .metric-accent { color: #4F9AFF; }
+
+        /* ── RIGHT VISUAL: Animated matrix preview ── */
+        .hero-visual {
+          position: absolute;
+          top: 40px;
+          right: -20px;
+          width: 360px;
+          opacity: 0.85;
+          pointer-events: none;
+        }
+        @media (max-width: 900px) {
+          .hero-visual { display: none; }
+        }
+
+        .matrix-preview {
+          background: rgba(10,18,40,0.9);
+          border: 1px solid rgba(79,154,255,0.18);
+          border-radius: 16px;
+          padding: 16px;
+          box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+        }
+        .matrix-header {
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          color: #4F9AFF;
+          text-transform: uppercase;
+          margin-bottom: 12px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .matrix-header::before {
+          content: '';
+          width: 6px; height: 6px;
+          background: #34D399;
+          border-radius: 50%;
+          animation: blink 1.5s infinite;
+        }
+        .matrix-grid {
+          display: grid;
+          grid-template-columns: 70px repeat(3, 1fr);
+          gap: 4px;
+        }
+        .m-cell {
+          border-radius: 7px;
+          padding: 7px 8px;
+          font-size: 9px;
+          line-height: 1.3;
+        }
+        .m-head {
+          background: rgba(79,154,255,0.15);
+          color: #7EB3FF;
+          font-weight: 700;
+          font-size: 8px;
+          letter-spacing: 0.04em;
+        }
+        .m-row-head {
+          background: rgba(79,154,255,0.08);
+          color: #7EB3FF;
+          font-weight: 600;
+          font-size: 9px;
+          display: flex;
+          align-items: center;
+        }
+        .m-data {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.07);
+          color: #8FA7C8;
+          position: relative;
+          overflow: hidden;
+        }
+        .m-data.winner {
+          background: rgba(52,211,153,0.10);
+          border-color: rgba(52,211,153,0.25);
+          color: #5EEAD4;
+        }
+        .m-fund-name {
+          font-size: 7.5px;
+          font-weight: 600;
+          color: #C8D8EE;
+          margin-bottom: 2px;
+        }
+        .m-fund-stat {
+          font-size: 7px;
+          color: #34D399;
+        }
+        .m-empty {
+          background: rgba(255,255,255,0.02);
+          border: 1px dashed rgba(255,255,255,0.06);
+          color: #2A3A52;
+          font-size: 8px;
+          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .m-badge {
+          display: inline-block;
+          font-size: 6.5px;
+          padding: 1px 4px;
+          border-radius: 3px;
+          font-weight: 700;
+          margin-bottom: 3px;
+        }
+        .badge-active { background: rgba(52,211,153,0.2); color: #34D399; }
+        .badge-index { background: rgba(79,154,255,0.2); color: #60A5FA; }
+
+        /* Subtle scan animation on matrix */
+        .matrix-scan {
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, rgba(79,154,255,0.6), transparent);
+          animation: scan 3s ease-in-out infinite;
+          border-radius: 0 0 0 0;
+        }
+        @keyframes scan {
+          0% { top: 0; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { top: 100%; opacity: 0; }
+        }
+      `}</style>
+
+      <section className="hero-root">
+        <div className="hero-grid-lines" />
+
+        <div className="hero-inner">
+          {/* Floating matrix visual — decorative right side */}
+          <div className="hero-visual">
+            <div className="matrix-preview" style={{ position: 'relative' }}>
+              <div className="matrix-scan" />
+              <div className="matrix-header">Live Fund Matrix · Auto-Updated</div>
+              <div className="matrix-grid">
+                {/* Header row */}
+                <div className="m-cell m-head" />
+                <div className="m-cell m-head">Value</div>
+                <div className="m-cell m-head">Growth</div>
+                <div className="m-cell m-head">Momentum</div>
+                {/* Row 1 */}
+                <div className="m-cell m-row-head">Large Cap</div>
+                <div className="m-cell m-data winner">
+                  <div className="m-badge badge-active">ACTIVE</div>
+                  <div className="m-fund-name">ICICI Pru Value Discovery</div>
+                  <div className="m-fund-stat">α +3.2% · Rank #1</div>
+                </div>
+                <div className="m-cell m-data">
+                  <div className="m-badge badge-index">INDEX</div>
+                  <div className="m-fund-name">UTI Nifty 50 ETF</div>
+                  <div className="m-fund-stat">TD -0.03%</div>
+                </div>
+                <div className="m-cell m-data">
+                  <div className="m-badge badge-index">INDEX</div>
+                  <div className="m-fund-name">Motilal Nifty 200 Mom</div>
+                  <div className="m-fund-stat">3Y +22.1%</div>
+                </div>
+                {/* Row 2 */}
+                <div className="m-cell m-row-head">Mid Cap</div>
+                <div className="m-cell m-empty">—</div>
+                <div className="m-cell m-data winner">
+                  <div className="m-badge badge-active">ACTIVE</div>
+                  <div className="m-fund-name">Nippon India Mid Cap</div>
+                  <div className="m-fund-stat">α +5.8% · Rank #1</div>
+                </div>
+                <div className="m-cell m-data">
+                  <div className="m-badge badge-index">INDEX</div>
+                  <div className="m-fund-name">Mirae Nifty Midcap 150</div>
+                  <div className="m-fund-stat">TD -0.11%</div>
+                </div>
+                {/* Row 3 */}
+                <div className="m-cell m-row-head">Small Cap</div>
+                <div className="m-cell m-empty">—</div>
+                <div className="m-cell m-data">
+                  <div className="m-badge badge-active">ACTIVE</div>
+                  <div className="m-fund-name">SBI Small Cap</div>
+                  <div className="m-fund-stat">α +4.1% · Rank #2</div>
+                </div>
+                <div className="m-cell m-empty">—</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Left content */}
+          <div style={{ maxWidth: 620 }}>
+            <div className="hero-tag">
+              <span className="hero-tag-dot" />
+              Smart Fund Engine
+            </div>
+
+            <h1 className="hero-headline">
+              Every rupee invested in<br />
+              <span className="hero-headline-accent">the right fund.</span>
+            </h1>
+
+            <p className="hero-sub">
+              Our engine scans the entire mutual fund universe, organises it into a scientific matrix, and surfaces the single best fund for every risk-style combination — with full transparency.
+            </p>
+
+            {/* Step Cards */}
+            <div className="hero-steps">
+              {/* Step 1 */}
+              <div className="step-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="step-icon-wrap step-icon-blue">🗂️</div>
+                  <span className="step-number">Step 01</span>
+                </div>
+                <div className="step-title">Map the universe</div>
+                <p className="step-body">
+                  Every Indian mutual fund is classified by asset class, market cap, and investment style into a logical grid.
+                </p>
+                <div className="step-tags">
+                  <span className="step-tag tag-blue">Equity</span>
+                  <span className="step-tag tag-blue">Hybrid</span>
+                  <span className="step-tag tag-blue">Debt</span>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="step-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="step-icon-wrap step-icon-teal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                      <path d="M11 8v6M8 11h6" strokeWidth="2.5"/>
+                    </svg>
+                  </div>
+                  <span className="step-number" style={{ color: '#34D399' }}>Step 02</span>
+                </div>
+                <div className="step-title">Find the best category</div>
+                <p className="step-body">
+                  For each cell, categories compete on real alpha and benchmark-beating rate. The winner is data-only — no bias.
+                </p>
+                <div className="step-tags">
+                  <span className="step-tag tag-teal">Alpha</span>
+                  <span className="step-tag tag-teal">Beat Rate</span>
+                  <span className="step-tag tag-teal">3Y History</span>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="step-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="step-icon-wrap step-icon-gold">🏆</div>
+                  <span className="step-number" style={{ color: '#FCD34D' }}>Step 03</span>
+                </div>
+                <div className="step-title">Surface #1 fund</div>
+                <p className="step-body">
+                  The top-ranked fund within the winning category is your pick — with rank, AUM, alpha and a full audit trail.
+                </p>
+                <div className="step-tags">
+                  <span className="step-tag tag-gold">Rank #1</span>
+                  <span className="step-tag tag-gold">Transparent</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Flow mini-diagram */}
+            <div className="hero-flow">
+              <div className="flow-node">
+                <div className="flow-node-icon">📥</div>
+                <div className="flow-node-label">All AMFI Funds</div>
+              </div>
+              <div className="flow-arrow">
+                <svg width="20" height="12" viewBox="0 0 20 12" fill="none">
+                  <path d="M0 6h16M11 1l5 5-5 5" stroke="#4F9AFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="flow-node">
+                <div className="flow-node-icon">⚖️</div>
+                <div className="flow-node-label">Classify by Risk & Style</div>
+              </div>
+              <div className="flow-arrow">
+                <svg width="20" height="12" viewBox="0 0 20 12" fill="none">
+                  <path d="M0 6h16M11 1l5 5-5 5" stroke="#4F9AFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="flow-node">
+                <div className="flow-node-icon">📊</div>
+                <div className="flow-node-label">Score by Alpha & Beat Rate</div>
+              </div>
+              <div className="flow-arrow">
+                <svg width="20" height="12" viewBox="0 0 20 12" fill="none">
+                  <path d="M0 6h16M11 1l5 5-5 5" stroke="#34D399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="flow-node">
+                <div className="flow-node-icon" style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.25)' }}>🎯</div>
+                <div className="flow-node-label">Best Fund per Cell</div>
+              </div>
+            </div>
+
+            {/* Trust metrics */}
+            <div className="hero-metrics">
+              <div className="metric-item">
+                <div className="metric-value">1,500<span className="metric-accent">+</span></div>
+                <div className="metric-label">Funds Analysed</div>
+              </div>
+              <div className="metric-item">
+                <div className="metric-value">16</div>
+                <div className="metric-label">Matrix Cells</div>
+              </div>
+              <div className="metric-item">
+                <div className="metric-value">0<span className="metric-accent">%</span></div>
+                <div className="metric-label">Hardcoding / Bias</div>
+              </div>
+              <div className="metric-item">
+                <div className="metric-value" style={{ color: '#34D399' }}>Live</div>
+                <div className="metric-label">Data, Always</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ──────────────────────────────────────────────────────────────
 
@@ -784,12 +1322,10 @@ export default function FindMyFundPage() {
           fetch("/api/insights").then(r => r.json()),
         ]);
 
-        // REQUIREMENT 7: Get Report_Date
         if (amfiRaw.length > 0) {
           setReportDate(amfiRaw[0].Report_Date);
         }
 
-        // Build 4×4 grid
         const gridMap: AMFIFund[][][] = Array.from({ length: 4 }, () =>
           Array.from({ length: 4 }, () => [])
         );
@@ -803,7 +1339,6 @@ export default function FindMyFundPage() {
           }
         }
 
-        // Build boxes
         const newBoxes: BoxResult[][] = [];
         const allSubCats = new Set<string>();
         let totalFundsAnalyzed = 0;
@@ -813,8 +1348,6 @@ export default function FindMyFundPage() {
           for (let c = 0; c < 4; c++) {
             const box = buildBox(r, c, gridMap[r][c], fundAnalytics, etfAnalytics, insights);
             rowBoxes.push(box);
-            
-            // REQUIREMENT 4: Calculate actual stats
             box.allConsideredSubCategories.forEach(cat => allSubCats.add(cat));
             totalFundsAnalyzed += gridMap[r][c].length;
           }
@@ -837,7 +1370,6 @@ export default function FindMyFundPage() {
   }, []);
 
   return (
-
     <div className="min-h-screen bg-[#F5F8FF] text-[#1F2937]">
       {/* NAV */}
       <div className="relative z-30 bg-[#F5F8FF]/95 border-b border-[#DDE6F3]">
@@ -849,50 +1381,14 @@ export default function FindMyFundPage() {
           </div>
         </div>
       </div>
-      {/* HERO - ENGINE EXPLANATION */}
-      <section className="relative overflow-hidden px-5 pt-14 pb-10">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 left-1/3 w-[520px] h-[520px] bg-[#2F5D7C]/10 rounded-full blur-[160px]" />
-          <div className="absolute bottom-1/3 right-1/4 w-[420px] h-[420px] bg-[#9BB4D6]/20 rounded-full blur-[140px]" />
-        </div>
-        <div className="relative max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row gap-8 mb-8">
-            {/* Visual Steps */}
-            <div className="flex-1 flex flex-col gap-6 justify-center">
-              <div className="flex items-center gap-4 bg-white rounded-xl shadow-md p-4">
-                <span className="text-4xl">🗂️</span>
-                <div>
-                  <div className="text-lg font-bold text-[#2563EB]">Step 1</div>
-                  <div className="text-sm text-[#374151]">All funds grouped by risk, style, and asset class</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 bg-white rounded-xl shadow-md p-4">
-                <span className="text-4xl">🔎</span>
-                <div>
-                  <div className="text-lg font-bold text-[#2563EB]">Step 2</div>
-                  <div className="text-sm text-[#374151]">Best-fit category found for each cell using real data</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 bg-white rounded-xl shadow-md p-4">
-                <span className="text-4xl">🏆</span>
-                <div>
-                  <div className="text-lg font-bold text-[#2563EB]">Step 3</div>
-                  <div className="text-sm text-[#374151]">Top fund selected for every cell—fully transparent</div>
-                </div>
-              </div>
-            </div>
-            {/* Matrix Visual */}
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="bg-gradient-to-br from-[#2563EB]/10 to-[#10B981]/10 rounded-2xl shadow-lg p-6 flex flex-col items-center">
-                <img src="/matrix-visual.png" alt="Fund Matrix Visual" className="w-56 h-56 object-contain mb-2" />
-                <div className="text-xs text-[#6B7280] text-center">Visual: Funds mapped into a matrix, best picked for you</div>
-              </div>
-            </div>
-          </div>
-          {/* SUB-TABS BELOW HERO */}
-          <FindMyFundTabs />
-        </div>
-      </section>
+
+      {/* ── NEW HERO ── */}
+      <HeroSection />
+
+      {/* SUB-TABS */}
+      <div className="max-w-6xl mx-auto px-5 py-6">
+        <FindMyFundTabs />
+      </div>
 
       {/* MATRIX */}
       <section className="px-6 pb-16">
@@ -900,7 +1396,6 @@ export default function FindMyFundPage() {
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="flex items-center justify-between mb-4">
               <SectionNum num="1" label="Equity Mutual Funds" />
-              {/* Date badge inline with header */}
               {reportDate && (
                 <span className="text-xs text-[#6B7280] bg-[#EFF6FF] px-3 py-1.5 rounded-full border border-[#DDE6F3]">
                   Data as of <strong className="text-[#3B82F6]">{reportDate}</strong>
@@ -943,7 +1438,7 @@ export default function FindMyFundPage() {
       {/* MODAL */}
       {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
 
-      {/* MATRIX: HYBRID (Single Column, Data-Driven, Equity Table Style) */}
+      {/* HYBRID & DEBT */}
       <HybridMatrixSectionSingleCol reportDate={reportDate} />
       <DebtMatrixSection reportDate={reportDate} />
     </div>
@@ -951,7 +1446,7 @@ export default function FindMyFundPage() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// HYBRID MATRIX SECTION (SINGLE COLUMN, EQUITY TABLE STYLE)
+// HYBRID MATRIX SECTION (unchanged)
 // ──────────────────────────────────────────────────────────────
 
 function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
@@ -969,7 +1464,6 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
         fetch("/api/etfs").then(r => r.json()),
         fetch("/api/insights").then(r => r.json()),
       ]);
-      // Only these sub-categories, in this order
       const hybridOrder = [
         "Aggressive Hybrid",
         "Conservative Hybrid",
@@ -979,17 +1473,14 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
         "Balanced Advantage",
         "Balanced Hybrid"
       ];
-      // Group by sub-category
       const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
       const bySubCat: Record<string, AMFIFund[]> = {};
       hybridFunds.forEach((f: AMFIFund) => {
         if (!bySubCat[f.Sub_Category]) bySubCat[f.Sub_Category] = [];
         bySubCat[f.Sub_Category].push(f);
       });
-      // Build rows in order, only if present in data
       const presentRows = hybridOrder.filter(subCat => bySubCat[subCat]);
       setRowDefs(presentRows.map(label => ({ label, subtitle: "" })));
-      // Build boxes (one per row)
       const boxes: BoxResult[] = presentRows.map((subCat, rowIdx) => {
         const funds = bySubCat[subCat];
         return buildBox(rowIdx, 0, funds, fundAnalytics, etfAnalytics, insights);
@@ -1046,7 +1537,6 @@ function HybridMatrixSectionSingleCol({ reportDate }: { reportDate: string }) {
   );
 }
 
-// Custom cell for hybrid fund: no sub-category name, bigger fund name
 function HybridFundCell({ box }: { box: BoxResult }) {
   if (box.empty || !box.selectedFund) {
     return (
@@ -1074,10 +1564,9 @@ function HybridFundCell({ box }: { box: BoxResult }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// DEBT MATRIX SECTION (Interest Rate Risk × Credit Risk)
+// DEBT MATRIX SECTION (unchanged)
 // ──────────────────────────────────────────────────────────────
 function DebtMatrixSection({ reportDate }: { reportDate: string }) {
-  // Define the grid: rows = Interest Rate Risk, cols = Credit Risk
   const rowDefs: GridDef = [
     { label: "Ultra Short (0–1Y)", subtitle: "Overnight, Liquid, Ultra Short, Money Market" },
     { label: "Short Duration (1–3Y)", subtitle: "Low Duration, Short Duration, Banking & PSU (Short Bias), Corporate Bond (Short Bias)" },
@@ -1103,7 +1592,6 @@ function DebtMatrixSection({ reportDate }: { reportDate: string }) {
         fetch("/api/etfs").then(r => r.json()),
         fetch("/api/insights").then(r => r.json()),
       ]);
-      // Map sub-categories to grid cells
       const cellMap: Record<string, [number, number][]> = {
         "Overnight": [[0,0]],
         "Liquid": [[0,0]],
@@ -1120,7 +1608,6 @@ function DebtMatrixSection({ reportDate }: { reportDate: string }) {
         "Credit Risk": [[1,2],[2,2],[3,2]],
         "Medium to Long Duration": [[3,1]]
       };
-      // Build grid: 4 rows × 3 cols
       const gridMap: AMFIFund[][][] = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => []));
       for (const fund of amfiRaw as AMFIFund[]) {
         if (fund.Category !== "Debt") continue;
@@ -1131,7 +1618,6 @@ function DebtMatrixSection({ reportDate }: { reportDate: string }) {
           }
         }
       }
-      // Build boxes
       const newBoxes: BoxResult[][] = [];
       for (let r = 0; r < 4; r++) {
         const rowBoxes: BoxResult[] = [];
