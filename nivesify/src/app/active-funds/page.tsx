@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ActiveFundsContent from "@/components/ActiveFundsContent.tsx";
+import ActiveFundsContent from "@/components/ActiveFundsContent";
 import { getBaseUrl } from "@/lib/base-url";
 import { computeAmfiAggregates, type AmfiRawRecord } from "@/lib/amfi-aggregates";
 import type { CategoryInsights, FundAnalytics, Manifest } from "@/lib/fund-types";
