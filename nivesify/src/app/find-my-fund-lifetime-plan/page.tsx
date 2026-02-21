@@ -642,216 +642,305 @@ function generateId(): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GROWTH TRAJECTORY CHART
-// Pure SVG — no external deps. Shows invested vs portfolio value over time.
+// PROJECTION ENGINE — single source of truth used by chart AND hero summary cards
+// Month-by-month simulation: SIP invested at start of each month, then compounded.
+// Phase lookup uses the actual phaseDescriptions from the plan engine so rates
+// are always in sync with the exposure blocks shown in the table.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GrowthTrajectoryChart({ plan, goals }: { plan: LifetimePlan; goals: GoalInput[] }) {
+type ProjectionPoint = {
+  year: number;
+  invested: number;
+  portfolioLow: number;
+  portfolioMid: number;
+  portfolioHigh: number;
+  monthlySIP: number;
+  loRate: number;
+  hiRate: number;
+  midRate: number;
+};
+
+function buildProjectionPoints(plan: LifetimePlan): ProjectionPoint[] {
+  let portMid = 0, portLo = 0, portHi = 0, invested = 0;
+  // Year 0 baseline
+  const pts: ProjectionPoint[] = [{ year:0, invested:0, portfolioLow:0, portfolioMid:0, portfolioHigh:0, monthlySIP:0, loRate:0, hiRate:0, midRate:0 }];
+
+  for (let yr = 1; yr <= plan.totalYears; yr++) {
+    // Phase that was active during this year (yr-1 to yr)
+    const phase = [...plan.phaseDescriptions].reverse().find(p => p.fromYear < yr) ?? plan.phaseDescriptions[0];
+    const loRate  = phase.plan.expectedReturnLo;
+    const hiRate  = phase.plan.expectedReturnHi;
+    const midRate = (loRate + hiRate) / 2;
+    // SIP for year yr uses the step-up from year yr-1 (step-up at start of each new year)
+    const monthlySIP = Math.ceil(plan.baseMonthlySIP * Math.pow(1.10, yr - 1) / 100) * 100;
+    const rMid = midRate / 100 / 12;
+    const rLo  = loRate  / 100 / 12;
+    const rHi  = hiRate  / 100 / 12;
+
+    for (let m = 0; m < 12; m++) {
+      portMid = (portMid + monthlySIP) * (1 + rMid);
+      portLo  = (portLo  + monthlySIP) * (1 + rLo);
+      portHi  = (portHi  + monthlySIP) * (1 + rHi);
+      invested += monthlySIP;
+    }
+    pts.push({ year:yr, invested, portfolioLow:portLo, portfolioMid:portMid, portfolioHigh:portHi, monthlySIP, loRate, hiRate, midRate });
+  }
+  return pts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GROWTH TRAJECTORY CHART
+// Pure SVG. All numbers flow from buildProjectionPoints — zero separate calcs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; goals: GoalInput[]; points: ProjectionPoint[] }) {
   const totalYears = plan.totalYears;
-  const W = 680, H = 260;
-  const PAD = { top: 20, right: 24, bottom: 44, left: 58 };
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; pt: ProjectionPoint } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const W = 680, H = 272;
+  const PAD = { top: 24, right: 28, bottom: 52, left: 64 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
 
-  // Build yearly data points
-  type DataPoint = { year: number; invested: number; portfolioLow: number; portfolioMid: number; portfolioHigh: number; sipAtYear: number };
-  const points: DataPoint[] = [];
-
-  let cumulativeInvested = 0;
-  let portfolioValueMid = 0;
-  let portfolioValueLow = 0;
-  let portfolioValueHigh = 0;
-
-  for (let yr = 0; yr <= totalYears; yr++) {
-    // Find the phase active at this year
-    const phase = plan.phaseDescriptions.find(p => yr >= p.fromYear && yr < p.toYear) ?? plan.phaseDescriptions[plan.phaseDescriptions.length - 1];
-    const sipAtYear = phase ? Math.ceil(plan.baseMonthlySIP * Math.pow(1.10, yr) / 100) * 100 : 0;
-    const midRate = phase ? (phase.plan.expectedReturnLo + phase.plan.expectedReturnHi) / 2 : 10;
-    const loRate = phase ? phase.plan.expectedReturnLo : 8;
-    const hiRate = phase ? phase.plan.expectedReturnHi : 14;
-
-    if (yr > 0) {
-      // Grow existing portfolio for 1 year, then add 12 months of SIP
-      const monthlyMid = midRate / 100 / 12;
-      const monthlyLo = loRate / 100 / 12;
-      const monthlyHi = hiRate / 100 / 12;
-      portfolioValueMid = portfolioValueMid * Math.pow(1 + midRate/100, 1) + sipAtYear * 12;
-      portfolioValueLow = portfolioValueLow * Math.pow(1 + loRate/100, 1) + sipAtYear * 12;
-      portfolioValueHigh = portfolioValueHigh * Math.pow(1 + hiRate/100, 1) + sipAtYear * 12;
-      cumulativeInvested += sipAtYear * 12;
-    }
-
-    points.push({ year: yr, invested: cumulativeInvested, portfolioLow: portfolioValueLow, portfolioMid: portfolioValueMid, portfolioHigh: portfolioValueHigh, sipAtYear });
+  // Y-axis: scale to portfolioHigh of last point, rounded up cleanly with minimal headroom
+  const rawMax = Math.max(...points.map(p => p.portfolioHigh));
+  function niceMax(v: number) {
+    const mag = Math.pow(10, Math.floor(Math.log10(v)));
+    const frac = v / mag;
+    const nice = frac <= 1.5 ? 1.5 : frac <= 2 ? 2 : frac <= 2.5 ? 2.5 : frac <= 3 ? 3 : frac <= 4 ? 4 : frac <= 5 ? 5 : frac <= 7.5 ? 7.5 : 10;
+    return nice * mag;
   }
-
-  const maxVal = Math.max(...points.map(p => p.portfolioHigh));
+  const maxVal = niceMax(rawMax * 1.04); // 4% headroom so top line isn't clipped
   const yTicks = 5;
   const yStep = maxVal / yTicks;
 
   function xPos(yr: number) { return PAD.left + (yr / totalYears) * chartW; }
-  function yPos(val: number) { return PAD.top + chartH - (val / maxVal) * chartH; }
+  function yPos(val: number) { return PAD.top + chartH - Math.min(1, val / maxVal) * chartH; }
 
-  function makePath(getter: (p: DataPoint) => number) {
+  function makePath(getter: (p: ProjectionPoint) => number) {
     return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(p.year).toFixed(1)},${yPos(getter(p)).toFixed(1)}`).join(' ');
   }
-
-  function makeAreaPath(getterTop: (p: DataPoint) => number, getterBot: (p: DataPoint) => number) {
+  function makeAreaPath(getterTop: (p: ProjectionPoint) => number, getterBot: (p: ProjectionPoint) => number) {
     const top = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(p.year).toFixed(1)},${yPos(getterTop(p)).toFixed(1)}`).join(' ');
-    const bot = [...points].reverse().map((p, i) => `${i === 0 ? 'L' : 'L'}${xPos(p.year).toFixed(1)},${yPos(getterBot(p)).toFixed(1)}`).join(' ');
+    const bot = [...points].reverse().map(p => `L${xPos(p.year).toFixed(1)},${yPos(getterBot(p)).toFixed(1)}`).join(' ');
     return `${top} ${bot} Z`;
   }
 
-  // Goal milestone markers
   const achievedGoalYears = plan.timeline.filter(s => s.achievedGoals.length > 0);
   const goalMap = new Map(goals.map(g => [g.id, g]));
 
-  // Y-axis formatter
   function fmtY(v: number) {
-    if (v >= 10000000) return `₹${(v/10000000).toFixed(0)}Cr`;
-    if (v >= 100000) return `₹${(v/100000).toFixed(0)}L`;
-    return `₹${(v/1000).toFixed(0)}K`;
+    if (v >= 10000000) return `₹${(v / 10000000).toFixed(1)}Cr`;
+    if (v >= 100000)   return `₹${(v / 100000).toFixed(0)}L`;
+    return `₹${(v / 1000).toFixed(0)}K`;
   }
 
-  // X ticks
   const xTickCount = Math.min(totalYears, 6);
-  const xTicks = Array.from({length: xTickCount + 1}, (_, i) => Math.round(i * totalYears / xTickCount));
+  const xTicks = Array.from({ length: xTickCount + 1 }, (_, i) => Math.round(i * totalYears / xTickCount));
+  const last = points[points.length - 1];
+  const TT_W = 176, TT_H = 114;
+
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const scaleX = W / rect.width;
+    const svgX = (e.clientX - rect.left) * scaleX;
+    const frac = Math.max(0, Math.min(1, (svgX - PAD.left) / chartW));
+    const yr = Math.round(frac * totalYears);
+    const pt = points.find(p => p.year === yr);
+    if (pt) setTooltip({ x: xPos(pt.year), y: yPos(pt.portfolioMid), pt });
+  }
 
   return (
-    <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '20px 20px 12px', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+    <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', padding:'20px 20px 14px', overflow:'hidden' }}>
+
+      {/* Header row */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px', flexWrap:'wrap', gap:'8px' }}>
         <div>
-          <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>Portfolio Growth Trajectory</div>
-          <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>Projected value over {totalYears} years with 10% annual SIP step-up</div>
+          <div style={{ fontSize:'13px', fontWeight:800, color:'#0F172A' }}>Portfolio Growth Trajectory</div>
+          <div style={{ fontSize:'11px', color:'#94A3B8', marginTop:'2px' }}>Hover to inspect · {totalYears}-yr projection · 10% annual SIP step-up</div>
         </div>
-        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+        <div style={{ display:'flex', gap:'16px', flexWrap:'wrap', alignItems:'center' }}>
           {[
-            { color: '#2563EB', dash: false, fill: false, label: 'Invested capital' },
-            { color: '#10B981', dash: false, fill: true,  label: 'Portfolio (likely)' },
-            { color: '#10B981', dash: true,  fill: false, label: 'Range (low–high)' },
+            { swatch:'line2', color:'#2563EB', label:'Capital invested' },
+            { swatch:'line3', color:'#10B981', label:'Portfolio (mid)' },
+            { swatch:'area',  color:'#10B981', label:'Low–High range' },
           ].map((l, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <svg width="20" height="10">
-                {l.fill
-                  ? <rect x="0" y="2" width="20" height="6" rx="2" fill={l.color} opacity="0.2" />
-                  : <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth={l.dash ? 1.5 : 2} strokeDasharray={l.dash ? '4,3' : 'none'} />
-                }
-                {!l.fill && <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth="2" strokeDasharray={l.dash ? '4,3' : 'none'} />}
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:'5px' }}>
+              <svg width="22" height="10">
+                {l.swatch === 'area'  && <rect x="0" y="1" width="22" height="8" rx="2" fill={l.color} opacity="0.2" />}
+                {l.swatch === 'line2' && <line x1="0" y1="5" x2="22" y2="5" stroke={l.color} strokeWidth="2" />}
+                {l.swatch === 'line3' && <line x1="0" y1="5" x2="22" y2="5" stroke={l.color} strokeWidth="3" />}
               </svg>
-              <span style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>{l.label}</span>
+              <span style={{ fontSize:'10px', color:'#64748B', fontWeight:600 }}>{l.label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', minWidth: '320px' }}>
+      {/* SVG chart */}
+      <div style={{ overflowX:'auto', position:'relative' }}>
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%"
+          style={{ display:'block', minWidth:'320px', cursor:'crosshair' }}
+          onMouseMove={handleMouseMove} onMouseLeave={() => setTooltip(null)}>
           <defs>
-            <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10B981" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#10B981" stopOpacity="0.02" />
+            <linearGradient id="ltPGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10B981" stopOpacity="0.14"/>
+              <stop offset="100%" stopColor="#10B981" stopOpacity="0.01"/>
             </linearGradient>
-            <linearGradient id="investedGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2563EB" stopOpacity="0.10" />
-              <stop offset="100%" stopColor="#2563EB" stopOpacity="0.01" />
+            <linearGradient id="ltIGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2563EB" stopOpacity="0.08"/>
+              <stop offset="100%" stopColor="#2563EB" stopOpacity="0.00"/>
             </linearGradient>
+            <clipPath id="ltClip">
+              <rect x={PAD.left} y={PAD.top} width={chartW} height={chartH}/>
+            </clipPath>
           </defs>
 
-          {/* Grid lines */}
-          {Array.from({length: yTicks + 1}, (_, i) => {
+          {/* Y-grid + labels */}
+          {Array.from({ length: yTicks + 1 }, (_, i) => {
             const val = i * yStep;
             const y = yPos(val);
             return (
               <g key={i}>
-                <line x1={PAD.left} y1={y} x2={PAD.left + chartW} y2={y} stroke="#F1F5F9" strokeWidth="1" />
-                <text x={PAD.left - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily="system-ui">{fmtY(val)}</text>
+                <line x1={PAD.left} y1={y} x2={PAD.left + chartW} y2={y} stroke={i === 0 ? '#E2E8F0' : '#F1F5F9'} strokeWidth="1"/>
+                <text x={PAD.left - 7} y={y + 3.5} textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily="system-ui">{fmtY(val)}</text>
               </g>
             );
           })}
 
-          {/* Phase transition lines */}
-          {plan.phaseDescriptions.slice(1).map((phase, i) => (
-            <line key={i} x1={xPos(phase.fromYear)} y1={PAD.top} x2={xPos(phase.fromYear)} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1" strokeDasharray="4,4" />
+          {/* Phase dividers */}
+          {plan.phaseDescriptions.slice(1).map((ph, i) => (
+            <line key={i} x1={xPos(ph.fromYear)} y1={PAD.top} x2={xPos(ph.fromYear)} y2={PAD.top + chartH}
+              stroke="#E2E8F0" strokeWidth="1" strokeDasharray="4,4"/>
           ))}
 
-          {/* Range area (low–high) */}
-          <path d={makeAreaPath(p => p.portfolioHigh, p => p.portfolioLow)} fill="url(#portfolioGrad)" opacity="0.8" />
-
-          {/* High line */}
-          <path d={makePath(p => p.portfolioHigh)} fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.5" />
-          {/* Low line */}
-          <path d={makePath(p => p.portfolioLow)} fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.5" />
-
-          {/* Invested area */}
-          <path d={makeAreaPath(p => p.invested, () => 0)} fill="url(#investedGrad)" />
-          {/* Invested line */}
-          <path d={makePath(p => p.invested)} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" />
-
-          {/* Portfolio mid line */}
-          <path d={makePath(p => p.portfolioMid)} fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {/* Chart paths — clipped */}
+          <g clipPath="url(#ltClip)">
+            <path d={makeAreaPath(p => p.portfolioHigh, p => p.portfolioLow)} fill="url(#ltPGrad)"/>
+            <path d={makePath(p => p.portfolioHigh)} fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.4"/>
+            <path d={makePath(p => p.portfolioLow)}  fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.4"/>
+            <path d={makeAreaPath(p => p.invested, () => 0)} fill="url(#ltIGrad)"/>
+            <path d={makePath(p => p.invested)} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
+            <path d={makePath(p => p.portfolioMid)} fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </g>
 
           {/* Goal milestone markers */}
           {achievedGoalYears.map((snap, i) => {
             const x = xPos(snap.year);
-            const midPt = points.find(p => p.year === snap.year);
-            const y = midPt ? yPos(midPt.portfolioMid) : PAD.top;
+            const pt = points.find(p => p.year === snap.year);
+            const y = pt ? yPos(pt.portfolioMid) : PAD.top;
             const goalsHere = snap.achievedGoals.map(id => goalMap.get(id)).filter(Boolean);
+            const onRight = snap.year / totalYears < 0.8;
             return (
               <g key={i}>
-                <line x1={x} y1={y} x2={x} y2={PAD.top + chartH} stroke="#D97706" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.7" />
-                <circle cx={x} cy={y} r="5" fill="#D97706" opacity="0.9" />
-                <circle cx={x} cy={y} r="8" fill="#D97706" opacity="0.15" />
+                <line x1={x} y1={PAD.top} x2={x} y2={PAD.top + chartH} stroke="#D97706" strokeWidth="1" strokeDasharray="3,3" opacity="0.5"/>
+                <circle cx={x} cy={y} r="5" fill="#D97706"/>
+                <circle cx={x} cy={y} r="9" fill="#D97706" opacity="0.12"/>
                 {goalsHere.map((g, j) => (
-                  <text key={j} x={x} y={PAD.top + chartH + 28 + j * 11} textAnchor="middle" fontSize="10" fill="#D97706" fontWeight="700" fontFamily="system-ui">{g!.emoji}</text>
+                  <text key={j}
+                    x={onRight ? x + 7 : x - 7}
+                    y={PAD.top + chartH + 30 + j * 13}
+                    textAnchor={onRight ? 'start' : 'end'}
+                    fontSize="11" fill="#D97706" fontWeight="700" fontFamily="system-ui">
+                    {g!.emoji} Yr {snap.year}
+                  </text>
                 ))}
               </g>
             );
           })}
 
-          {/* X axis ticks */}
+          {/* X-axis */}
           {xTicks.map((yr, i) => (
             <g key={i}>
-              <line x1={xPos(yr)} y1={PAD.top + chartH} x2={xPos(yr)} y2={PAD.top + chartH + 4} stroke="#CBD5E1" strokeWidth="1" />
-              <text x={xPos(yr)} y={PAD.top + chartH + 14} textAnchor="middle" fontSize="9" fill="#94A3B8" fontFamily="system-ui">Yr {yr}</text>
+              <line x1={xPos(yr)} y1={PAD.top + chartH} x2={xPos(yr)} y2={PAD.top + chartH + 4} stroke="#CBD5E1" strokeWidth="1"/>
+              <text x={xPos(yr)} y={PAD.top + chartH + 15} textAnchor="middle" fontSize="9" fill="#94A3B8" fontFamily="system-ui">Yr {yr}</text>
             </g>
           ))}
 
-          {/* Axis lines */}
-          <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1" />
-          <line x1={PAD.left} y1={PAD.top + chartH} x2={PAD.left + chartW} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1" />
+          {/* Axes */}
+          <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1"/>
+          <line x1={PAD.left} y1={PAD.top + chartH} x2={PAD.left + chartW} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1"/>
 
-          {/* Final value callout */}
+          {/* Final-year callout — value taken from last point, same as summary cards */}
           {(() => {
-            const last = points[points.length - 1];
             const x = xPos(last.year);
             const y = yPos(last.portfolioMid);
+            const lbl = fmtY(last.portfolioMid);
+            const bW = lbl.length * 7.2 + 16;
             return (
               <g>
-                <rect x={x - 36} y={y - 22} width="72" height="18" rx="6" fill="#10B981" opacity="0.95" />
-                <text x={x} y={y - 9} textAnchor="middle" fontSize="9.5" fill="white" fontWeight="800" fontFamily="system-ui">{fmtY(last.portfolioMid)}</text>
+                <rect x={x - bW / 2} y={y - 22} width={bW} height="17" rx="5" fill="#10B981"/>
+                <text x={x} y={y - 10} textAnchor="middle" fontSize="9.5" fill="white" fontWeight="800" fontFamily="system-ui">{lbl}</text>
+                <line x1={x} y1={y - 5} x2={x} y2={y} stroke="#10B981" strokeWidth="1.5"/>
+              </g>
+            );
+          })()}
+
+          {/* Hover tooltip */}
+          {tooltip && (() => {
+            const { x, pt } = tooltip;
+            const midY = yPos(pt.portfolioMid);
+            const ttX = x + TT_W + 10 > PAD.left + chartW ? x - TT_W - 10 : x + 10;
+            const ttY = Math.max(PAD.top, Math.min(PAD.top + chartH - TT_H, midY - TT_H / 2));
+            const goalsAchieved = plan.timeline.find(s => s.year === pt.year)?.achievedGoals ?? [];
+            const goalLabels = goalsAchieved.map(id => goalMap.get(id)).filter(Boolean);
+            return (
+              <g>
+                {/* Vertical crosshair */}
+                <line x1={x} y1={PAD.top} x2={x} y2={PAD.top + chartH} stroke="#94A3B8" strokeWidth="1" strokeDasharray="3,3" opacity="0.6"/>
+                {/* Dots on each series */}
+                <circle cx={x} cy={yPos(pt.portfolioMid)} r="4.5" fill="#10B981" stroke="white" strokeWidth="2"/>
+                <circle cx={x} cy={yPos(pt.invested)} r="3.5" fill="#2563EB" stroke="white" strokeWidth="2"/>
+                {/* Card shadow background */}
+                <rect x={ttX + 1} y={ttY + 1} width={TT_W} height={TT_H} rx="9" fill="rgba(0,0,0,0.06)"/>
+                {/* Card */}
+                <rect x={ttX} y={ttY} width={TT_W} height={TT_H} rx="9" fill="white" stroke="#E2E8F0" strokeWidth="1"/>
+                {/* Header bar */}
+                <rect x={ttX} y={ttY} width={TT_W} height="24" rx="9" fill="#0F172A"/>
+                <rect x={ttX} y={ttY + 16} width={TT_W} height="8" fill="#0F172A"/>
+                <text x={ttX + TT_W / 2} y={ttY + 15.5} textAnchor="middle" fontSize="10" fill="white" fontWeight="800" fontFamily="system-ui">
+                  {`Year ${pt.year}  ·  SIP ₹${(pt.monthlySIP / 1000).toFixed(0)}K/mo`}
+                </text>
+                {/* Portfolio mid */}
+                <text x={ttX + 11} y={ttY + 37} fontSize="8.5" fill="#94A3B8" fontFamily="system-ui">Portfolio value</text>
+                <text x={ttX + 11} y={ttY + 51} fontSize="14" fill="#10B981" fontWeight="900" fontFamily="system-ui">{fmtY(pt.portfolioMid)}</text>
+                {/* Range */}
+                <text x={ttX + 11} y={ttY + 65} fontSize="8" fill="#CBD5E1" fontFamily="system-ui">{`${fmtY(pt.portfolioLow)} – ${fmtY(pt.portfolioHigh)}`}</text>
+                {/* Invested */}
+                <text x={ttX + 11} y={ttY + 80} fontSize="8.5" fill="#94A3B8" fontFamily="system-ui">Capital invested</text>
+                <text x={ttX + 11} y={ttY + 93} fontSize="13" fill="#2563EB" fontWeight="800" fontFamily="system-ui">{fmtY(pt.invested)}</text>
+                {/* Return rate chip */}
+                <rect x={ttX + TT_W - 48} y={ttY + 77} width="42" height="16" rx="4" fill="#ECFDF5" stroke="#A7F3D0" strokeWidth="0.8"/>
+                <text x={ttX + TT_W - 27} y={ttY + 88} textAnchor="middle" fontSize="8" fill="#059669" fontWeight="700" fontFamily="system-ui">{pt.midRate.toFixed(1)}% p.a.</text>
+                {/* Goal achieved tags */}
+                {goalLabels.map((g, j) => (
+                  <g key={j}>
+                    <rect x={ttX + TT_W - 44} y={ttY + 27 + j * 18} width="38" height="15" rx="4" fill="#FFFBEB" stroke="#FDE68A" strokeWidth="0.8"/>
+                    <text x={ttX + TT_W - 25} y={ttY + 38 + j * 18} textAnchor="middle" fontSize="8.5" fill="#D97706" fontWeight="700" fontFamily="system-ui">✓ {g!.emoji}</text>
+                  </g>
+                ))}
               </g>
             );
           })()}
         </svg>
       </div>
 
-      {/* Bottom summary row */}
-      <div style={{ display: 'flex', gap: '16px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid #F8FAFC', flexWrap: 'wrap' }}>
-        {(() => {
-          const last = points[points.length - 1];
-          const wealth = last.portfolioMid - last.invested;
-          const mult = last.invested > 0 ? (last.portfolioMid / last.invested).toFixed(1) : '—';
-          return [
-            { label: 'Total invested', value: fmtINR(last.invested), color: '#2563EB' },
-            { label: 'Estimated portfolio', value: fmtINR(last.portfolioMid), color: '#10B981' },
-            { label: 'Wealth created', value: fmtINR(wealth), color: '#059669' },
-            { label: 'Money multiplier', value: `${mult}×`, color: '#D97706' },
-          ].map((s, i) => (
-            <div key={i} style={{ flex: '1 1 100px' }}>
-              <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 600 }}>{s.label}</div>
-              <div style={{ fontSize: '16px', fontWeight: 900, color: s.color }}>{s.value}</div>
-            </div>
-          ));
-        })()}
+      {/* Summary stats — identical values to the hero cards (both use `last` from same points array) */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px, 1fr))', gap:'10px', marginTop:'14px', paddingTop:'12px', borderTop:'1px solid #F1F5F9' }}>
+        {[
+          { label:'Total invested',      value: fmtINR(last.invested),                                                sub:`${totalYears}yr · 10% step-up`,   color:'#2563EB' },
+          { label:'Estimated portfolio', value: fmtINR(last.portfolioMid),                                            sub:'mid-case projection',              color:'#10B981' },
+          { label:'Wealth created',      value: fmtINR(last.portfolioMid - last.invested),                            sub:'gains on invested capital',        color:'#059669' },
+          { label:'Money multiplier',    value:`${(last.portfolioMid / Math.max(1, last.invested)).toFixed(1)}×`,     sub:'portfolio ÷ invested',             color:'#D97706' },
+        ].map((s, i) => (
+          <div key={i} style={{ background:'#F8FAFC', borderRadius:'10px', padding:'10px 12px', border:'1px solid #F1F5F9' }}>
+            <div style={{ fontSize:'10px', color:'#94A3B8', fontWeight:600, marginBottom:'2px' }}>{s.label}</div>
+            <div style={{ fontSize:'18px', fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
+            <div style={{ fontSize:'9px', color:'#CBD5E1', marginTop:'3px' }}>{s.sub}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1242,6 +1331,7 @@ export default function LifetimePlanPage() {
 
   const [goals, setGoals] = useState<GoalInput[]>([]);
   const [lifetimePlan, setLifetimePlan] = useState<LifetimePlan | null>(null);
+  const [projectionPoints, setProjectionPoints] = useState<ProjectionPoint[]>([]);
   const [generating, setGenerating] = useState(false);
   const [selectedPhaseIdx, setSelectedPhaseIdx] = useState(0);
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
@@ -1271,7 +1361,8 @@ export default function LifetimePlanPage() {
     setGenerating(true); setLifetimePlan(null); setSelectedPhaseIdx(0);
     setTimeout(()=>{
       const plan=buildLifetimePlan(goals,amfiRaw,fundAnalytics,etfAnalytics,insights);
-      setLifetimePlan(plan); setGenerating(false);
+      const pts = buildProjectionPoints(plan);
+      setLifetimePlan(plan); setProjectionPoints(pts); setGenerating(false);
       setTimeout(()=>resultRef.current?.scrollIntoView({behavior:'smooth',block:'start'}),150);
     },1200);
   }
@@ -1408,7 +1499,7 @@ export default function LifetimePlanPage() {
                 {goals.length} goal{goals.length>1?'s':''} · {lifetimePlan.totalYears}-year journey
               </h2>
 
-              {/* Key numbers */}
+              {/* Key numbers — all from projectionPoints so they match chart exactly */}
               <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px',marginBottom:'20px' }}>
                 <div style={{ background:'white',borderRadius:'14px',border:'2px solid #BFDBFE',padding:'14px 18px' }}>
                   <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Start investing today with</div>
@@ -1416,14 +1507,21 @@ export default function LifetimePlanPage() {
                   <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>per month · grows 10% every year</div>
                 </div>
                 <div style={{ background:'white',borderRadius:'14px',border:'1px solid #E2E8F0',padding:'14px 18px' }}>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>In year {Math.floor(lifetimePlan.totalYears/2)}, your SIP becomes</div>
-                  <div style={{ fontSize:'22px',fontWeight:900,color:'#059669',lineHeight:1 }}>₹{(Math.ceil(lifetimePlan.baseMonthlySIP*Math.pow(1.10,Math.floor(lifetimePlan.totalYears/2))/100)*100).toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>
+                    In year {Math.floor(lifetimePlan.totalYears/2)}, your SIP becomes
+                  </div>
+                  <div style={{ fontSize:'22px',fontWeight:900,color:'#059669',lineHeight:1 }}>
+                    {/* Use projectionPoints so this matches the chart tooltip exactly */}
+                    ₹{(projectionPoints.find(p => p.year === Math.floor(lifetimePlan.totalYears/2))?.monthlySIP ?? 0).toLocaleString('en-IN')}
+                  </div>
                   <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>after 10% annual step-ups</div>
                 </div>
                 <div style={{ background:'white',borderRadius:'14px',border:'1px solid #E2E8F0',padding:'14px 18px' }}>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Portfolio phases</div>
-                  <div style={{ fontSize:'28px',fontWeight:900,color:'#D97706',lineHeight:1 }}>{lifetimePlan.phaseDescriptions.length}</div>
-                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>allocation shifts as goals are met</div>
+                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Estimated final portfolio</div>
+                  <div style={{ fontSize:'22px',fontWeight:900,color:'#10B981',lineHeight:1 }}>
+                    {fmtINR(projectionPoints[projectionPoints.length - 1]?.portfolioMid ?? 0)}
+                  </div>
+                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>mid-case · matches chart below</div>
                 </div>
               </div>
 
@@ -1448,7 +1546,7 @@ export default function LifetimePlanPage() {
             </div>
 
             {/* ── GROWTH TRAJECTORY CHART — added below plan overview ── */}
-            <GrowthTrajectoryChart plan={lifetimePlan} goals={goals} />
+            <GrowthTrajectoryChart plan={lifetimePlan} goals={goals} points={projectionPoints} />
 
             {/* Phase detail */}
             {selectedPhase&&(
