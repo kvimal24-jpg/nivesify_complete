@@ -12,6 +12,23 @@ Nivesify is a Next.js app deployed on Cloudflare. It includes a full onboarding 
 - Quick Picks: curated fund recommendations for easy selection.
 - Lifetime Plan: long-term planning and projections.
 
+---
+
+### Fund Selection Engine (Quick Picks, Lifetime Plan, Smart Fund Finder)
+
+All three features use the same robust, transparent selection engine to recommend funds. The engine:
+- Maps all available funds into a grid by type, size, and style
+- Groups by sub-category or benchmark
+- Aggregates performance (alpha, beat rate)
+- Applies a tiebreaker (beat rate if alpha difference ≤ 0.1%)
+- Picks the top-ranked fund in the winning group
+
+For a full, example-rich explanation, see:
+- docs/quick-picks.md (detailed step-by-step logic, examples, and rationale)
+- docs/lifetime-plan.md (multi-goal adaptation)
+
+This ensures consistency, transparency, and no human bias across all fund recommendation features.
+
 ## Project structure
 - src/app - Next.js App Router pages
 - src/app/dashboard - onboarding and dashboard experiences
