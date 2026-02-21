@@ -1,21 +1,108 @@
 "use client";
 
-import AnalysisTabs from "@/components/AnalysisTabs";
 import React, { useState, useEffect, useRef } from "react";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-NAV TABS (integrated into hero)
+// ─────────────────────────────────────────────────────────────────────────────
+const SUB_TABS = [
+  { label: "Why Mutual Funds", href: "/why-mutual-fund", active: true },
+  { label: "Smart Fund Finder", href: "/mutual-fund-match", active: false },
+  { label: "MF Industry Analysis", href: "/mutual-fund-analysis", active: false },
+  { label: "Active Funds", href: "/active-funds", active: false },
+  { label: "Passive Funds", href: "/index-funds", active: false },
+];
+
+function SubNavTabs() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={scrollRef}
+      style={{
+        display: "flex",
+        gap: "4px",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        paddingBottom: "2px",
+      }}
+    >
+      {SUB_TABS.map((tab) => (
+        <a
+          key={tab.href}
+          href={tab.href}
+          style={{
+            flexShrink: 0,
+            textDecoration: "none",
+            padding: "6px 14px",
+            borderRadius: "100px",
+            fontSize: "12px",
+            fontWeight: tab.active ? 700 : 500,
+            color: tab.active ? "#059669" : "rgba(255,255,255,0.6)",
+            background: tab.active ? "rgba(255,255,255,0.12)" : "transparent",
+            border: tab.active ? "1px solid rgba(255,255,255,0.25)" : "1px solid transparent",
+            transition: "all 0.2s",
+            whiteSpace: "nowrap",
+            letterSpacing: "0.01em",
+          }}
+          onMouseEnter={(e) => {
+            if (!tab.active) {
+              (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.9)";
+              (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!tab.active) {
+              (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)";
+              (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+            }
+          }}
+        >
+          {tab.label}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCROLL REVEAL
 // ─────────────────────────────────────────────────────────────────────────────
-function Reveal({ children, delay = 0, style = {} }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
+function Reveal({
+  children,
+  delay = 0,
+  style = {},
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  style?: React.CSSProperties;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const observer = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); observer.disconnect(); } }, { threshold: 0.07 });
+    const observer = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.07 }
+    );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
   return (
-    <div ref={ref} style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(26px)", transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`, ...style }}>
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(26px)",
+        transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
+        ...style,
+      }}
+    >
       {children}
     </div>
   );
@@ -24,10 +111,41 @@ function Reveal({ children, delay = 0, style = {} }: { children: React.ReactNode
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION LABEL
 // ─────────────────────────────────────────────────────────────────────────────
-function SectionLabel({ text, color = "#059669", bg = "rgba(5,150,105,0.08)", border = "rgba(5,150,105,0.2)" }: { text: string; color?: string; bg?: string; border?: string }) {
+function SectionLabel({
+  text,
+  color = "#059669",
+  bg = "rgba(5,150,105,0.08)",
+  border = "rgba(5,150,105,0.2)",
+}: {
+  text: string;
+  color?: string;
+  bg?: string;
+  border?: string;
+}) {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: bg, border: `1px solid ${border}`, borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
-      <span style={{ fontSize: "11px", fontWeight: 700, color, letterSpacing: "0.09em", textTransform: "uppercase" as const }}>{text}</span>
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        background: bg,
+        border: `1px solid ${border}`,
+        borderRadius: "100px",
+        padding: "4px 13px",
+        marginBottom: "10px",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          color,
+          letterSpacing: "0.09em",
+          textTransform: "uppercase" as const,
+        }}
+      >
+        {text}
+      </span>
     </div>
   );
 }
@@ -39,13 +157,53 @@ function FAQItem({ q, a, delay }: { q: string; a: string; delay: number }) {
   const [open, setOpen] = useState(false);
   return (
     <Reveal delay={delay}>
-      <div onClick={() => setOpen(!open)} style={{ cursor: "pointer", background: "white", border: "1.5px solid #E2E8F0", borderRadius: "14px", overflow: "hidden", transition: "box-shadow 0.2s", boxShadow: open ? "0 4px 20px rgba(0,0,0,0.07)" : "none" }}>
-        <div style={{ padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "13px", fontWeight: 700, color: "#0F172A", lineHeight: 1.4 }}>{q}</span>
-          <span style={{ fontSize: "18px", color: "#94A3B8", flexShrink: 0, transition: "transform 0.3s", transform: open ? "rotate(45deg)" : "rotate(0deg)" }}>+</span>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          cursor: "pointer",
+          background: "white",
+          border: "1.5px solid #E2E8F0",
+          borderRadius: "14px",
+          overflow: "hidden",
+          transition: "box-shadow 0.2s",
+          boxShadow: open ? "0 4px 20px rgba(0,0,0,0.07)" : "none",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px 18px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <span style={{ fontSize: "13px", fontWeight: 700, color: "#0F172A", lineHeight: 1.4 }}>
+            {q}
+          </span>
+          <span
+            style={{
+              fontSize: "18px",
+              color: "#94A3B8",
+              flexShrink: 0,
+              transition: "transform 0.3s",
+              transform: open ? "rotate(45deg)" : "rotate(0deg)",
+            }}
+          >
+            +
+          </span>
         </div>
         {open && (
-          <div style={{ padding: "0 18px 16px", fontSize: "12.5px", color: "#475569", lineHeight: 1.7, borderTop: "1px solid #F1F5F9", paddingTop: "12px" }}>
+          <div
+            style={{
+              padding: "0 18px 16px",
+              paddingTop: "12px",
+              fontSize: "12.5px",
+              color: "#475569",
+              lineHeight: 1.7,
+              borderTop: "1px solid #F1F5F9",
+            }}
+          >
             {a}
           </div>
         )}
@@ -61,19 +219,88 @@ function MythCard({ myth, truth, delay }: { myth: string; truth: string; delay: 
   const [flipped, setFlipped] = useState(false);
   return (
     <Reveal delay={delay}>
-      <div onClick={() => setFlipped(!flipped)} style={{ cursor: "pointer", height: "140px", perspective: "1000px" }}>
-        <div style={{ position: "relative", width: "100%", height: "100%", transformStyle: "preserve-3d", transition: "transform 0.55s ease", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}>
-          <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden" as const, background: "linear-gradient(135deg,#FEF2F2,#FFF5F5)", border: "1.5px solid #FECACA", borderRadius: "16px", padding: "16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        onClick={() => setFlipped(!flipped)}
+        style={{ cursor: "pointer", height: "140px", perspective: "1000px" }}
+      >
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            transformStyle: "preserve-3d",
+            transition: "transform 0.55s ease",
+            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+          {/* Front */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backfaceVisibility: "hidden" as const,
+              background: "linear-gradient(135deg,#FEF2F2,#FFF5F5)",
+              border: "1.5px solid #FECACA",
+              borderRadius: "16px",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+          >
             <div>
-              <div style={{ fontSize: "9.5px", fontWeight: 800, color: "#DC2626", letterSpacing: "0.09em", textTransform: "uppercase" as const, marginBottom: "7px" }}>❌ Common Myth</div>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#7F1D1D", lineHeight: 1.45 }}>{myth}</div>
+              <div
+                style={{
+                  fontSize: "9.5px",
+                  fontWeight: 800,
+                  color: "#DC2626",
+                  letterSpacing: "0.09em",
+                  textTransform: "uppercase" as const,
+                  marginBottom: "7px",
+                }}
+              >
+                ❌ Common Myth
+              </div>
+              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#7F1D1D", lineHeight: 1.45 }}>
+                {myth}
+              </div>
             </div>
-            <div style={{ fontSize: "9.5px", color: "#DC2626", fontWeight: 600 }}>Tap to see the truth →</div>
+            <div style={{ fontSize: "9.5px", color: "#DC2626", fontWeight: 600 }}>
+              Tap to see the truth →
+            </div>
           </div>
-          <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden" as const, transform: "rotateY(180deg)", background: "linear-gradient(135deg,#ECFDF5,#F0FFF4)", border: "1.5px solid #A7F3D0", borderRadius: "16px", padding: "16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          {/* Back */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backfaceVisibility: "hidden" as const,
+              transform: "rotateY(180deg)",
+              background: "linear-gradient(135deg,#ECFDF5,#F0FFF4)",
+              border: "1.5px solid #A7F3D0",
+              borderRadius: "16px",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+          >
             <div>
-              <div style={{ fontSize: "9.5px", fontWeight: 800, color: "#059669", letterSpacing: "0.09em", textTransform: "uppercase" as const, marginBottom: "7px" }}>✅ The Truth</div>
-              <div style={{ fontSize: "12px", fontWeight: 600, color: "#064E3B", lineHeight: 1.55 }}>{truth}</div>
+              <div
+                style={{
+                  fontSize: "9.5px",
+                  fontWeight: 800,
+                  color: "#059669",
+                  letterSpacing: "0.09em",
+                  textTransform: "uppercase" as const,
+                  marginBottom: "7px",
+                }}
+              >
+                ✅ The Truth
+              </div>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "#064E3B", lineHeight: 1.55 }}>
+                {truth}
+              </div>
             </div>
             <div style={{ fontSize: "9.5px", color: "#059669", fontWeight: 600 }}>Tap to flip back →</div>
           </div>
@@ -86,20 +313,104 @@ function MythCard({ myth, truth, delay }: { myth: string; truth: string; delay: 
 // ─────────────────────────────────────────────────────────────────────────────
 // PILLAR CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function PillarCard({ number, icon, title, subtitle, points, color, bg, border }: { number: string; icon: string; title: string; subtitle: string; points: { icon: string; title: string; body: string }[]; color: string; bg: string; border: string }) {
+function PillarCard({
+  number,
+  icon,
+  title,
+  subtitle,
+  points,
+  color,
+  bg,
+  border,
+}: {
+  number: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+  points: { icon: string; title: string; body: string }[];
+  color: string;
+  bg: string;
+  border: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div style={{ background: "white", borderRadius: "22px", border: `1.5px solid ${border}`, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.05)", transition: "box-shadow 0.3s,transform 0.3s", display: "flex", flexDirection: "column" }}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 12px 44px rgba(0,0,0,0.10)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 20px rgba(0,0,0,0.05)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}>
-      <div style={{ background: bg, padding: "20px 20px 16px", borderBottom: `1px solid ${border}`, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -14, right: -10, fontSize: "80px", opacity: 0.06, lineHeight: 1 }}>{number}</div>
+    <div
+      style={{
+        background: "white",
+        borderRadius: "22px",
+        border: `1.5px solid ${border}`,
+        overflow: "hidden",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+        transition: "box-shadow 0.3s,transform 0.3s",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          background: bg,
+          padding: "20px 20px 16px",
+          borderBottom: `1px solid ${border}`,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: -14,
+            right: -10,
+            fontSize: "80px",
+            opacity: 0.06,
+            lineHeight: 1,
+          }}
+        >
+          {number}
+        </div>
         <div style={{ display: "flex", gap: "11px", alignItems: "flex-start" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "11px", background: "white", border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "19px", flexShrink: 0 }}>{icon}</div>
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "11px",
+              background: "white",
+              border: `1.5px solid ${border}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "19px",
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </div>
           <div>
-            <div style={{ fontSize: "9.5px", fontWeight: 800, color, letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: "2px" }}>Pillar {number}</div>
-            <h3 style={{ fontSize: "clamp(14px,2.2vw,17px)", fontWeight: 800, color: "#0F172A", margin: 0, lineHeight: 1.25 }}>{title}</h3>
-            <p style={{ fontSize: "11px", color: "#64748B", margin: "3px 0 0", lineHeight: 1.5 }}>{subtitle}</p>
+            <div
+              style={{
+                fontSize: "9.5px",
+                fontWeight: 800,
+                color,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase" as const,
+                marginBottom: "2px",
+              }}
+            >
+              Pillar {number}
+            </div>
+            <h3
+              style={{
+                fontSize: "clamp(14px,2.2vw,17px)",
+                fontWeight: 800,
+                color: "#0F172A",
+                margin: 0,
+                lineHeight: 1.25,
+              }}
+            >
+              {title}
+            </h3>
+            <p style={{ fontSize: "11px", color: "#64748B", margin: "3px 0 0", lineHeight: 1.5 }}>
+              {subtitle}
+            </p>
           </div>
         </div>
       </div>
@@ -107,16 +418,48 @@ function PillarCard({ number, icon, title, subtitle, points, color, bg, border }
         <div style={{ display: "flex", flexDirection: "column", gap: "11px" }}>
           {points.slice(0, expanded ? points.length : 2).map((p, i) => (
             <div key={i} style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}>
-              <div style={{ width: "30px", height: "30px", borderRadius: "8px", background: bg, border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", flexShrink: 0 }}>{p.icon}</div>
+              <div
+                style={{
+                  width: "30px",
+                  height: "30px",
+                  borderRadius: "8px",
+                  background: bg,
+                  border: `1px solid ${border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "13px",
+                  flexShrink: 0,
+                }}
+              >
+                {p.icon}
+              </div>
               <div>
-                <div style={{ fontSize: "11.5px", fontWeight: 700, color, marginBottom: "2px" }}>{p.title}</div>
+                <div style={{ fontSize: "11.5px", fontWeight: 700, color, marginBottom: "2px" }}>
+                  {p.title}
+                </div>
                 <div style={{ fontSize: "11px", color: "#475569", lineHeight: 1.6 }}>{p.body}</div>
               </div>
             </div>
           ))}
         </div>
         {points.length > 2 && (
-          <button onClick={() => setExpanded(!expanded)} style={{ marginTop: "11px", width: "100%", background: bg, border: `1px solid ${border}`, borderRadius: "9px", padding: "6px", fontSize: "11px", fontWeight: 700, color, cursor: "pointer", fontFamily: "inherit" }}>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{
+              marginTop: "11px",
+              width: "100%",
+              background: bg,
+              border: `1px solid ${border}`,
+              borderRadius: "9px",
+              padding: "6px",
+              fontSize: "11px",
+              fontWeight: 700,
+              color,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
             {expanded ? "▲ Show less" : `▼ ${points.length - 2} more insights`}
           </button>
         )}
@@ -128,28 +471,125 @@ function PillarCard({ number, icon, title, subtitle, points, color, bg, border }
 // ─────────────────────────────────────────────────────────────────────────────
 // STRUCTURE CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function StructureCard({ icon, bigStat, statLabel, title, body, color, bg, border, accentGradient, visual, delay }: {
-  icon: string; bigStat: string; statLabel: string; title: string; body: string;
-  color: string; bg: string; border: string; accentGradient: string; visual: React.ReactNode; delay: number;
+function StructureCard({
+  icon,
+  bigStat,
+  statLabel,
+  title,
+  body,
+  color,
+  bg,
+  border,
+  accentGradient,
+  visual,
+  delay,
+}: {
+  icon: string;
+  bigStat: string;
+  statLabel: string;
+  title: string;
+  body: string;
+  color: string;
+  bg: string;
+  border: string;
+  accentGradient: string;
+  visual: React.ReactNode;
+  delay: number;
 }) {
   return (
     <Reveal delay={delay}>
-      <div style={{ background: "white", borderRadius: "22px", border: `1.5px solid ${border}`, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.06)", transition: "box-shadow 0.3s,transform 0.3s", display: "flex", flexDirection: "column", height: "100%" }}
-        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 14px 52px rgba(0,0,0,0.12)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-5px)"; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.06)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}>
+      <div
+        style={{
+          background: "white",
+          borderRadius: "22px",
+          border: `1.5px solid ${border}`,
+          overflow: "hidden",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+          transition: "box-shadow 0.3s,transform 0.3s",
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 14px 52px rgba(0,0,0,0.12)";
+          (e.currentTarget as HTMLDivElement).style.transform = "translateY(-5px)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.06)";
+          (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+        }}
+      >
         <div style={{ height: "4px", background: accentGradient }} />
-        <div style={{ background: bg, padding: "22px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "140px", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle at 70% 50%, ${color}10 0%, transparent 60%)` }} />
+        <div
+          style={{
+            background: bg,
+            padding: "22px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "140px",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage: `radial-gradient(circle at 70% 50%, ${color}10 0%, transparent 60%)`,
+            }}
+          />
           <div style={{ position: "relative", zIndex: 1, width: "100%" }}>{visual}</div>
         </div>
         <div style={{ padding: "16px 18px 18px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "9px", marginBottom: "8px" }}>
-            <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: bg, border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", flexShrink: 0 }}>{icon}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color, lineHeight: 1.25, marginBottom: "1px" }}>{title}</div>
-              {bigStat && <div style={{ fontSize: "9.5px", fontWeight: 600, color: "#94A3B8" }}>{statLabel}</div>}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "9px",
+              marginBottom: "8px",
+            }}
+          >
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "9px",
+                background: bg,
+                border: `1.5px solid ${border}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "15px",
+                flexShrink: 0,
+              }}
+            >
+              {icon}
             </div>
-            {bigStat && <div style={{ background: accentGradient, borderRadius: "8px", padding: "3px 9px", fontSize: "11.5px", fontWeight: 900, color: "white", whiteSpace: "nowrap", flexShrink: 0 }}>{bigStat}</div>}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color, lineHeight: 1.25, marginBottom: "1px" }}>
+                {title}
+              </div>
+              {bigStat && (
+                <div style={{ fontSize: "9.5px", fontWeight: 600, color: "#94A3B8" }}>{statLabel}</div>
+              )}
+            </div>
+            {bigStat && (
+              <div
+                style={{
+                  background: accentGradient,
+                  borderRadius: "8px",
+                  padding: "3px 9px",
+                  fontSize: "11.5px",
+                  fontWeight: 900,
+                  color: "white",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {bigStat}
+              </div>
+            )}
           </div>
           <p style={{ fontSize: "11.5px", color: "#475569", lineHeight: 1.7, margin: 0 }}>{body}</p>
         </div>
@@ -159,7 +599,7 @@ function StructureCard({ icon, bigStat, statLabel, title, body, color, bg, borde
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INLINE SVG VISUALS
+// INLINE SVG VISUALS (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 const TaxFreeViz = ({ color }: { color: string }) => (
   <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", justifyContent: "center", width: "100%" }}>
@@ -270,14 +710,16 @@ const ElasticityViz = ({ color }: { color: string }) => (
         { emoji: "🏦", label: "Debt", bg: "#FFFBEB", bd: "#FDE68A", tc: "#D97706" },
         { arrow: true, color: "#059669" },
         { emoji: "🥇", label: "Gold", bg: "#FEF2F2", bd: "#FECACA", tc: "#DC2626" },
-      ].map((item: any, i) => item.arrow ? (
-        <div key={i} style={{ fontSize: "16px", color: "#059669", fontWeight: 900, padding: "0 1px" }}>→</div>
-      ) : (
-        <div key={i} style={{ textAlign: "center", background: item.bg, border: `1.5px solid ${item.bd}`, borderRadius: "10px", padding: "7px 5px", minWidth: "50px" }}>
-          <div style={{ fontSize: "19px" }}>{item.emoji}</div>
-          <div style={{ fontSize: "7.5px", fontWeight: 700, color: item.tc, marginTop: "2px" }}>{item.label}</div>
-        </div>
-      ))}
+      ].map((item: any, i) =>
+        item.arrow ? (
+          <div key={i} style={{ fontSize: "16px", color: "#059669", fontWeight: 900, padding: "0 1px" }}>→</div>
+        ) : (
+          <div key={i} style={{ textAlign: "center", background: item.bg, border: `1.5px solid ${item.bd}`, borderRadius: "10px", padding: "7px 5px", minWidth: "50px" }}>
+            <div style={{ fontSize: "19px" }}>{item.emoji}</div>
+            <div style={{ fontSize: "7.5px", fontWeight: 700, color: item.tc, marginTop: "2px" }}>{item.label}</div>
+          </div>
+        )
+      )}
     </div>
     <div style={{ textAlign: "center", marginTop: "9px" }}>
       <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: `${color}14`, border: `1px solid ${color}35`, borderRadius: "100px", padding: "3px 11px", fontSize: "9.5px", fontWeight: 700, color }}>
@@ -288,11 +730,10 @@ const ElasticityViz = ({ color }: { color: string }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOW IT WORKS — pooling diagram
+// POOLING DIAGRAM
 // ─────────────────────────────────────────────────────────────────────────────
 const PoolingDiagram = () => (
   <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "clamp(8px,2vw,20px)", justifyContent: "center", flexWrap: "wrap" }}>
-    {/* Investors */}
     <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
       {[{ emoji: "👨‍💼", label: "₹1,000" }, { emoji: "👩‍🏫", label: "₹5,000" }, { emoji: "👨‍🔧", label: "₹500" }, { emoji: "👩‍⚕️", label: "₹10,000" }].map((p, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "5px 10px", fontSize: "12px" }}>
@@ -301,27 +742,28 @@ const PoolingDiagram = () => (
       ))}
       <div style={{ fontSize: "9px", color: "#94A3B8", fontWeight: 600 }}>Many investors</div>
     </div>
-    {/* Arrow */}
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
       <div style={{ fontSize: "22px", color: "#10B981" }}>→</div>
       <div style={{ fontSize: "8.5px", color: "#059669", fontWeight: 700 }}>Pool money</div>
     </div>
-    {/* Fund pool */}
     <div style={{ background: "linear-gradient(135deg,#EFF6FF,#F5F3FF)", border: "2px solid #BFDBFE", borderRadius: "16px", padding: "12px 14px", textAlign: "center", minWidth: "90px" }}>
       <div style={{ fontSize: "26px", marginBottom: "4px" }}>🏦</div>
       <div style={{ fontSize: "10px", fontWeight: 800, color: "#1E40AF" }}>Mutual Fund</div>
       <div style={{ fontSize: "8.5px", color: "#64748B", marginTop: "2px" }}>Managed by expert</div>
     </div>
-    {/* Arrow */}
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
       <div style={{ fontSize: "22px", color: "#10B981" }}>→</div>
       <div style={{ fontSize: "8.5px", color: "#059669", fontWeight: 700 }}>Invests in</div>
     </div>
-    {/* Assets */}
     <div style={{ display: "flex", flexDirection: "column", gap: "5px", alignItems: "flex-start" }}>
-      {[{ emoji: "🏭", label: "Company stocks", c: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" }, { emoji: "📄", label: "Govt bonds", c: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" }, { emoji: "🥇", label: "Gold / other", c: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" }].map((a, i) => (
+      {[
+        { emoji: "🏭", label: "Company stocks", c: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
+        { emoji: "📄", label: "Govt bonds", c: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
+        { emoji: "🥇", label: "Gold / other", c: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
+      ].map((a, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", background: a.bg, border: `1px solid ${a.bd}`, borderRadius: "8px", padding: "5px 10px" }}>
-          <span style={{ fontSize: "13px" }}>{a.emoji}</span><span style={{ fontSize: "10px", fontWeight: 700, color: a.c }}>{a.label}</span>
+          <span style={{ fontSize: "13px" }}>{a.emoji}</span>
+          <span style={{ fontSize: "10px", fontWeight: 700, color: a.c }}>{a.label}</span>
         </div>
       ))}
       <div style={{ fontSize: "9px", color: "#94A3B8", fontWeight: 600 }}>Diversified basket</div>
@@ -331,7 +773,7 @@ const PoolingDiagram = () => (
 
 // NAV analogy diagram
 const NAVDiagram = () => (
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", width: "100%" }}>
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px", width: "100%" }}>
     {[
       { icon: "🍕", title: "Pizza Analogy", desc: "1 large pizza (the fund) sliced into many pieces (units). You buy as many slices as your budget allows.", color: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
       { icon: "📈", title: "NAV goes up", desc: "Pizza value rises (stocks perform) → your slices are worth more. You profit proportionally.", color: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
@@ -346,9 +788,7 @@ const NAVDiagram = () => (
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HOW TO START — step visual
-// ─────────────────────────────────────────────────────────────────────────────
+// HOW TO START
 const HowToStartSteps = () => (
   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
     {[
@@ -373,7 +813,6 @@ const HowToStartSteps = () => (
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WhyMutualFundsPage() {
-
   const structureCards = [
     { icon: "⚡", bigStat: "~1.5%", statLabel: "saved annually vs direct stocks", title: "Tax-Free Internal Compounding", body: "When the fund manager switches stocks, you pay zero capital gains tax. Do this yourself with direct stocks → you're taxed 12.5–20% every time. This 'tax drag' silently destroys compounding over decades.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", accentGradient: "linear-gradient(90deg,#2563EB,#7C3AED)", visual: <TaxFreeViz color="#2563EB" /> },
     { icon: "🐋", bigStat: "~0%", statLabel: "market impact cost at QIB scale", title: "Institutional Buying Power", body: "Funds buy stocks in hundreds of crores as Qualified Institutional Buyers — near-zero market impact cost. A retail investor buying the same stock pays 0.5–1% slippage per trade. You get whale power on a fish budget.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", accentGradient: "linear-gradient(90deg,#7C3AED,#2563EB)", visual: <PricingViz color="#7C3AED" /> },
@@ -409,80 +848,209 @@ export default function WhyMutualFundsPage() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", color: "#1F2937" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#F8FAFC",
+        fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif",
+        color: "#1F2937",
+      }}
+    >
+      {/* ── HERO with embedded sub-nav ── */}
+      <section
+        style={{
+          background: "linear-gradient(155deg,#0F172A 0%,#1E3A5F 55%,#065F46 100%)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* dot grid */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)",
+            backgroundSize: "28px 28px",
+            pointerEvents: "none",
+          }}
+        />
+        {/* glow */}
+        <div
+          style={{
+            position: "absolute",
+            top: -80,
+            right: -60,
+            width: "500px",
+            height: "500px",
+            background: "radial-gradient(circle,rgba(16,185,129,0.15) 0%,transparent 65%)",
+            pointerEvents: "none",
+          }}
+        />
 
-      {/* NAV BAR */}
-      <div style={{ background: "white", borderBottom: "1px solid #E2E8F0", zIndex: 30, position: "sticky", top: 0 }}>
-        <div style={{ maxWidth: "1152px", margin: "0 auto" }}><AnalysisTabs /></div>
-      </div>
-
-      {/* ── HERO ── */}
-      <section style={{ background: "linear-gradient(155deg,#F0FDF4 0%,#EFF6FF 55%,#FFF7ED 100%)", borderBottom: "1px solid #E2E8F0", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 1px 1px, rgba(16,185,129,0.07) 1px, transparent 0)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: -100, right: -60, width: "500px", height: "500px", background: "radial-gradient(circle,rgba(59,130,246,0.09) 0%,transparent 65%)", pointerEvents: "none" }} />
-        <div style={{ position: "relative", maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,6vw,72px) clamp(16px,4vw,32px) clamp(36px,5vw,56px)" }}>
+        <div
+          style={{
+            position: "relative",
+            maxWidth: "1100px",
+            margin: "0 auto",
+            padding: "clamp(32px,5vw,56px) clamp(16px,4vw,32px) clamp(28px,4vw,44px)",
+          }}
+        >
+          {/* Breadcrumb / page context */}
           <Reveal>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: "100px", padding: "5px 16px", marginBottom: "18px" }}>
-              <span style={{ width: "7px", height: "7px", background: "#10B981", borderRadius: "50%" }} />
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "#065F46", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Complete Guide · For Every Indian Investor</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "20px",
+                flexWrap: "wrap",
+              }}
+            >
+              <a
+                href="/"
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.45)",
+                  textDecoration: "none",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                Nivesify
+              </a>
+              <span style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px" }}>/</span>
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.45)",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                Mutual Fund World
+              </span>
             </div>
           </Reveal>
-          <Reveal delay={80}>
-            <h1 style={{ fontSize: "clamp(2rem,5.5vw,3.6rem)", fontWeight: 900, color: "#0F172A", lineHeight: 1.06, letterSpacing: "-0.04em", marginBottom: "18px", maxWidth: "780px" }}>
-              Mutual Funds — Explained<br />
-              <span style={{ background: "linear-gradient(90deg,#059669 0%,#2563EB 60%,#7C3AED 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "block" }}>Simply, Clearly, Completely.</span>
+
+          {/* Title */}
+          <Reveal delay={60}>
+            <h1
+              style={{
+                fontSize: "clamp(1.75rem,5vw,3.2rem)",
+                fontWeight: 900,
+                color: "white",
+                lineHeight: 1.08,
+                letterSpacing: "-0.03em",
+                marginBottom: "10px",
+                maxWidth: "720px",
+              }}
+            >
+              Mutual Funds —{" "}
+              <span
+                style={{
+                  background: "linear-gradient(90deg,#34D399 0%,#60A5FA 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                Simply, Clearly, Completely.
+              </span>
             </h1>
           </Reveal>
-          <Reveal delay={160}>
-            <p style={{ fontSize: "clamp(14px,2vw,16px)", color: "#475569", lineHeight: 1.8, maxWidth: "540px" }}>
-              What they are, how they work, their real benefits and risks, what they cost, and exactly how to get started — all in one place.
+
+          <Reveal delay={120}>
+            <p
+              style={{
+                fontSize: "clamp(13px,1.8vw,15px)",
+                color: "rgba(255,255,255,0.62)",
+                lineHeight: 1.75,
+                maxWidth: "500px",
+                marginBottom: "28px",
+              }}
+            >
+              What they are, how they work, their real benefits and risks, what they cost, and exactly
+              how to get started — all in one place.
             </p>
+          </Reveal>
+
+          {/* ── SUB-NAV TABS ── */}
+          <Reveal delay={180}>
+            <div
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "14px",
+                padding: "6px 8px",
+                display: "block",
+                width: "100%",
+                maxWidth: "fit-content",
+                boxSizing: "border-box",
+                overflow: "hidden",
+              }}
+            >
+              <SubNavTabs />
+            </div>
           </Reveal>
         </div>
       </section>
 
       {/* ── BODY ── */}
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(28px,5vw,56px) clamp(16px,4vw,32px)" }}>
-
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 1 — WHAT IS A MUTUAL FUND                         */}
-        {/* ══════════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          maxWidth: "1100px",
+          margin: "0 auto",
+          padding: "clamp(28px,5vw,56px) clamp(16px,4vw,32px)",
+        }}
+      >
+        {/* SECTION 1 */}
         <Reveal>
-          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(22px,4vw,36px)", marginBottom: "48px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
+          <div
+            style={{
+              background: "white",
+              borderRadius: "24px",
+              border: "1.5px solid #E2E8F0",
+              padding: "clamp(20px,4vw,36px)",
+              marginBottom: "40px",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.05)",
+            }}
+          >
             <SectionLabel text="Section 1 · Definition" />
-            <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 8px" }}>What is a Mutual Fund?</h2>
+            <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 8px" }}>
+              What is a Mutual Fund?
+            </h2>
             <p style={{ fontSize: "clamp(13px,1.8vw,15px)", color: "#475569", lineHeight: 1.8, maxWidth: "680px", marginBottom: "28px" }}>
-              A mutual fund <strong>pools money from many investors</strong> to buy a diversified basket of stocks, bonds, or other assets. A professional fund manager makes all investment decisions. You own a proportional share — called <strong>units</strong> — of the entire pool.
+              A mutual fund <strong>pools money from many investors</strong> to buy a diversified basket of
+              stocks, bonds, or other assets. A professional fund manager makes all investment decisions.
+              You own a proportional share — called <strong>units</strong> — of the entire pool.
             </p>
-
-            {/* Pooling diagram */}
-            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "clamp(16px,3vw,28px)", marginBottom: "24px", overflowX: "auto" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.08em", textAlign: "center", marginBottom: "18px" }}>How the Pool Works</div>
+            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "clamp(14px,3vw,28px)", marginBottom: "24px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.08em", textAlign: "center", marginBottom: "18px" }}>
+                How the Pool Works
+              </div>
               <PoolingDiagram />
             </div>
-
-            {/* One-liner callout */}
             <div style={{ background: "linear-gradient(90deg,#ECFDF5,#EFF6FF)", border: "1.5px solid #A7F3D0", borderRadius: "12px", padding: "14px 18px", display: "flex", alignItems: "center", gap: "12px" }}>
               <span style={{ fontSize: "24px", flexShrink: 0 }}>💡</span>
               <p style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A", margin: 0, lineHeight: 1.6 }}>
-                Think of it like a <strong>group buying club</strong>. Alone you can only afford one share of one company. Together, the pool buys hundreds of companies — and you own a small piece of all of them.
+                Think of it like a <strong>group buying club</strong>. Alone you can only afford one share of
+                one company. Together, the pool buys hundreds of companies — and you own a small piece of all of them.
               </p>
             </div>
           </div>
         </Reveal>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 2 — HOW IT WORKS (NAV, SIP, Units)                */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 2 */}
         <Reveal>
-          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(22px,4vw,36px)", marginBottom: "48px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
+          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,36px)", marginBottom: "40px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
             <SectionLabel text="Section 2 · How It Works" color="#2563EB" bg="rgba(37,99,235,0.08)" border="rgba(37,99,235,0.2)" />
-            <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 8px" }}>How Do Mutual Funds Actually Work?</h2>
-            <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "620px", marginBottom: "24px" }}>Three concepts explain everything: NAV (unit price), Units (your ownership), and SIP (how you invest regularly).</p>
-
+            <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 8px" }}>
+              How Do Mutual Funds Actually Work?
+            </h2>
+            <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "620px", marginBottom: "24px" }}>
+              Three concepts explain everything: NAV (unit price), Units (your ownership), and SIP (how you invest regularly).
+            </p>
             <NAVDiagram />
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginTop: "18px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginTop: "18px" }}>
               {[
                 { term: "NAV", full: "Net Asset Value", explain: "The per-unit price of the fund. Calculated daily. Buy low, accumulate units, sell when higher. Simple.", icon: "💹", color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
                 { term: "Units", full: "Your ownership stake", explain: "When you invest ₹5,000 at NAV ₹50, you get 100 units. As NAV rises to ₹80, your 100 units = ₹8,000.", icon: "🎫", color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE" },
@@ -503,16 +1071,17 @@ export default function WhyMutualFundsPage() {
           </div>
         </Reveal>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 3 — PROS & CONS                                   */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 3 — PROS & CONS */}
         <Reveal>
-          <div style={{ marginBottom: "48px" }}>
+          <div style={{ marginBottom: "40px" }}>
             <SectionLabel text="Section 3 · Pros & Cons" color="#D97706" bg="rgba(217,119,6,0.08)" border="rgba(217,119,6,0.2)" />
-            <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>The Honest Picture — Benefits & Risks</h2>
-            <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "560px", marginBottom: "20px" }}>No investment is perfect. Here's exactly what mutual funds do well — and where you need to be aware.</p>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>
+              The Honest Picture — Benefits & Risks
+            </h2>
+            <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "560px", marginBottom: "20px" }}>
+              No investment is perfect. Here's exactly what mutual funds do well — and where you need to be aware.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
               {/* Pros */}
               <div style={{ background: "linear-gradient(135deg,#ECFDF5,#F0FFF4)", border: "1.5px solid #A7F3D0", borderRadius: "20px", padding: "20px 22px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 800, color: "#059669", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -538,7 +1107,6 @@ export default function WhyMutualFundsPage() {
                   ))}
                 </div>
               </div>
-
               {/* Cons */}
               <div style={{ background: "linear-gradient(135deg,#FEF2F2,#FFF5F5)", border: "1.5px solid #FECACA", borderRadius: "20px", padding: "20px 22px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 800, color: "#DC2626", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -568,23 +1136,22 @@ export default function WhyMutualFundsPage() {
           </div>
         </Reveal>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 4 — THE IRON-CLAD STRUCTURE (why MF wins)        */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 4 — IRON-CLAD STRUCTURE */}
         <Reveal>
           <SectionLabel text="Section 4 · Why the Vehicle Wins" color="#7C3AED" bg="rgba(124,58,237,0.08)" border="rgba(124,58,237,0.2)" />
           <h2 style={{ fontSize: "clamp(18px,3vw,28px)", fontWeight: 900, color: "#0F172A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
             The Iron-Clad Structure:{" "}
-            <span style={{ background: "linear-gradient(90deg,#7C3AED,#059669)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Engineered to Win</span>
+            <span style={{ background: "linear-gradient(90deg,#7C3AED,#059669)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Engineered to Win
+            </span>
           </h2>
           <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 20px" }}>
             Beyond the basic benefits — the mutual fund <strong>vehicle itself</strong> has structural advantages that no other investment product offers.
           </p>
         </Reveal>
 
-        {/* Dark banner */}
         <Reveal delay={80}>
-          <div style={{ background: "linear-gradient(135deg,#0F172A 0%,#1E3A8A 55%,#065F46 100%)", borderRadius: "22px", padding: "clamp(20px,4vw,36px)", marginBottom: "16px", position: "relative", overflow: "hidden", display: "flex", alignItems: "center", gap: "clamp(14px,4vw,36px)", flexWrap: "wrap" }}>
+          <div style={{ background: "linear-gradient(135deg,#0F172A 0%,#1E3A8A 55%,#065F46 100%)", borderRadius: "22px", padding: "clamp(18px,4vw,36px)", marginBottom: "16px", position: "relative", overflow: "hidden", display: "flex", alignItems: "center", gap: "clamp(14px,4vw,36px)", flexWrap: "wrap" }}>
             <div style={{ position: "absolute", top: -50, right: -50, width: "280px", height: "280px", background: "radial-gradient(circle,rgba(16,185,129,0.18) 0%,transparent 70%)", pointerEvents: "none" }} />
             <div style={{ flex: "1 1 220px", position: "relative" }}>
               <div style={{ fontSize: "clamp(13px,2.5vw,17px)", fontWeight: 900, color: "white", lineHeight: 1.3, marginBottom: "8px" }}>"Invest in the Structure, Not Just the Manager."</div>
@@ -601,20 +1168,17 @@ export default function WhyMutualFundsPage() {
           </div>
         </Reveal>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: "14px", marginBottom: "48px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", marginBottom: "48px" }}>
           {structureCards.map((card, i) => <StructureCard key={i} {...card} delay={i * 60} />)}
         </div>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 5 — COSTS                                          */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 5 — COSTS */}
         <Reveal>
-          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,34px)", marginBottom: "48px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
+          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,34px)", marginBottom: "40px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
             <SectionLabel text="Section 5 · What Does It Cost?" color="#D97706" bg="rgba(217,119,6,0.08)" border="rgba(217,119,6,0.2)" />
             <h2 style={{ fontSize: "clamp(17px,3vw,24px)", fontWeight: 800, color: "#0F172A", margin: "0 0 8px" }}>Understanding Mutual Fund Costs</h2>
             <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "600px", marginBottom: "20px" }}>Costs directly reduce your returns. Knowing them helps you make smarter choices.</p>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "20px" }}>
               {[
                 { icon: "📊", term: "Expense Ratio", explain: "Annual fee charged to manage the fund. Deducted daily from NAV automatically. Index funds: 0.1–0.5%. Active funds: 0.5–2%.", range: "0.1% – 2%", rangeLabel: "annual fee", color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
                 { icon: "🚪", term: "Exit Load", explain: "A penalty for exiting too early — typically 1% if you redeem within 1 year of investing. Encourages long-term holding. Most index funds have 0% exit load.", range: "0–1%", rangeLabel: "early exit penalty", color: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
@@ -635,30 +1199,25 @@ export default function WhyMutualFundsPage() {
                 </div>
               ))}
             </div>
-
             <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "12px", padding: "12px 16px", fontSize: "12px", color: "#92400E", lineHeight: 1.65 }}>
               💡 <strong>Rule of thumb:</strong> For passive/index funds, always pick the lowest expense ratio. For active funds, focus on alpha after fees — not just returns. A fund that earns 14% but charges 2% is worse than one that earns 13% and charges 0.5%.
             </div>
           </div>
         </Reveal>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 6 — THE 3 PILLARS (for advanced investing)        */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 6 — 3 PILLARS */}
         <Reveal>
           <SectionLabel text="Section 6 · The Iron-Clad Framework" color="#059669" />
           <h2 style={{ fontSize: "clamp(18px,3vw,26px)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>3 Pillars for Serious Long-Term Investors</h2>
           <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "540px", margin: "0 0 22px" }}>Once you understand the basics, these 3 pillars are how experienced investors build wealth systematically.</p>
         </Reveal>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: "18px", marginBottom: "48px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "18px", marginBottom: "48px" }}>
           {pillars.map((p, i) => <Reveal key={i} delay={i * 100}><PillarCard {...p} /></Reveal>)}
         </div>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 7 — HOW TO START                                   */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 7 — HOW TO START */}
         <Reveal>
-          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,34px)", marginBottom: "48px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
+          <div style={{ background: "white", borderRadius: "24px", border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,34px)", marginBottom: "40px", boxShadow: "0 4px 24px rgba(0,0,0,0.05)" }}>
             <SectionLabel text="Section 7 · How to Start" color="#2563EB" bg="rgba(37,99,235,0.08)" border="rgba(37,99,235,0.2)" />
             <h2 style={{ fontSize: "clamp(17px,3vw,24px)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>Start Investing in 6 Simple Steps</h2>
             <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "540px", marginBottom: "22px" }}>From zero to first SIP — here's exactly what to do.</p>
@@ -670,21 +1229,17 @@ export default function WhyMutualFundsPage() {
           </div>
         </Reveal>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* MYTH BUSTERS                                               */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* MYTH BUSTERS */}
         <Reveal>
           <SectionLabel text="Myth Busters" color="#DC2626" bg="rgba(220,38,38,0.08)" border="rgba(220,38,38,0.2)" />
           <h2 style={{ fontSize: "clamp(17px,3vw,24px)", fontWeight: 800, color: "#0F172A", margin: "0 0 4px" }}>6 Things Your Neighbour Got Wrong</h2>
           <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 18px" }}>👆 Tap each card to reveal the truth</p>
         </Reveal>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "12px", marginBottom: "48px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px", marginBottom: "48px" }}>
           {myths.map((m, i) => <MythCard key={i} myth={m.myth} truth={m.truth} delay={i * 60} />)}
         </div>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 8 — FAQs                                           */}
-        {/* ══════════════════════════════════════════════════════════ */}
+        {/* SECTION 8 — FAQs */}
         <Reveal>
           <SectionLabel text="Section 8 · FAQs" color="#7C3AED" bg="rgba(124,58,237,0.08)" border="rgba(124,58,237,0.2)" />
           <h2 style={{ fontSize: "clamp(17px,3vw,24px)", fontWeight: 800, color: "#0F172A", margin: "0 0 6px" }}>Frequently Asked Questions</h2>
@@ -694,15 +1249,17 @@ export default function WhyMutualFundsPage() {
           {faqs.map((f, i) => <FAQItem key={i} q={f.q} a={f.a} delay={i * 50} />)}
         </div>
 
-        {/* ── CONCLUSION BANNER ── */}
+        {/* CONCLUSION BANNER */}
         <Reveal>
-          <div style={{ background: "linear-gradient(135deg,#0F172A 0%,#1E3A8A 60%,#065F46 100%)", borderRadius: "26px", padding: "clamp(26px,5vw,46px)", marginBottom: "22px", position: "relative", overflow: "hidden" }}>
+          <div style={{ background: "linear-gradient(135deg,#0F172A 0%,#1E3A8A 60%,#065F46 100%)", borderRadius: "26px", padding: "clamp(24px,5vw,46px)", marginBottom: "22px", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: -50, right: -50, width: "280px", height: "280px", background: "radial-gradient(circle,rgba(16,185,129,0.15) 0%,transparent 70%)", pointerEvents: "none" }} />
             <div style={{ position: "relative" }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "4px 13px", marginBottom: "14px" }}>
                 <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#A7F3D0", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>The Conclusion</span>
               </div>
-              <h2 style={{ fontSize: "clamp(20px,4vw,30px)", fontWeight: 900, color: "white", margin: "0 0 10px", lineHeight: 1.15, maxWidth: "560px" }}>Invest in the Structure. Not Just the Manager.</h2>
+              <h2 style={{ fontSize: "clamp(18px,4vw,30px)", fontWeight: 900, color: "white", margin: "0 0 10px", lineHeight: 1.15, maxWidth: "560px" }}>
+                Invest in the Structure. Not Just the Manager.
+              </h2>
               <p style={{ fontSize: "clamp(12px,1.8vw,13.5px)", color: "rgba(255,255,255,0.7)", lineHeight: 1.8, maxWidth: "520px", marginBottom: "20px" }}>
                 Legal protection, tax efficiency, SIP discipline, and market participation — all in one wrapper, starting at ₹100/month. You don't need to be perfect. You just need to stay invested.
               </p>
@@ -715,7 +1272,7 @@ export default function WhyMutualFundsPage() {
           </div>
         </Reveal>
 
-        {/* ── CTAs ── */}
+        {/* CTAs */}
         <Reveal>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px", marginBottom: "20px" }}>
             <a href="/find-my-fund" style={{ textDecoration: "none", background: "linear-gradient(90deg,#059669 0%,#2563EB 100%)", borderRadius: "18px", padding: "clamp(16px,3vw,24px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "14px", boxShadow: "0 8px 28px rgba(5,150,105,0.3)", transition: "transform 0.2s,box-shadow 0.2s" }}
@@ -746,6 +1303,23 @@ export default function WhyMutualFundsPage() {
           <strong style={{ color: "#64748B" }}>Important Disclaimer:</strong> Mutual fund investments are subject to market risks. Past performance is not indicative of future returns. Returns shown are illustrative and based on historical data — not guaranteed. Please read all scheme-related documents carefully before investing. Consult a SEBI-registered investment advisor for personalised advice.
         </div>
       </div>
+
+      <style>{`
+        * { -ms-overflow-style: none; scrollbar-width: none; box-sizing: border-box; }
+        *::-webkit-scrollbar { display: none; }
+        html { scroll-behavior: smooth; }
+        img, iframe, table { max-width: 100%; }
+        @media (max-width: 480px) {
+          h1 { letter-spacing: -0.02em !important; }
+          /* Myth flip cards: ensure full height on small screens */
+          .myth-card { height: 160px !important; }
+          /* FAQ items: bigger tap target */
+          .faq-item { padding: 18px !important; }
+        }
+        @media (max-width: 640px) {
+          section { padding-left: 14px !important; padding-right: 14px !important; }
+        }
+      `}</style>
     </div>
   );
 }
