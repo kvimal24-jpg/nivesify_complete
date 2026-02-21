@@ -156,27 +156,13 @@ type GoalInput = {
   priority: "essential" | "important" | "aspirational";
 };
 
-type GoalStatus = "active" | "achieved" | "upcoming";
-
 type YearSnapshot = {
   year: number;
-  activeGoals: string[];  // goal ids still active
-  achievedGoals: string[]; // goal ids just achieved this year
-  totalSIP: number;
+  activeGoals: string[];
+  achievedGoals: string[];
+  totalSIP: number;         // stepped-up SIP at this year
   blocks: ExposureBlock[];
-  equityPct: number;
-  debtPct: number;
-  hybridPct: number;
   label: string;
-};
-
-type LifetimePlan = {
-  goals: GoalInput[];
-  totalYears: number;
-  timeline: YearSnapshot[];
-  totalMonthlySIP: number;
-  phaseDescriptions: PhaseDescription[];
-  resolvedFundsByPhase: Map<string, ResolvedFundSlot[]>;
 };
 
 type PhaseDescription = {
@@ -185,8 +171,21 @@ type PhaseDescription = {
   label: string;
   description: string;
   activeGoalLabels: string[];
+  achievedGoalLabels: string[];   // goals completed AT start of this phase
   plan: AllocationPlan;
-  totalSIP: number;
+  totalSIP: number;               // stepped-up SIP for this phase (first year of phase)
+  baseSIP: number;                // year-0 SIP (shown for reference)
+  // per-goal SIP breakdown for clarity
+  goalSIPs: { goalId: string; goalLabel: string; goalEmoji: string; sip: number }[];
+};
+
+type LifetimePlan = {
+  goals: GoalInput[];
+  totalYears: number;
+  timeline: YearSnapshot[];
+  baseMonthlySIP: number;         // year-0 SIP commitment
+  phaseDescriptions: PhaseDescription[];
+  resolvedFundsByPhase: Map<string, ResolvedFundSlot[]>;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -194,26 +193,26 @@ type PhaseDescription = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GOAL_TEMPLATES = [
-  { emoji: "🛡️", label: "Emergency Fund",    targetLakh: "5",   horizonYears: "1",  riskScore: 2, priority: "essential"    as const, tip: "3-6 months of expenses parked safely" },
-  { emoji: "✈️", label: "Dream Vacation",     targetLakh: "3",   horizonYears: "2",  riskScore: 3, priority: "aspirational" as const, tip: "International trip you've been planning" },
-  { emoji: "🚗", label: "Buy a Car",           targetLakh: "10",  horizonYears: "3",  riskScore: 4, priority: "important"    as const, tip: "Down payment or full purchase" },
-  { emoji: "💒", label: "Wedding Fund",        targetLakh: "20",  horizonYears: "4",  riskScore: 4, priority: "important"    as const, tip: "A wedding you'll always remember" },
-  { emoji: "🏠", label: "Home Down Payment",   targetLakh: "30",  horizonYears: "6",  riskScore: 5, priority: "essential"    as const, tip: "20% of a ₹1.5Cr flat" },
-  { emoji: "👶", label: "Child's Education",   targetLakh: "50",  horizonYears: "12", riskScore: 6, priority: "essential"    as const, tip: "Fund a professional degree" },
-  { emoji: "💍", label: "Child's Wedding",     targetLakh: "40",  horizonYears: "18", riskScore: 5, priority: "important"    as const, tip: "A gift they'll never forget" },
-  { emoji: "🌴", label: "Retirement",          targetLakh: "500", horizonYears: "25", riskScore: 6, priority: "essential"    as const, tip: "Build a comfortable retirement corpus" },
-  { emoji: "🏖️", label: "Second Home",        targetLakh: "80",  horizonYears: "10", riskScore: 6, priority: "aspirational" as const, tip: "A holiday home or rental property" },
-  { emoji: "🎓", label: "Higher Education",    targetLakh: "15",  horizonYears: "5",  riskScore: 5, priority: "important"    as const, tip: "MBA or professional certification" },
+  { emoji: "🛡️", label: "Emergency Fund",   targetLakh: "5",   horizonYears: "1",  riskScore: 2, priority: "essential"    as const },
+  { emoji: "✈️", label: "Dream Vacation",    targetLakh: "3",   horizonYears: "2",  riskScore: 3, priority: "aspirational" as const },
+  { emoji: "🚗", label: "Buy a Car",          targetLakh: "10",  horizonYears: "3",  riskScore: 4, priority: "important"    as const },
+  { emoji: "💒", label: "Wedding Fund",       targetLakh: "20",  horizonYears: "4",  riskScore: 4, priority: "important"    as const },
+  { emoji: "🏠", label: "Home Down Payment",  targetLakh: "30",  horizonYears: "6",  riskScore: 5, priority: "essential"    as const },
+  { emoji: "👶", label: "Child's Education",  targetLakh: "50",  horizonYears: "12", riskScore: 6, priority: "essential"    as const },
+  { emoji: "💍", label: "Child's Wedding",    targetLakh: "40",  horizonYears: "18", riskScore: 5, priority: "important"    as const },
+  { emoji: "🌴", label: "Retirement",         targetLakh: "500", horizonYears: "25", riskScore: 6, priority: "essential"    as const },
+  { emoji: "🏖️", label: "Second Home",       targetLakh: "80",  horizonYears: "10", riskScore: 6, priority: "aspirational" as const },
+  { emoji: "🎓", label: "Higher Education",   targetLakh: "15",  horizonYears: "5",  riskScore: 5, priority: "important"    as const },
 ];
 
 const PRIORITY_CONFIG = {
   essential:    { label: "Essential",    color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",  desc: "Must achieve — plan built around this" },
   important:    { label: "Important",    color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",  desc: "High priority — significant trade-offs made" },
-  aspirational: { label: "Aspirational", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", desc: "Nice to have — first to reduce if SIP is stretched" },
+  aspirational: { label: "Aspirational", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", desc: "Nice to have — first to adjust if SIP is stretched" },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN PAGE HELPERS — copied exactly from single-goal page
+// ENGINE HELPERS — copied exactly from single-goal page
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getStyle(fund: AMFIFund): number {
@@ -335,7 +334,7 @@ function buildBox(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SINGLE-GOAL ENGINE — same as quick-picks page
+// SINGLE-GOAL ENGINE — identical to quick-picks page
 // ─────────────────────────────────────────────────────────────────────────────
 
 function computeAllocationPlan(horizonYears: number, riskScore: number, targetAmount: number): AllocationPlan {
@@ -349,104 +348,104 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
   if (timeBucket === "0-2Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
-        { type: "Capital Safety", pct: 70, emoji: "🛡️", description: "Most of your money in high-quality short-term bond funds.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC", cells: [{ matrix:"debt",row:0,col:0,label:"Overnight / Liquid",allocationPct:40 },{ matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:30 }]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Conservative hybrids to add modest return above pure debt.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:25 }]},
-        { type: "Core Equity", pct: 5, emoji: "📈", description: "Minimal equity to marginally beat inflation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:5 }]},
+        { type:"Capital Safety", pct:70, emoji:"🛡️", description:"Most of your money in high-quality short-term bond funds.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Overnight / Liquid",allocationPct:40},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:30}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Conservative hybrids to add modest return above pure debt.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:25}]},
+        { type:"Core Equity", pct:5, emoji:"📈", description:"Minimal equity to marginally beat inflation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:5}]},
       ];
     } else if (riskIntensity === "Balanced") {
       blocks = [
-        { type: "Capital Safety", pct: 55, emoji: "🛡️", description: "More than half in safe short-term debt.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC", cells: [{ matrix:"debt",row:0,col:0,label:"Liquid / Ultra Short",allocationPct:30 },{ matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:25 }]},
-        { type: "Stability", pct: 30, emoji: "⚓", description: "Conservative and balanced hybrid for some upside.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:15 },{ matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15 }]},
-        { type: "Core Equity", pct: 15, emoji: "📈", description: "Large-cap for mild growth participation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15 }]},
+        { type:"Capital Safety", pct:55, emoji:"🛡️", description:"More than half in safe short-term debt.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Ultra Short",allocationPct:30},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:25}]},
+        { type:"Stability", pct:30, emoji:"⚓", description:"Conservative and balanced hybrid for some upside.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:15},{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15}]},
+        { type:"Core Equity", pct:15, emoji:"📈", description:"Large-cap for mild growth participation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15}]},
       ];
     } else {
       blocks = [
-        { type: "Capital Safety", pct: 40, emoji: "🛡️", description: "Base safety layer in liquid funds.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC", cells: [{ matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20 },{ matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:20 }]},
-        { type: "Balanced Equity", pct: 35, emoji: "⚖️", description: "Balanced and aggressive hybrid for growth-safety balance.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", cells: [{ matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:20 },{ matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15 }]},
-        { type: "Core Equity", pct: 25, emoji: "📈", description: "Large-cap equity for market participation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 }]},
+        { type:"Capital Safety", pct:40, emoji:"🛡️", description:"Base safety layer in liquid funds.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:20}]},
+        { type:"Balanced Equity", pct:35, emoji:"⚖️", description:"Balanced and aggressive hybrid for growth-safety balance.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:20},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15}]},
+        { type:"Core Equity", pct:25, emoji:"📈", description:"Large-cap equity for market participation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
       ];
     }
   } else if (timeBucket === "2-5Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
-        { type: "Stability", pct: 45, emoji: "⚓", description: "Conservative and equity savings for steady income.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:25 },{ matrix:"hybrid",row:2,col:0,label:"Equity Savings Fund",allocationPct:20 }]},
-        { type: "Capital Safety", pct: 30, emoji: "🛡️", description: "Medium-term bond funds for predictable returns.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:30 }]},
-        { type: "Core Equity", pct: 25, emoji: "📈", description: "Large-cap core and value for managed equity risk.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 }]},
+        { type:"Stability", pct:45, emoji:"⚓", description:"Conservative and equity savings for steady income.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:25},{matrix:"hybrid",row:2,col:0,label:"Equity Savings Fund",allocationPct:20}]},
+        { type:"Capital Safety", pct:30, emoji:"🛡️", description:"Medium-term bond funds for predictable returns.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:30}]},
+        { type:"Core Equity", pct:25, emoji:"📈", description:"Large-cap core and value for managed equity risk.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
       ];
     } else if (riskIntensity === "Balanced") {
       blocks = [
-        { type: "Balanced Equity", pct: 40, emoji: "⚖️", description: "Balanced advantage and aggressive hybrid as growth-safety bridge.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", cells: [{ matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:25 },{ matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15 }]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Corporate bonds as stability anchor.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond / Short Duration",allocationPct:25 }]},
-        { type: "Core Equity", pct: 35, emoji: "📈", description: "Diversified equity across large, flexi and value styles.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:12 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:8 }]},
+        { type:"Balanced Equity", pct:40, emoji:"⚖️", description:"Balanced advantage and aggressive hybrid as growth-safety bridge.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:25},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Corporate bonds as stability anchor.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Short Duration",allocationPct:25}]},
+        { type:"Core Equity", pct:35, emoji:"📈", description:"Diversified equity across large, flexi and value styles.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:12},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:8}]},
       ];
     } else if (riskIntensity === "Growth") {
       blocks = [
-        { type: "Core Equity", pct: 45, emoji: "📈", description: "Broad equity diversification across size and style.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:15 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 }]},
-        { type: "Balanced Equity", pct: 30, emoji: "⚖️", description: "Multi-asset and aggressive hybrid for flexibility.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", cells: [{ matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:15 },{ matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15 }]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Corporate bonds as ballast.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:25 }]},
+        { type:"Core Equity", pct:45, emoji:"📈", description:"Broad equity diversification across size and style.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:15},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
+        { type:"Balanced Equity", pct:30, emoji:"⚖️", description:"Multi-asset and aggressive hybrid for flexibility.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:15},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Corporate bonds as ballast.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:25}]},
       ];
     } else {
       blocks = [
-        { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap for core equity exposure.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20 }]},
-        { type: "High Growth", pct: 25, emoji: "🚀", description: "Mid-cap for higher return potential.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", cells: [{ matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:25 }]},
-        { type: "Tactical", pct: 20, emoji: "⚡", description: "Momentum and aggressive hybrid for tactical alpha.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", cells: [{ matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:10 },{ matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:10 }]},
-        { type: "Stability", pct: 15, emoji: "⚓", description: "Short-duration bonds as safety cushion.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:15 }]},
+        { type:"Core Equity", pct:40, emoji:"📈", description:"Large and flexi cap for core equity exposure.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20}]},
+        { type:"High Growth", pct:25, emoji:"🚀", description:"Mid-cap for higher return potential.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:25}]},
+        { type:"Tactical", pct:20, emoji:"⚡", description:"Momentum and aggressive hybrid for tactical alpha.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:10},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:10}]},
+        { type:"Stability", pct:15, emoji:"⚓", description:"Short-duration bonds as safety cushion.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:15}]},
       ];
     }
   } else if (timeBucket === "5-10Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
-        { type: "Core Equity", pct: 40, emoji: "📈", description: "Diversified large, value and flexi — equity over 5 years has strong historical record.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:10 }]},
-        { type: "Balanced Equity", pct: 25, emoji: "⚖️", description: "Balanced advantage dynamically manages equity-debt ratio.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", cells: [{ matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15 },{ matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:10 }]},
-        { type: "Stability", pct: 35, emoji: "⚓", description: "Medium-duration bonds provide predictable returns.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:20 },{ matrix:"debt",row:2,col:0,label:"Medium Duration Bonds",allocationPct:15 }]},
+        { type:"Core Equity", pct:40, emoji:"📈", description:"Diversified large, value and flexi — equity over 5 years has strong historical record.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:10}]},
+        { type:"Balanced Equity", pct:25, emoji:"⚖️", description:"Balanced advantage dynamically manages equity-debt ratio.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15},{matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:10}]},
+        { type:"Stability", pct:35, emoji:"⚓", description:"Medium-duration bonds provide predictable returns.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:20},{matrix:"debt",row:2,col:0,label:"Medium Duration Bonds",allocationPct:15}]},
       ];
     } else if (riskIntensity === "Balanced") {
       blocks = [
-        { type: "Core Equity", pct: 50, emoji: "📈", description: "Diversified equity across three styles.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:18 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:12 }]},
-        { type: "Balanced Equity", pct: 25, emoji: "⚖️", description: "Multi-asset and balanced advantage for tactical balance.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", cells: [{ matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:15 },{ matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:10 }]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Corporate bonds to anchor the portfolio.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:25 }]},
+        { type:"Core Equity", pct:50, emoji:"📈", description:"Diversified equity across three styles.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:18},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:12}]},
+        { type:"Balanced Equity", pct:25, emoji:"⚖️", description:"Multi-asset and balanced advantage for tactical balance.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:15},{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:10}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Corporate bonds to anchor the portfolio.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:25}]},
       ];
     } else if (riskIntensity === "Growth") {
       blocks = [
-        { type: "Core Equity", pct: 45, emoji: "📈", description: "Style-diversified equity across large, value, and flexi cap.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:18 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:17 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 }]},
-        { type: "High Growth", pct: 20, emoji: "🚀", description: "Mid-cap for meaningful return premium.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", cells: [{ matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20 }]},
-        { type: "Tactical", pct: 15, emoji: "⚡", description: "Momentum and multi-asset for alpha generation.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", cells: [{ matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:8 },{ matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:7 }]},
-        { type: "Stability", pct: 20, emoji: "⚓", description: "Corporate bonds as stability anchor.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:20 }]},
+        { type:"Core Equity", pct:45, emoji:"📈", description:"Style-diversified equity across large, value, and flexi cap.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:18},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:17},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
+        { type:"High Growth", pct:20, emoji:"🚀", description:"Mid-cap for meaningful return premium.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20}]},
+        { type:"Tactical", pct:15, emoji:"⚡", description:"Momentum and multi-asset for alpha generation.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:8},{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:7}]},
+        { type:"Stability", pct:20, emoji:"⚓", description:"Corporate bonds as stability anchor.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:20}]},
       ];
     } else {
       blocks = [
-        { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap — the foundation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20 }]},
-        { type: "High Growth", pct: 30, emoji: "🚀", description: "Mid and small cap for high-conviction upside.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", cells: [{ matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:18 },{ matrix:"equity",row:2,col:1,label:"Small Cap",allocationPct:12 }]},
-        { type: "Tactical", pct: 20, emoji: "⚡", description: "Momentum and aggressive hybrid for return boosting.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", cells: [{ matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:12 },{ matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:8 }]},
-        { type: "Stability", pct: 10, emoji: "⚓", description: "Minimal debt buffer.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:10 }]},
+        { type:"Core Equity", pct:40, emoji:"📈", description:"Large and flexi cap — the foundation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20}]},
+        { type:"High Growth", pct:30, emoji:"🚀", description:"Mid and small cap for high-conviction upside.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:18},{matrix:"equity",row:2,col:1,label:"Small Cap",allocationPct:12}]},
+        { type:"Tactical", pct:20, emoji:"⚡", description:"Momentum and aggressive hybrid for return boosting.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:12},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:8}]},
+        { type:"Stability", pct:10, emoji:"⚓", description:"Minimal debt buffer.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:10}]},
       ];
     }
-  } else {
+  } else { // 10Y+
     if (riskIntensity === "Conservative") {
       blocks = [
-        { type: "Core Equity", pct: 50, emoji: "📈", description: "Compounding engine — diversified large, value, and flexi cap.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:22 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:18 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 }]},
-        { type: "Balanced Equity", pct: 25, emoji: "⚖️", description: "Balanced advantage and multi-asset as path-smoother.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE", cells: [{ matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15 },{ matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:10 }]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Medium-duration bonds for stability.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:15 },{ matrix:"debt",row:2,col:0,label:"Medium Duration",allocationPct:10 }]},
+        { type:"Core Equity", pct:50, emoji:"📈", description:"Compounding engine — diversified large, value, and flexi cap.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:22},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:18},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
+        { type:"Balanced Equity", pct:25, emoji:"⚖️", description:"Balanced advantage and multi-asset as path-smoother.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15},{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:10}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Medium-duration bonds for stability.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:15},{matrix:"debt",row:2,col:0,label:"Medium Duration",allocationPct:10}]},
       ];
     } else if (riskIntensity === "Balanced") {
       blocks = [
-        { type: "Core Equity", pct: 55, emoji: "📈", description: "Three-style equity diversification — the long-term compounding core.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:22 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:13 }]},
-        { type: "High Growth", pct: 20, emoji: "🚀", description: "Mid-cap for long-horizon return premium.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", cells: [{ matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20 }]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Corporate and medium-duration bonds to reduce volatility.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:15 },{ matrix:"debt",row:2,col:0,label:"Medium Duration",allocationPct:10 }]},
+        { type:"Core Equity", pct:55, emoji:"📈", description:"Three-style equity diversification — the long-term compounding core.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:22},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:13}]},
+        { type:"High Growth", pct:20, emoji:"🚀", description:"Mid-cap for long-horizon return premium.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Corporate and medium-duration bonds to reduce volatility.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:15},{matrix:"debt",row:2,col:0,label:"Medium Duration",allocationPct:10}]},
       ];
     } else if (riskIntensity === "Growth") {
       blocks = [
-        { type: "Core Equity", pct: 45, emoji: "📈", description: "Broad equity — style diversification reduces factor concentration risk.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:18 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:17 },{ matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10 }]},
-        { type: "High Growth", pct: 30, emoji: "🚀", description: "Mid + small cap for long-term compounding upside.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", cells: [{ matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:18 },{ matrix:"equity",row:2,col:1,label:"Small Cap",allocationPct:12 }]},
-        { type: "Tactical", pct: 10, emoji: "⚡", description: "Momentum as a return booster.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", cells: [{ matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:10 }]},
-        { type: "Stability", pct: 15, emoji: "⚓", description: "Small bond allocation for volatility dampening.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:15 }]},
+        { type:"Core Equity", pct:45, emoji:"📈", description:"Broad equity — style diversification reduces factor concentration risk.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:18},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:17},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
+        { type:"High Growth", pct:30, emoji:"🚀", description:"Mid + small cap for long-term compounding upside.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:18},{matrix:"equity",row:2,col:1,label:"Small Cap",allocationPct:12}]},
+        { type:"Tactical", pct:10, emoji:"⚡", description:"Momentum as a return booster.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:10}]},
+        { type:"Stability", pct:15, emoji:"⚓", description:"Small bond allocation for volatility dampening.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:15}]},
       ];
     } else {
       blocks = [
-        { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap — foundational equity.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", cells: [{ matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20 },{ matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20 }]},
-        { type: "High Growth", pct: 35, emoji: "🚀", description: "Mid + small cap for maximum compounding over 10+ years.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", cells: [{ matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20 },{ matrix:"equity",row:2,col:1,label:"Small Cap",allocationPct:15 }]},
-        { type: "Tactical", pct: 15, emoji: "⚡", description: "Momentum + manager's best bets for alpha-seeking exposure.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", cells: [{ matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:8 },{ matrix:"equity",row:3,col:3,label:"Manager's Best Bets",allocationPct:7 }]},
-        { type: "Stability", pct: 10, emoji: "⚓", description: "Minimal debt buffer for liquidity.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0", cells: [{ matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:10 }]},
+        { type:"Core Equity", pct:40, emoji:"📈", description:"Large and flexi cap — foundational equity.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20}]},
+        { type:"High Growth", pct:35, emoji:"🚀", description:"Mid + small cap for maximum compounding over 10+ years.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20},{matrix:"equity",row:2,col:1,label:"Small Cap",allocationPct:15}]},
+        { type:"Tactical", pct:15, emoji:"⚡", description:"Momentum + manager's best bets for alpha-seeking exposure.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:8},{matrix:"equity",row:3,col:3,label:"Manager's Best Bets",allocationPct:7}]},
+        { type:"Stability", pct:10, emoji:"⚓", description:"Minimal debt buffer for liquidity.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:10}]},
       ];
     }
   }
@@ -479,9 +478,8 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
   const suggestedMonthlySIP = sipFV > 0 ? Math.ceil(targetAmount/sipFV/100)*100 : Math.ceil(targetAmount/n/100)*100;
 
   const label = `${riskIntensity} ${timeBucket==="0-2Y"?"Short-term":timeBucket==="2-5Y"?"Medium-term":timeBucket==="5-10Y"?"Growth-horizon":"Long-term"}`;
-  const plainEnglish = "";
 
-  return { timeBucket, riskIntensity, blocks, label, plainEnglish, expectedReturnLo: parseFloat(lo.toFixed(1)), expectedReturnHi: parseFloat(hi.toFixed(1)), maxDrawdown: parseFloat(maxDrawdown.toFixed(1)), successRate, suggestedMonthlySIP };
+  return { timeBucket, riskIntensity, blocks, label, plainEnglish:"", expectedReturnLo:parseFloat(lo.toFixed(1)), expectedReturnHi:parseFloat(hi.toFixed(1)), maxDrawdown:parseFloat(maxDrawdown.toFixed(1)), successRate, suggestedMonthlySIP };
 }
 
 function resolveAllFunds(
@@ -522,83 +520,106 @@ function resolveAllFunds(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MULTI-GOAL LIFETIME ENGINE
+// MULTI-GOAL LIFETIME ENGINE — FIXED SIP WITH 10% STEP-UP
+//
+// Logic:
+// 1. Compute raw SIP needed for each goal at year 0 (full horizon, assuming 10% annual step-up)
+// 2. The base SIP = sum of all goal SIPs (with step-up discount applied)
+// 3. At each phase, SIP = base × (1.10)^year  (the 10% annual step-up)
+// 4. Within each phase, allocate SIP proportionally to active goals by their required share
+// 5. Nearest goals get funded first (priority queue approach by horizon then priority)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildLifetimePlan(goals: GoalInput[], amfiRaw: AMFIFund[], fundAnalytics: FundAnalytics[], etfAnalytics: ETFAnalytics[], insights: InsightRow[]): LifetimePlan {
+// SIP with step-up: future value of a SIP that grows 10% each year
+// FV = SIP_month1 × Σ(t=1 to n) [(1 + r_monthly)^(n-t+1) × (1 + stepup_annual/12)^(t-1)]
+// Approximation: use equivalent flat SIP that produces same corpus with step-up
+function sipWithStepup(targetAmt: number, horizonMonths: number, annualReturn: number, annualStepup = 0.10): number {
+  const r = annualReturn / 100 / 12;
+  const s = annualStepup / 12; // monthly step-up rate (approximate)
+  let fv = 0;
+  // simulate: each month SIP grows, accumulates with return
+  // base_sip × (1+s)^(t-1) invested at month t grows for (n-t) more months
+  // Total FV = base_sip × Σ_{t=0}^{n-1} [(1+s)^t × (1+r)^(n-t)]
+  // = base_sip × (1+r)^n × Σ_{t=0}^{n-1} [(1+s)^t / (1+r)^t]  — if r ≠ s
+  if (Math.abs(r - s) < 0.0001) {
+    fv = horizonMonths * Math.pow(1 + r, horizonMonths); // degenerate case
+  } else {
+    fv = (Math.pow(1 + r, horizonMonths) - Math.pow(1 + s, horizonMonths)) / (r - s);
+  }
+  return fv > 0 ? Math.ceil(targetAmt / fv / 100) * 100 : Math.ceil(targetAmt / horizonMonths / 100) * 100;
+}
+
+function buildLifetimePlan(
+  goals: GoalInput[], amfiRaw: AMFIFund[], fundAnalytics: FundAnalytics[], etfAnalytics: ETFAnalytics[], insights: InsightRow[]
+): LifetimePlan {
+  const STEP_UP = 0.10; // 10% annual step-up
+
   const sortedGoals = [...goals].sort((a, b) => parseInt(a.horizonYears) - parseInt(b.horizonYears));
   const totalYears = Math.max(...goals.map(g => parseInt(g.horizonYears)));
 
-  // Build timeline snapshots at key transition years
+  // ── Step 1: Compute per-goal base SIP (year-0 amount with step-up built in) ──
+  const goalBaseSIPs: Record<string, number> = {};
+  sortedGoals.forEach(g => {
+    const months = parseInt(g.horizonYears) * 12;
+    const target = parseFloat(g.targetLakh) * 100000;
+    const plan = computeAllocationPlan(parseInt(g.horizonYears), g.riskScore, target);
+    const midRate = (plan.expectedReturnLo + plan.expectedReturnHi) / 2;
+    goalBaseSIPs[g.id] = sipWithStepup(target, months, midRate, STEP_UP);
+  });
+
+  // ── Step 2: Total base SIP = sum of all goals ──
+  const baseMonthlySIP = Math.ceil(
+    Object.values(goalBaseSIPs).reduce((s, v) => s + v, 0) / 100
+  ) * 100;
+
+  // ── Step 3: Build transition phases ──
   const transitionYears = Array.from(new Set([0, ...goals.map(g => parseInt(g.horizonYears))])).sort((a,b)=>a-b);
 
   const timeline: YearSnapshot[] = [];
   const phases: PhaseDescription[] = [];
   const resolvedFundsByPhase = new Map<string, ResolvedFundSlot[]>();
 
-  // For each phase between transitions
   for (let i = 0; i < transitionYears.length; i++) {
     const year = transitionYears[i];
 
-    // Which goals are still active at this year (not yet achieved)
-    const activeGoalIds = goals.filter(g => parseInt(g.horizonYears) > year).map(g => g.id);
-    const achievedThisYear = goals.filter(g => parseInt(g.horizonYears) === year).map(g => g.id);
-    const activeGoals = goals.filter(g => activeGoalIds.includes(g.id));
+    const activeGoalIds = sortedGoals.filter(g => parseInt(g.horizonYears) > year).map(g => g.id);
+    const achievedThisYear = sortedGoals.filter(g => parseInt(g.horizonYears) === year).map(g => g.id);
+    const activeGoals = sortedGoals.filter(g => activeGoalIds.includes(g.id));
 
     if (activeGoals.length === 0 && year > 0) {
-      // All goals achieved
-      timeline.push({
-        year, activeGoals: [], achievedGoals: achievedThisYear,
-        totalSIP: 0, blocks: [], equityPct: 0, debtPct: 0, hybridPct: 0,
-        label: "All goals achieved 🎉",
-      });
+      timeline.push({ year, activeGoals:[], achievedGoals:achievedThisYear, totalSIP:0, blocks:[], label:"All goals achieved 🎉" });
       break;
     }
 
-    // Weighted risk: essential goals dominate, aspirational goals reduce weight
-    const priorityWeights = { essential: 1.5, important: 1.0, aspirational: 0.6 };
+    // Stepped-up SIP at this year: base × (1.10)^year (rounded to nearest 100)
+    const steppedup = Math.ceil(baseMonthlySIP * Math.pow(1 + STEP_UP, year) / 100) * 100;
+
+    // Per-goal SIP share at this phase (active goals only, re-proportioned by their base SIP)
+    const activeBaseTotal = activeGoals.reduce((s, g) => s + goalBaseSIPs[g.id], 0);
+    const goalSIPs = activeGoals.map(g => ({
+      goalId: g.id,
+      goalLabel: g.label,
+      goalEmoji: g.emoji,
+      sip: Math.round(steppedup * (goalBaseSIPs[g.id] / (activeBaseTotal || 1)) / 100) * 100,
+    }));
+
+    // Blended risk and horizon for allocation
+    const priorityWeights = { essential:1.5, important:1.0, aspirational:0.6 };
     let weightedRisk = 0, totalWeight = 0;
-    activeGoals.forEach(g => {
-      const w = priorityWeights[g.priority];
-      weightedRisk += g.riskScore * w;
-      totalWeight += w;
-    });
+    activeGoals.forEach(g => { const w=priorityWeights[g.priority]; weightedRisk+=g.riskScore*w; totalWeight+=w; });
     const blendedRisk = totalWeight > 0 ? weightedRisk / totalWeight : 5;
 
-    // Horizon is the SHORTEST remaining active goal (most conservative wins for portfolio safety)
     const minHorizon = Math.min(...activeGoals.map(g => parseInt(g.horizonYears) - year));
-    // But temper: if min horizon is short but there are long-horizon goals, average them
-    const avgHorizon = activeGoals.reduce((s, g) => s + (parseInt(g.horizonYears) - year), 0) / activeGoals.length;
-    // Use weighted blend: 60% min (safety) + 40% avg (opportunity)
+    const avgHorizon = activeGoals.reduce((s,g)=>s+(parseInt(g.horizonYears)-year),0)/activeGoals.length;
     const effectiveHorizon = Math.max(1, Math.round(minHorizon * 0.6 + avgHorizon * 0.4));
 
-    // Compute per-goal SIPs, then sum
-    let totalSIP = 0;
-    activeGoals.forEach(g => {
-      const remaining = parseInt(g.horizonYears) - year;
-      const target = parseFloat(g.targetLakh) * 100000;
-      const plan = computeAllocationPlan(remaining, g.riskScore, target);
-      // Weight by priority
-      const priorityMultiplier = g.priority === "essential" ? 1.0 : g.priority === "important" ? 0.9 : 0.8;
-      totalSIP += plan.suggestedMonthlySIP * priorityMultiplier;
-    });
-    totalSIP = Math.ceil(totalSIP / 100) * 100;
-
-    // Compute blended allocation plan
     const blendedPlan = computeAllocationPlan(effectiveHorizon, Math.round(blendedRisk), 100000);
 
-    // Calculate aggregate bucket percentages for visualisation
-    const equityPct = blendedPlan.blocks.filter(b => ["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-    const hybridPct = blendedPlan.blocks.filter(b => b.type==="Balanced Equity").reduce((s,b)=>s+b.pct,0);
-    const debtPct   = blendedPlan.blocks.filter(b => ["Capital Safety","Stability"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-
     timeline.push({
-      year, activeGoals: activeGoalIds, achievedGoals: achievedThisYear,
-      totalSIP, blocks: blendedPlan.blocks, equityPct, debtPct, hybridPct,
-      label: blendedPlan.label,
+      year, activeGoals:activeGoalIds, achievedGoals:achievedThisYear,
+      totalSIP:steppedup, blocks:blendedPlan.blocks, label:blendedPlan.label,
     });
 
-    // Build phase: from this year to next transition
     const nextYear = transitionYears[i+1] ?? totalYears;
     if (nextYear > year) {
       const phaseKey = `${year}-${nextYear}`;
@@ -609,16 +630,17 @@ function buildLifetimePlan(goals: GoalInput[], amfiRaw: AMFIFund[], fundAnalytic
         fromYear: year, toYear: nextYear,
         label: year === 0 ? "Starting Phase" : `After Year ${year}`,
         description: blendedPlan.label,
-        activeGoalLabels: activeGoals.map(g => `${g.emoji} ${g.label}`),
+        activeGoalLabels: activeGoals.map(g=>`${g.emoji} ${g.label}`),
+        achievedGoalLabels: achievedThisYear.map(id=>{const g=sortedGoals.find(g=>g.id===id);return g?`${g.emoji} ${g.label}`:'';}).filter(Boolean),
         plan: blendedPlan,
-        totalSIP,
+        totalSIP: steppedup,
+        baseSIP: baseMonthlySIP,
+        goalSIPs,
       });
     }
   }
 
-  const totalMonthlySIP = timeline[0]?.totalSIP ?? 0;
-
-  return { goals: sortedGoals, totalYears, timeline, totalMonthlySIP, phaseDescriptions: phases, resolvedFundsByPhase };
+  return { goals:sortedGoals, totalYears, timeline, baseMonthlySIP, phaseDescriptions:phases, resolvedFundsByPhase };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -627,8 +649,8 @@ function buildLifetimePlan(goals: GoalInput[], amfiRaw: AMFIFund[], fundAnalytic
 
 function fmtINR(n: number): string {
   if (n >= 10000000) return `₹${(n/10000000).toFixed(1)} Cr`;
-  if (n >= 100000) return `₹${(n/100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n/1000).toFixed(0)}K`;
+  if (n >= 100000)   return `₹${(n/100000).toFixed(1)}L`;
+  if (n >= 1000)     return `₹${(n/1000).toFixed(0)}K`;
   return `₹${Math.round(n)}`;
 }
 
@@ -661,11 +683,11 @@ function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: (
           {slot.stats && (
             <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(90px,1fr))',gap:'8px' }}>
               {[
-                { label:'3Y Returns',value:`${slot.stats.return3Y?.toFixed(2)}%`,color:'#0F172A' },
-                { label:'5Y Returns',value:slot.stats.return5Y?`${slot.stats.return5Y.toFixed(2)}%`:'—',color:'#0F172A' },
-                { label:'Extra vs Index',value:`${slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'+':''}${slot.stats.alpha3Y?.toFixed(2)}%`,color:slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'#059669':'#DC2626' },
-                { label:'Category Rank',value:`#${slot.stats.rank}`,color:'#0F172A' },
-                { label:'Fund Size',value:`₹${(slot.stats.aum/1000).toFixed(0)}K Cr`,color:'#0F172A' },
+                { label:'3Y Returns',     value:`${slot.stats.return3Y?.toFixed(2)}%`,  color:'#0F172A' },
+                { label:'5Y Returns',     value:slot.stats.return5Y?`${slot.stats.return5Y.toFixed(2)}%`:'—', color:'#0F172A' },
+                { label:'Extra vs Index', value:`${slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'+':''}${slot.stats.alpha3Y?.toFixed(2)}%`, color:slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'#059669':'#DC2626' },
+                { label:'Category Rank', value:`#${slot.stats.rank}`,  color:'#0F172A' },
+                { label:'Fund Size',     value:`₹${(slot.stats.aum/1000).toFixed(0)}K Cr`, color:'#0F172A' },
               ].map((s,i)=>(
                 <div key={i} style={{ background:'#F8FAFC',borderRadius:'10px',padding:'10px 12px',border:'1px solid #E2E8F0' }}>
                   <div style={{ fontSize:'10px',color:'#94A3B8',marginBottom:'3px' }}>{s.label}</div>
@@ -715,24 +737,23 @@ function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: (
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GOAL CARD (editable)
+// GOAL CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GoalCard({ goal, onChange, onRemove, index }: {
-  goal: GoalInput; onChange: (g: GoalInput) => void; onRemove: () => void; index: number;
+function GoalCard({ goal, onChange, onRemove }: {
+  goal: GoalInput; onChange: (g: GoalInput) => void; onRemove: () => void;
 }) {
   const pc = PRIORITY_CONFIG[goal.priority];
-  const riskColor = goal.riskScore <= 3 ? "#059669" : goal.riskScore <= 5 ? "#0891B2" : goal.riskScore <= 7 ? "#D97706" : "#DC2626";
+  const riskColor = goal.riskScore<=3?"#059669":goal.riskScore<=5?"#0891B2":goal.riskScore<=7?"#D97706":"#DC2626";
 
   return (
-    <div style={{ background:'white',border:`2px solid ${pc.border}`,borderRadius:'18px',padding:'18px 20px',position:'relative',boxShadow:'0 2px 12px rgba(0,0,0,0.04)',transition:'box-shadow 0.2s' }}>
-      {/* Header row */}
+    <div style={{ background:'white',border:`2px solid ${pc.border}`,borderRadius:'18px',padding:'18px 20px',boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px',flexWrap:'wrap',gap:'8px' }}>
         <div style={{ display:'flex',alignItems:'center',gap:'10px' }}>
           <span style={{ fontSize:'26px' }}>{goal.emoji}</span>
           <div>
             <input value={goal.label} onChange={e=>onChange({...goal,label:e.target.value})}
-              style={{ fontSize:'14px',fontWeight:800,color:'#0F172A',border:'none',outline:'none',background:'transparent',fontFamily:'inherit',width:'100%',padding:0 }}
+              style={{ fontSize:'14px',fontWeight:800,color:'#0F172A',border:'none',outline:'none',background:'transparent',fontFamily:'inherit',padding:0 }}
               placeholder="Goal name" />
             <div style={{ fontSize:'10px',color:pc.color,fontWeight:700,marginTop:'1px' }}>{pc.label} goal · {pc.desc}</div>
           </div>
@@ -744,12 +765,10 @@ function GoalCard({ goal, onChange, onRemove, index }: {
             <option value="important">Important</option>
             <option value="aspirational">Aspirational</option>
           </select>
-          <button onClick={onRemove} style={{ width:'26px',height:'26px',borderRadius:'8px',border:'none',background:'#FEF2F2',color:'#DC2626',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>×</button>
+          <button onClick={onRemove} style={{ width:'26px',height:'26px',borderRadius:'8px',border:'none',background:'#FEF2F2',color:'#DC2626',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
         </div>
       </div>
-
-      {/* Inputs */}
-      <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'10px',marginBottom:'12px' }}>
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'10px' }}>
         <div>
           <label style={{ fontSize:'10px',fontWeight:700,color:'#374151',display:'block',marginBottom:'4px' }}>Target amount</label>
           <div style={{ position:'relative' }}>
@@ -758,14 +777,14 @@ function GoalCard({ goal, onChange, onRemove, index }: {
               style={{ width:'100%',padding:'8px 10px 8px 22px',borderRadius:'8px',border:'1.5px solid #E2E8F0',fontSize:'13px',color:'#0F172A',outline:'none',boxSizing:'border-box',fontFamily:'inherit' }}
               onFocus={e=>e.target.style.borderColor='#3B82F6'} onBlur={e=>e.target.style.borderColor='#E2E8F0'} />
           </div>
-          {goal.targetLakh && <div style={{ fontSize:'10px',color:'#059669',marginTop:'3px',fontWeight:600 }}>{fmtINR(parseFloat(goal.targetLakh)*100000)}</div>}
+          {goal.targetLakh&&<div style={{ fontSize:'10px',color:'#059669',marginTop:'3px',fontWeight:600 }}>{fmtINR(parseFloat(goal.targetLakh)*100000)}</div>}
         </div>
         <div>
           <label style={{ fontSize:'10px',fontWeight:700,color:'#374151',display:'block',marginBottom:'4px' }}>In how many years?</label>
           <input type="number" value={goal.horizonYears} onChange={e=>onChange({...goal,horizonYears:e.target.value})} placeholder="Years" min="1" max="40"
             style={{ width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1.5px solid #E2E8F0',fontSize:'13px',color:'#0F172A',outline:'none',boxSizing:'border-box',fontFamily:'inherit' }}
             onFocus={e=>e.target.style.borderColor='#3B82F6'} onBlur={e=>e.target.style.borderColor='#E2E8F0'} />
-          {goal.horizonYears && (
+          {goal.horizonYears&&(
             <div style={{ fontSize:'10px',marginTop:'3px',fontWeight:600,color:parseInt(goal.horizonYears)<=2?'#DC2626':parseInt(goal.horizonYears)<=5?'#D97706':parseInt(goal.horizonYears)<=10?'#059669':'#2563EB' }}>
               {parseInt(goal.horizonYears)<=2?'🔴 Short-term':parseInt(goal.horizonYears)<=5?'🟡 Medium-term':parseInt(goal.horizonYears)<=10?'🟢 Growth-horizon':'🔵 Long-term'}
             </div>
@@ -792,69 +811,56 @@ function GoalCard({ goal, onChange, onRemove, index }: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function TimelineVisual({ plan, goals, selectedPhaseIdx, onSelectPhase }: {
-  plan: LifetimePlan; goals: GoalInput[]; selectedPhaseIdx: number; onSelectPhase: (i: number) => void;
+  plan: LifetimePlan; goals: GoalInput[]; selectedPhaseIdx: number; onSelectPhase: (i:number)=>void;
 }) {
   const totalYears = plan.totalYears;
-  const goalMap = new Map(goals.map(g => [g.id, g]));
+  const goalMap = new Map(goals.map(g=>[g.id,g]));
   const snapshots = plan.timeline;
 
   return (
     <div style={{ position:'relative',padding:'8px 0 0' }}>
-      {/* Timeline track */}
-      <div style={{ position:'relative',height:'60px',marginBottom:'12px' }}>
-        {/* Background bar */}
-        <div style={{ position:'absolute',top:'24px',left:0,right:0,height:'8px',background:'#F1F5F9',borderRadius:'100px' }} />
-
-        {/* Phase segments */}
-        {plan.phaseDescriptions.map((phase, i) => {
-          const left  = `${(phase.fromYear / totalYears) * 100}%`;
-          const width = `${((phase.toYear - phase.fromYear) / totalYears) * 100}%`;
-          const equityPct = phase.plan.blocks.filter(b=>["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-          const color = equityPct >= 60 ? '#2563EB' : equityPct >= 35 ? '#7C3AED' : '#059669';
-          const isSelected = selectedPhaseIdx === i;
+      <div style={{ position:'relative',height:'64px',marginBottom:'12px' }}>
+        <div style={{ position:'absolute',top:'26px',left:0,right:0,height:'8px',background:'#F1F5F9',borderRadius:'100px' }} />
+        {plan.phaseDescriptions.map((phase,i)=>{
+          const left=`${(phase.fromYear/totalYears)*100}%`;
+          const width=`${((phase.toYear-phase.fromYear)/totalYears)*100}%`;
+          const equityPct=phase.plan.blocks.filter(b=>["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
+          const color=equityPct>=60?'#2563EB':equityPct>=35?'#7C3AED':'#059669';
+          const isSelected=selectedPhaseIdx===i;
           return (
-            <div key={i} onClick={() => onSelectPhase(i)}
-              style={{ position:'absolute',top:'20px',left,width,height:'16px',background:color,opacity:isSelected?1:0.55,borderRadius:'4px',cursor:'pointer',transition:'opacity 0.2s',zIndex:2 }}
+            <div key={i} onClick={()=>onSelectPhase(i)}
+              style={{ position:'absolute',top:'22px',left,width,height:'16px',background:color,opacity:isSelected?1:0.5,borderRadius:'4px',cursor:'pointer',transition:'opacity 0.2s',zIndex:2 }}
               title={phase.label} />
           );
         })}
-
-        {/* Goal markers */}
-        {snapshots.filter(s => s.achievedGoals.length > 0).map((snapshot, i) => {
-          const left = `${(snapshot.year / totalYears) * 100}%`;
-          const goalsHere = snapshot.achievedGoals.map(id => goalMap.get(id)).filter(Boolean);
+        {snapshots.filter(s=>s.achievedGoals.length>0).map((snapshot,i)=>{
+          const left=`${(snapshot.year/totalYears)*100}%`;
+          const goalsHere=snapshot.achievedGoals.map(id=>goalMap.get(id)).filter(Boolean);
           return (
             <div key={i} style={{ position:'absolute',top:0,left,transform:'translateX(-50%)',display:'flex',flexDirection:'column',alignItems:'center',zIndex:10 }}>
-              <div style={{ display:'flex',gap:'2px',marginBottom:'3px' }}>
-                {goalsHere.map((g,j) => <span key={j} style={{ fontSize:'14px' }}>{g!.emoji}</span>)}
-              </div>
-              <div style={{ width:'2px',height:'32px',background:'#94A3B8' }} />
-              <div style={{ fontSize:'9px',color:'#64748B',fontWeight:700,marginTop:'2px',whiteSpace:'nowrap' }}>Yr {snapshot.year}</div>
+              <div style={{ display:'flex',gap:'2px',marginBottom:'2px' }}>{goalsHere.map((g,j)=><span key={j} style={{ fontSize:'13px' }}>{g!.emoji}</span>)}</div>
+              <div style={{ width:'2px',height:'34px',background:'#CBD5E1' }} />
+              <div style={{ fontSize:'9px',color:'#64748B',fontWeight:700,whiteSpace:'nowrap' }}>Yr {snapshot.year}</div>
             </div>
           );
         })}
       </div>
-
-      {/* Year labels */}
       <div style={{ display:'flex',justifyContent:'space-between',fontSize:'10px',color:'#94A3B8',fontWeight:600,padding:'0 2px' }}>
         <span>Now</span>
-        {[...Array(Math.min(5, totalYears))].map((_,i) => {
-          const yr = Math.round((i+1) * totalYears / Math.min(5, totalYears));
+        {[...Array(Math.min(5,totalYears))].map((_,i)=>{
+          const yr=Math.round((i+1)*totalYears/Math.min(5,totalYears));
           return <span key={i}>Yr {yr}</span>;
         })}
       </div>
-
-      {/* Phase selector tabs */}
       <div style={{ display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'14px' }}>
-        {plan.phaseDescriptions.map((phase, i) => {
-          const equityPct = phase.plan.blocks.filter(b=>["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-          const color = equityPct>=60?'#2563EB':equityPct>=35?'#7C3AED':'#059669';
-          const isSelected = selectedPhaseIdx === i;
+        {plan.phaseDescriptions.map((phase,i)=>{
+          const equityPct=phase.plan.blocks.filter(b=>["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
+          const color=equityPct>=60?'#2563EB':equityPct>=35?'#7C3AED':'#059669';
+          const isSelected=selectedPhaseIdx===i;
           return (
-            <button key={i} onClick={() => onSelectPhase(i)}
+            <button key={i} onClick={()=>onSelectPhase(i)}
               style={{ padding:'6px 12px',borderRadius:'100px',border:`1.5px solid ${isSelected?color:'#E2E8F0'}`,background:isSelected?color:'white',color:isSelected?'white':'#374151',fontSize:'11px',fontWeight:700,cursor:'pointer',transition:'all 0.15s',fontFamily:'inherit',whiteSpace:'nowrap' }}>
               {phase.label}
-              
             </button>
           );
         })}
@@ -867,67 +873,102 @@ function TimelineVisual({ plan, goals, selectedPhaseIdx, onSelectPhase }: {
 // PHASE DETAIL PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PhaseDetailPanel({ phase, phaseKey, resolvedFunds, goals, onFundDetail }: {
-  phase: PhaseDescription; phaseKey: string; resolvedFunds: ResolvedFundSlot[]; goals: GoalInput[]; onFundDetail: (s: ResolvedFundSlot) => void;
+function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
+  phase: PhaseDescription; resolvedFunds: ResolvedFundSlot[]; onFundDetail: (s:ResolvedFundSlot)=>void;
 }) {
   const [showFunds, setShowFunds] = useState(false);
-  const equityPct = phase.plan.blocks.filter(b=>["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-  const hybridPct = phase.plan.blocks.filter(b=>b.type==="Balanced Equity").reduce((s,b)=>s+b.pct,0);
-  const debtPct   = phase.plan.blocks.filter(b=>["Capital Safety","Stability"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
 
   return (
     <div style={{ background:'white',border:'1px solid #E2E8F0',borderRadius:'16px',overflow:'hidden' }}>
-      {/* Phase header */}
+      {/* Header */}
       <div style={{ background:'linear-gradient(135deg,#EFF6FF,#F0FDF4)',padding:'16px 18px',borderBottom:'1px solid #E2E8F0' }}>
         <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'10px' }}>
           <div>
             <div style={{ fontSize:'11px',fontWeight:700,color:'#94A3B8',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'4px' }}>
-              {phase.fromYear===0?'From today':phase.fromYear===phase.toYear?`Year ${phase.fromYear}`:`Year ${phase.fromYear} → Year ${phase.toYear}`}
+              {phase.fromYear===0?'From today':`Year ${phase.fromYear} → Year ${phase.toYear}`}
             </div>
-            <h3 style={{ fontSize:'16px',fontWeight:800,color:'#0F172A',margin:'0 0 4px' }}>{phase.description}</h3>
-            <div style={{ display:'flex',gap:'6px',flexWrap:'wrap' }}>
-              {phase.activeGoalLabels.map((lbl,i) => (
+            <h3 style={{ fontSize:'16px',fontWeight:800,color:'#0F172A',margin:'0 0 6px' }}>{phase.description}</h3>
+
+            {/* Goals achieved chip (if any) */}
+            {phase.achievedGoalLabels.length > 0 && (
+              <div style={{ display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'6px' }}>
+                {phase.achievedGoalLabels.map((lbl,i)=>(
+                  <span key={i} style={{ fontSize:'10px',padding:'2px 8px',borderRadius:'100px',background:'#ECFDF5',border:'1px solid #A7F3D0',color:'#059669',fontWeight:700 }}>✓ {lbl} achieved</span>
+                ))}
+              </div>
+            )}
+
+            {/* Active goals */}
+            <div style={{ display:'flex',gap:'5px',flexWrap:'wrap' }}>
+              {phase.activeGoalLabels.map((lbl,i)=>(
                 <span key={i} style={{ fontSize:'11px',padding:'2px 8px',borderRadius:'100px',background:'#F8FAFC',border:'1px solid #E2E8F0',color:'#374151',fontWeight:600 }}>{lbl}</span>
               ))}
             </div>
           </div>
-          <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:'11px',color:'#94A3B8',marginBottom:'2px' }}>Monthly SIP needed</div>
-            <div style={{ fontSize:'24px',fontWeight:900,color:'#2563EB' }}>₹{phase.totalSIP.toLocaleString('en-IN')}</div>
+
+          {/* SIP box */}
+          <div style={{ background:'white',border:'2px solid #BFDBFE',borderRadius:'14px',padding:'12px 18px',textAlign:'center',minWidth:'140px' }}>
+            <div style={{ fontSize:'10px',color:'#94A3B8',fontWeight:600,marginBottom:'2px' }}>Monthly SIP</div>
+            <div style={{ fontSize:'26px',fontWeight:900,color:'#2563EB',lineHeight:1 }}>₹{phase.totalSIP.toLocaleString('en-IN')}</div>
+            {phase.fromYear > 0 && (
+              <div style={{ fontSize:'9px',color:'#94A3B8',marginTop:'3px' }}>
+                Started at ₹{phase.baseSIP.toLocaleString('en-IN')} · +10%/yr
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Allocation bar */}
+      {/* Per-goal SIP breakdown */}
+      {phase.goalSIPs.length > 1 && (
+        <div style={{ padding:'12px 18px',borderBottom:'1px solid #F1F5F9',background:'#FAFAFA' }}>
+          <div style={{ fontSize:'10px',fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px' }}>Where your SIP goes this phase</div>
+          <div style={{ display:'flex',flexWrap:'wrap',gap:'8px' }}>
+            {phase.goalSIPs.map((gs,i)=>(
+              <div key={i} style={{ background:'white',border:'1px solid #E2E8F0',borderRadius:'10px',padding:'8px 12px',display:'flex',alignItems:'center',gap:'8px' }}>
+                <span style={{ fontSize:'16px' }}>{gs.goalEmoji}</span>
+                <div>
+                  <div style={{ fontSize:'11px',fontWeight:700,color:'#1F2937' }}>{gs.goalLabel}</div>
+                  <div style={{ fontSize:'13px',fontWeight:900,color:'#2563EB' }}>₹{gs.sip.toLocaleString('en-IN')}<span style={{ fontSize:'9px',color:'#94A3B8',fontWeight:600 }}>/mo</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Exposure blocks — same style as single-goal page */}
       <div style={{ padding:'14px 18px',borderBottom:'1px solid #F1F5F9' }}>
         <div style={{ fontSize:'11px',fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px' }}>Exposure breakdown</div>
-        <div style={{ display:'flex',borderRadius:'10px',overflow:'hidden',height:'12px',marginBottom:'8px' }}>
-          {phase.plan.blocks.map((b,i) => (
+
+        {/* Stacked bar */}
+        <div style={{ display:'flex',borderRadius:'10px',overflow:'hidden',height:'12px',marginBottom:'10px' }}>
+          {phase.plan.blocks.map((b,i)=>(
             <div key={i} style={{ width:`${b.pct}%`,background:b.color,opacity:0.85 }} title={`${b.type} ${b.pct}%`} />
           ))}
         </div>
+
+        {/* Block legend — identical to single-goal page */}
         <div style={{ display:'flex',flexWrap:'wrap',gap:'10px' }}>
-          {[
-            { label:'Equity-type', pct:equityPct, color:'#2563EB' },
-            { label:'Hybrid-type', pct:hybridPct, color:'#7C3AED' },
-            { label:'Debt-type',   pct:debtPct,   color:'#059669' },
-          ].map((s,i) => (
+          {phase.plan.blocks.map((b,i)=>(
             <div key={i} style={{ display:'flex',alignItems:'center',gap:'5px' }}>
-              <div style={{ width:'8px',height:'8px',borderRadius:'2px',background:s.color }} />
-              <span style={{ fontSize:'11px',color:'#64748B',fontWeight:600 }}>{s.label} <strong style={{ color:s.color }}>{s.pct}%</strong></span>
+              <span style={{ fontSize:'13px' }}>{b.emoji}</span>
+              <span style={{ fontSize:'11px',color:'#64748B',fontWeight:600 }}>
+                {b.type} <strong style={{ color:b.color }}>{b.pct}%</strong>
+              </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Expected return range */}
+      {/* Stats row */}
       <div style={{ padding:'12px 18px',borderBottom:'1px solid #F1F5F9',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))',gap:'8px' }}>
         {[
-          { label:'Return range',  value:`${phase.plan.expectedReturnLo}–${phase.plan.expectedReturnHi}%`, color:'#2563EB' },
-          { label:'Risk level',    value:phase.plan.riskIntensity, color:'#D97706' },
-          { label:'Time bucket',   value:phase.plan.timeBucket, color:'#059669' },
-          { label:'Success rate',  value:`${phase.plan.successRate}%`, color:'#0F172A' },
-        ].map((s,i) => (
+          { label:'Return range', value:`${phase.plan.expectedReturnLo}–${phase.plan.expectedReturnHi}%`, color:'#2563EB' },
+          { label:'Risk level',   value:phase.plan.riskIntensity, color:'#D97706' },
+          { label:'Time bucket',  value:phase.plan.timeBucket, color:'#059669' },
+          { label:'Success rate', value:`${phase.plan.successRate}%`, color:'#0F172A' },
+        ].map((s,i)=>(
           <div key={i} style={{ background:'#F8FAFC',borderRadius:'8px',padding:'8px 10px',border:'1px solid #F1F5F9' }}>
             <div style={{ fontSize:'10px',color:'#94A3B8',marginBottom:'2px' }}>{s.label}</div>
             <div style={{ fontSize:'14px',fontWeight:800,color:s.color }}>{s.value}</div>
@@ -935,30 +976,29 @@ function PhaseDetailPanel({ phase, phaseKey, resolvedFunds, goals, onFundDetail 
         ))}
       </div>
 
-      {/* Fund list toggle */}
+      {/* Fund list */}
       <div style={{ padding:'0 18px' }}>
-        <button onClick={() => setShowFunds(!showFunds)}
-          style={{ width:'100%',background:showFunds?'#EFF6FF':'white',border:'none',borderTop:'none',padding:'14px 0',fontSize:'12px',fontWeight:700,color:'#1E40AF',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',fontFamily:'inherit' }}>
-          <span style={{ display:'flex',alignItems:'center',gap:'6px' }}>📋 Funds for this phase ({resolvedFunds.length} picks)</span>
+        <button onClick={()=>setShowFunds(!showFunds)}
+          style={{ width:'100%',background:showFunds?'#EFF6FF':'white',border:'none',padding:'14px 0',fontSize:'12px',fontWeight:700,color:'#1E40AF',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',fontFamily:'inherit' }}>
+          <span>📋 Recommended funds for this phase ({resolvedFunds.length} picks)</span>
           <span style={{ fontSize:'10px',color:'#60A5FA' }}>{showFunds?'▲ Hide':'▼ Show'}</span>
         </button>
 
         {showFunds && (
           <div style={{ paddingBottom:'16px' }}>
-            {phase.plan.blocks.map(block => {
-              const blockFunds = resolvedFunds.filter(f => f.exposureBlock === block.type);
-              if (blockFunds.length === 0) return null;
+            {phase.plan.blocks.map(block=>{
+              const blockFunds=resolvedFunds.filter(f=>f.exposureBlock===block.type);
+              if(blockFunds.length===0) return null;
               return (
                 <div key={block.type} style={{ marginBottom:'16px' }}>
-                  <div style={{ display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px' }}>
-                    <span style={{ fontSize:'14px' }}>{block.emoji}</span>
-                    <span style={{ fontSize:'12px',fontWeight:800,color:'#0F172A' }}>{block.type} Exposure</span>
-                    <span style={{ fontSize:'10px',color:block.color,fontWeight:700,background:block.bg,border:`1px solid ${block.border}`,padding:'1px 8px',borderRadius:'100px' }}>{block.pct}%</span>
-                    <span style={{ fontSize:'10px',color:'#94A3B8' }}>≈ ₹{Math.round(phase.totalSIP*block.pct/100/100)*100}/mo</span>
+                  <div style={{ display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',padding:'8px 12px',background:block.bg,borderRadius:'10px',border:`1px solid ${block.border}` }}>
+                    <span style={{ fontSize:'16px' }}>{block.emoji}</span>
+                    <span style={{ fontSize:'13px',fontWeight:800,color:block.color }}>{block.type}</span>
+                    <span style={{ fontSize:'11px',fontWeight:700,color:block.color,marginLeft:'auto' }}>{block.pct}% · ≈ ₹{Math.round(phase.totalSIP*block.pct/100/100)*100}/mo</span>
                   </div>
                   <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'8px' }}>
-                    {blockFunds.map((slot,i) => {
-                      const slotSIP = Math.round(phase.totalSIP*slot.cellAllocationPct/100/100)*100;
+                    {blockFunds.map((slot,i)=>{
+                      const slotSIP=Math.round(phase.totalSIP*slot.cellAllocationPct/100/100)*100;
                       return (
                         <div key={i} style={{ background:'white',border:`1.5px solid ${slot.blockBorder}`,borderRadius:'12px',padding:'12px 14px' }}>
                           <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6px' }}>
@@ -971,15 +1011,15 @@ function PhaseDetailPanel({ phase, phaseKey, resolvedFunds, goals, onFundDetail 
                               </div>
                               <div style={{ fontSize:'11px',fontWeight:800,color:'#0F172A',lineHeight:1.3 }}>{slot.fundName}</div>
                             </div>
-                            {slotSIP>0 && <div style={{ fontSize:'10px',fontWeight:700,color:slot.blockColor,background:slot.blockBg,border:`1px solid ${slot.blockBorder}`,borderRadius:'100px',padding:'2px 8px',flexShrink:0,marginLeft:'6px' }}>₹{slotSIP.toLocaleString('en-IN')}/mo</div>}
+                            {slotSIP>0&&<div style={{ fontSize:'10px',fontWeight:700,color:slot.blockColor,background:slot.blockBg,border:`1px solid ${slot.blockBorder}`,borderRadius:'100px',padding:'2px 8px',flexShrink:0,marginLeft:'6px' }}>₹{slotSIP.toLocaleString('en-IN')}/mo</div>}
                           </div>
-                          {slot.stats && (
+                          {slot.stats&&(
                             <div style={{ display:'flex',gap:'6px',marginBottom:'8px' }}>
                               {[
-                                { v:`${slot.stats.return3Y?.toFixed(1)}%`,l:'3Y',c:'#059669' },
-                                { v:`${slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'+':''}${slot.stats.alpha3Y?.toFixed(1)}%`,l:'α',c:slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'#059669':'#DC2626' },
-                                { v:`#${slot.stats.rank}`,l:'Rank',c:'#1E3A5F' },
-                              ].map((s,j) => (
+                                { v:`${slot.stats.return3Y?.toFixed(1)}%`, l:'3Y',  c:'#059669' },
+                                { v:`${slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'+':''}${slot.stats.alpha3Y?.toFixed(1)}%`, l:'α', c:slot.stats.alpha3Y&&slot.stats.alpha3Y>0?'#059669':'#DC2626' },
+                                { v:`#${slot.stats.rank}`, l:'Rank', c:'#1E3A5F' },
+                              ].map((s,j)=>(
                                 <div key={j} style={{ flex:1,background:'#F8FAFC',borderRadius:'6px',padding:'5px',textAlign:'center',border:'1px solid #F1F5F9' }}>
                                   <div style={{ fontSize:'9px',color:'#94A3B8' }}>{s.l}</div>
                                   <div style={{ fontSize:'12px',fontWeight:800,color:s.c }}>{s.v}</div>
@@ -987,7 +1027,7 @@ function PhaseDetailPanel({ phase, phaseKey, resolvedFunds, goals, onFundDetail 
                               ))}
                             </div>
                           )}
-                          <button onClick={() => onFundDetail(slot)}
+                          <button onClick={()=>onFundDetail(slot)}
                             style={{ width:'100%',background:slot.blockBg,border:`1px solid ${slot.blockBorder}`,borderRadius:'7px',padding:'6px',fontSize:'10px',fontWeight:700,color:slot.blockColor,cursor:'pointer',fontFamily:'inherit' }}>
                             Why this fund? →
                           </button>
@@ -1010,75 +1050,58 @@ function PhaseDetailPanel({ phase, phaseKey, resolvedFunds, goals, onFundDetail 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LifetimePlanPage() {
-  // Data
   const [amfiRaw,       setAmfiRaw]       = useState<AMFIFund[]>([]);
   const [fundAnalytics, setFundAnalytics] = useState<FundAnalytics[]>([]);
   const [etfAnalytics,  setEtfAnalytics]  = useState<ETFAnalytics[]>([]);
   const [insights,      setInsights]      = useState<InsightRow[]>([]);
   const [dataReady,     setDataReady]     = useState(false);
 
-  // Goals
   const [goals, setGoals] = useState<GoalInput[]>([]);
-
-  // Results
-  const [lifetimePlan,   setLifetimePlan]   = useState<LifetimePlan | null>(null);
-  const [generating,     setGenerating]     = useState(false);
+  const [lifetimePlan, setLifetimePlan] = useState<LifetimePlan | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [selectedPhaseIdx, setSelectedPhaseIdx] = useState(0);
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/amfi-raw").then(r => r.json()),
-      fetch("/api/funds").then(r => r.json()),
-      fetch("/api/etfs").then(r => r.json()),
-      fetch("/api/insights").then(r => r.json()),
-    ]).then(([amfi, funds, etfs, ins]) => {
+      fetch("/api/amfi-raw").then(r=>r.json()),
+      fetch("/api/funds").then(r=>r.json()),
+      fetch("/api/etfs").then(r=>r.json()),
+      fetch("/api/insights").then(r=>r.json()),
+    ]).then(([amfi,funds,etfs,ins])=>{
       setAmfiRaw(amfi); setFundAnalytics(funds); setEtfAnalytics(etfs); setInsights(ins); setDataReady(true);
     }).catch(console.error);
   }, []);
 
-  function addGoalFromTemplate(template: typeof GOAL_TEMPLATES[0]) {
-    setGoals(prev => [...prev, { id: generateId(), emoji: template.emoji, label: template.label, targetLakh: template.targetLakh, horizonYears: template.horizonYears, riskScore: template.riskScore, priority: template.priority }]);
+  function addGoalFromTemplate(t: typeof GOAL_TEMPLATES[0]) {
+    setGoals(prev=>[...prev,{ id:generateId(), emoji:t.emoji, label:t.label, targetLakh:t.targetLakh, horizonYears:t.horizonYears, riskScore:t.riskScore, priority:t.priority }]);
   }
 
   function addBlankGoal() {
-    setGoals(prev => [...prev, { id: generateId(), emoji: "🎯", label: "My Goal", targetLakh: "10", horizonYears: "5", riskScore: 5, priority: "important" }]);
-  }
-
-  function updateGoal(id: string, updated: GoalInput) {
-    setGoals(prev => prev.map(g => g.id === id ? updated : g));
-  }
-
-  function removeGoal(id: string) {
-    setGoals(prev => prev.filter(g => g.id !== id));
+    setGoals(prev=>[...prev,{ id:generateId(), emoji:"🎯", label:"My Goal", targetLakh:"10", horizonYears:"5", riskScore:5, priority:"important" }]);
   }
 
   function generate() {
-    if (goals.length === 0) return;
-    setGenerating(true);
-    setLifetimePlan(null);
-    setSelectedPhaseIdx(0);
-
-    setTimeout(() => {
-      const plan = buildLifetimePlan(goals, amfiRaw, fundAnalytics, etfAnalytics, insights);
-      setLifetimePlan(plan);
-      setGenerating(false);
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-    }, 1200);
+    if(goals.length===0) return;
+    setGenerating(true); setLifetimePlan(null); setSelectedPhaseIdx(0);
+    setTimeout(()=>{
+      const plan=buildLifetimePlan(goals,amfiRaw,fundAnalytics,etfAnalytics,insights);
+      setLifetimePlan(plan); setGenerating(false);
+      setTimeout(()=>resultRef.current?.scrollIntoView({behavior:'smooth',block:'start'}),150);
+    },1200);
   }
 
-  const canGenerate = goals.length >= 1 && goals.every(g => g.label && g.targetLakh && g.horizonYears);
+  const canGenerate = goals.length>=1 && goals.every(g=>g.label&&g.targetLakh&&g.horizonYears);
+  const totalTargetLakh = goals.reduce((s,g)=>s+(parseFloat(g.targetLakh)||0),0);
+  const maxHorizon = goals.length>0 ? Math.max(...goals.map(g=>parseInt(g.horizonYears)||0)) : 0;
+
   const selectedPhase = lifetimePlan?.phaseDescriptions[selectedPhaseIdx];
   const selectedPhaseKey = selectedPhase ? `${selectedPhase.fromYear}-${selectedPhase.toYear}` : "";
-  const selectedFunds = selectedPhaseKey ? (lifetimePlan?.resolvedFundsByPhase.get(selectedPhaseKey) ?? []) : [];
-
-  // Totals for summary
-  const totalTargetLakh = goals.reduce((s,g) => s + (parseFloat(g.targetLakh)||0), 0);
-  const maxHorizon = goals.length > 0 ? Math.max(...goals.map(g => parseInt(g.horizonYears)||0)) : 0;
+  const selectedFunds = selectedPhaseKey ? (lifetimePlan?.resolvedFundsByPhase.get(selectedPhaseKey)??[]) : [];
 
   return (
-    <div style={{ minHeight:'100vh',background:'#F8FAFC',fontFamily:"'DM Sans', system-ui, -apple-system, sans-serif",color:'#1F2937' }}>
+    <div style={{ minHeight:'100vh',background:'#F8FAFC',fontFamily:"'DM Sans',system-ui,-apple-system,sans-serif",color:'#1F2937' }}>
 
       {/* NAV */}
       <div style={{ background:'white',borderBottom:'1px solid #E2E8F0',zIndex:30,position:'sticky',top:0 }}>
@@ -1087,9 +1110,8 @@ export default function LifetimePlanPage() {
 
       {/* HERO */}
       <section style={{ background:'linear-gradient(155deg,#FFFBEB 0%,#F0FDF4 50%,#EFF6FF 100%)',borderBottom:'1px solid #E2E8F0',position:'relative',overflow:'hidden' }}>
-        <div style={{ position:'absolute',inset:0,backgroundImage:'radial-gradient(circle at 1px 1px, rgba(217,119,6,0.06) 1px, transparent 0)',backgroundSize:'28px 28px',pointerEvents:'none' }} />
-        <div style={{ position:'absolute',top:-80,right:-60,width:'380px',height:'380px',background:'radial-gradient(circle, rgba(217,119,6,0.08) 0%, transparent 70%)',pointerEvents:'none' }} />
-        <div style={{ position:'absolute',bottom:-60,left:'8%',width:'320px',height:'320px',background:'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%)',pointerEvents:'none' }} />
+        <div style={{ position:'absolute',inset:0,backgroundImage:'radial-gradient(circle at 1px 1px,rgba(217,119,6,0.06) 1px,transparent 0)',backgroundSize:'28px 28px',pointerEvents:'none' }} />
+        <div style={{ position:'absolute',top:-80,right:-60,width:'380px',height:'380px',background:'radial-gradient(circle,rgba(217,119,6,0.08) 0%,transparent 70%)',pointerEvents:'none' }} />
         <div style={{ position:'relative',maxWidth:'1100px',margin:'0 auto',padding:'clamp(32px,5vw,52px) clamp(16px,4vw,24px) clamp(36px,5vw,56px)' }}>
           <div style={{ display:'inline-flex',alignItems:'center',gap:'8px',background:'rgba(217,119,6,0.1)',border:'1px solid rgba(217,119,6,0.25)',borderRadius:'100px',padding:'5px 14px',marginBottom:'16px' }}>
             <span style={{ width:'7px',height:'7px',background:'#D97706',borderRadius:'50%' }} />
@@ -1104,14 +1126,12 @@ export default function LifetimePlanPage() {
           <p style={{ fontSize:'clamp(13px,2vw,15px)',color:'#475569',lineHeight:1.75,maxWidth:'540px',marginBottom:'24px' }}>
             Car in 3 years. Home in 6. Child's college in 12. Retirement in 25. Most people invest in silos — one fund for this, another for that. We build a single living portfolio that covers all your goals, shifts as each one is achieved, and is always backed by live fund data.
           </p>
-
-          {/* How it's different */}
           <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'10px',maxWidth:'700px' }}>
             {[
-              { icon:'🔀', title:'Goals change the mix', desc:'As each goal is achieved, the portfolio automatically shifts to serve the remaining ones.' },
-              { icon:'📊', title:'Same live engine', desc:'Every fund pick uses the identical alpha-based engine powering our full matrix.' },
-              { icon:'⚖️', title:'Priorities respected', desc:'Essential goals protect capital first. Aspirational goals take more risk for higher returns.' },
-            ].map((b,i) => (
+              { icon:'🔄', title:'Fixed SIP, 10% step-up', desc:'You commit to one SIP today. Every year it grows 10% — matching your salary growth. No surprises.' },
+              { icon:'🎯', title:'Nearest goal gets funded first', desc:'Your SIP is always directed to the goal that needs it soonest. Surplus automatically flows to longer-horizon goals.' },
+              { icon:'📊', title:'Same live fund engine', desc:'Every fund pick uses the identical alpha-based engine powering our full matrix. No compromises.' },
+            ].map((b,i)=>(
               <div key={i} style={{ background:'rgba(255,255,255,0.7)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.8)',borderRadius:'14px',padding:'14px 16px',boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
                 <div style={{ fontSize:'20px',marginBottom:'6px' }}>{b.icon}</div>
                 <div style={{ fontSize:'12px',fontWeight:800,color:'#1F2937',marginBottom:'3px' }}>{b.title}</div>
@@ -1128,16 +1148,16 @@ export default function LifetimePlanPage() {
         {/* Goal templates */}
         <div style={{ background:'white',borderRadius:'20px',border:'1px solid #E2E8F0',boxShadow:'0 1px 6px rgba(0,0,0,0.04)',padding:'clamp(16px,3vw,22px)',marginBottom:'14px' }}>
           <div style={{ fontSize:'13px',fontWeight:700,color:'#0F172A',marginBottom:'4px' }}>Add goals to your plan</div>
-          <div style={{ fontSize:'12px',color:'#94A3B8',marginBottom:'14px' }}>Tap any goal below, then customise the amount, years, and risk. Add as many as you like.</div>
+          <div style={{ fontSize:'12px',color:'#94A3B8',marginBottom:'14px' }}>Tap any goal below to add it. Then customise the amount, years, and risk tolerance.</div>
           <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(105px,1fr))',gap:'8px' }}>
-            {GOAL_TEMPLATES.map((t,i) => {
-              const alreadyAdded = goals.some(g => g.label === t.label);
+            {GOAL_TEMPLATES.map((t,i)=>{
+              const alreadyAdded=goals.some(g=>g.label===t.label);
               return (
-                <button key={i} onClick={() => addGoalFromTemplate(t)} disabled={alreadyAdded}
+                <button key={i} onClick={()=>addGoalFromTemplate(t)} disabled={alreadyAdded}
                   style={{ background:alreadyAdded?'#F8FAFC':'white',border:`2px solid ${alreadyAdded?'#E2E8F0':PRIORITY_CONFIG[t.priority].border}`,borderRadius:'14px',padding:'10px 6px',cursor:alreadyAdded?'default':'pointer',textAlign:'center',transition:'all 0.15s',fontFamily:'inherit',opacity:alreadyAdded?0.5:1 }}>
                   <div style={{ fontSize:'22px',marginBottom:'4px' }}>{t.emoji}</div>
                   <div style={{ fontSize:'10px',fontWeight:700,color:alreadyAdded?'#94A3B8':PRIORITY_CONFIG[t.priority].color,lineHeight:1.3 }}>{t.label}</div>
-                  {alreadyAdded && <div style={{ fontSize:'9px',color:'#94A3B8',marginTop:'2px' }}>Added ✓</div>}
+                  {alreadyAdded&&<div style={{ fontSize:'9px',color:'#94A3B8',marginTop:'2px' }}>Added ✓</div>}
                 </button>
               );
             })}
@@ -1150,63 +1170,81 @@ export default function LifetimePlanPage() {
         </div>
 
         {/* Goal cards */}
-        {goals.length > 0 && (
+        {goals.length>0&&(
           <div style={{ display:'flex',flexDirection:'column',gap:'12px',marginBottom:'14px' }}>
-            {goals.map((g, i) => (
-              <GoalCard key={g.id} goal={g} index={i} onChange={updated => updateGoal(g.id, updated)} onRemove={() => removeGoal(g.id)} />
+            {goals.map(g=>(
+              <GoalCard key={g.id} goal={g}
+                onChange={updated=>setGoals(prev=>prev.map(x=>x.id===g.id?updated:x))}
+                onRemove={()=>setGoals(prev=>prev.filter(x=>x.id!==g.id))} />
             ))}
           </div>
         )}
 
-        {/* Goals summary before generate */}
-        {goals.length > 0 && (
+        {/* Summary + generate */}
+        {goals.length>0&&(
           <div style={{ background:'white',borderRadius:'16px',border:'1px solid #E2E8F0',padding:'16px 20px',marginBottom:'14px',display:'flex',flexWrap:'wrap',gap:'16px',alignItems:'center',justifyContent:'space-between' }}>
             <div style={{ display:'flex',flexWrap:'wrap',gap:'16px' }}>
               {[
-                { label:'Goals added', value:`${goals.length}`, color:'#2563EB' },
-                { label:'Total target', value:fmtINR(totalTargetLakh*100000), color:'#059669' },
-                { label:'Plan duration', value:`${maxHorizon} years`, color:'#D97706' },
-                { label:'Essential goals', value:`${goals.filter(g=>g.priority==='essential').length}`, color:'#DC2626' },
-              ].map((s,i) => (
+                { label:'Goals added',      value:`${goals.length}`,     color:'#2563EB' },
+                { label:'Total target',     value:fmtINR(totalTargetLakh*100000), color:'#059669' },
+                { label:'Plan duration',    value:`${maxHorizon} years`, color:'#D97706' },
+                { label:'Essential goals',  value:`${goals.filter(g=>g.priority==='essential').length}`, color:'#DC2626' },
+              ].map((s,i)=>(
                 <div key={i}>
                   <div style={{ fontSize:'10px',color:'#94A3B8',fontWeight:600 }}>{s.label}</div>
                   <div style={{ fontSize:'18px',fontWeight:800,color:s.color,lineHeight:1.1 }}>{s.value}</div>
                 </div>
               ))}
             </div>
-            <button onClick={generate} disabled={!canGenerate || generating}
-              style={{ background:canGenerate?'linear-gradient(90deg,#D97706 0%,#059669 100%)':'#E2E8F0',color:canGenerate?'white':'#94A3B8',border:'none',borderRadius:'14px',padding:'14px 24px',fontSize:'14px',fontWeight:800,cursor:canGenerate?'pointer':'not-allowed',letterSpacing:'-0.01em',boxShadow:canGenerate?'0 4px 20px rgba(217,119,6,0.3)':'none',transition:'all 0.2s',fontFamily:'inherit',whiteSpace:'nowrap' }}>
-              {generating ? '⏳  Building your lifetime plan…' : '🌱  Build my lifetime plan →'}
+            <button onClick={generate} disabled={!canGenerate||generating}
+              style={{ background:canGenerate?'linear-gradient(90deg,#D97706 0%,#059669 100%)':'#E2E8F0',color:canGenerate?'white':'#94A3B8',border:'none',borderRadius:'14px',padding:'14px 24px',fontSize:'14px',fontWeight:800,cursor:canGenerate?'pointer':'not-allowed',boxShadow:canGenerate?'0 4px 20px rgba(217,119,6,0.3)':'none',transition:'all 0.2s',fontFamily:'inherit',whiteSpace:'nowrap' }}>
+              {generating?'⏳  Building your lifetime plan…':'🌱  Build my lifetime plan →'}
             </button>
           </div>
         )}
 
-        {goals.length === 0 && (
+        {goals.length===0&&(
           <div style={{ background:'white',borderRadius:'16px',border:'2px dashed #E2E8F0',padding:'32px',textAlign:'center',color:'#94A3B8' }}>
             <div style={{ fontSize:'36px',marginBottom:'12px' }}>🌱</div>
             <div style={{ fontSize:'14px',fontWeight:700,color:'#374151',marginBottom:'6px' }}>Start adding your goals above</div>
-            <div style={{ fontSize:'12px',lineHeight:1.6 }}>Pick from common goals or create a custom one. You can add as many as you like — we'll build one plan that covers them all.</div>
+            <div style={{ fontSize:'12px',lineHeight:1.6 }}>Pick from common goals or create a custom one. Add as many as you like — we'll build one plan that covers them all.</div>
           </div>
         )}
 
         {/* ── RESULTS ── */}
-        {lifetimePlan && (
+        {lifetimePlan&&(
           <div ref={resultRef} style={{ marginTop:'32px',display:'flex',flexDirection:'column',gap:'16px' }}>
 
-            {/* ── PLAN OVERVIEW ── */}
+            {/* Plan overview */}
             <div style={{ background:'linear-gradient(135deg,#FFFBEB,#F0FDF4)',borderRadius:'20px',border:'1px solid #E2E8F0',padding:'clamp(18px,3vw,26px)' }}>
               <div style={{ fontSize:'11px',fontWeight:700,color:'#94A3B8',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'8px' }}>Your lifetime wealth plan</div>
               <h2 style={{ fontSize:'clamp(18px,3vw,24px)',fontWeight:800,color:'#0F172A',margin:'0 0 6px' }}>
-                {goals.length} goal{goals.length>1?'s':''} · {lifetimePlan.totalYears}-year journey · ₹{lifetimePlan.totalMonthlySIP.toLocaleString('en-IN')}/month to start
+                {goals.length} goal{goals.length>1?'s':''} · {lifetimePlan.totalYears}-year journey
               </h2>
-              <p style={{ fontSize:'13px',color:'#475569',margin:'0 0 16px',lineHeight:1.6,maxWidth:'600px' }}>
-                Your portfolio will pass through <strong>{lifetimePlan.phaseDescriptions.length} distinct phases</strong> as goals are achieved. Each phase below shows the allocation and fund picks that apply during that window.
-              </p>
 
-              {/* Goal roadmap pills */}
-              <div style={{ display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'16px' }}>
-                {[...lifetimePlan.goals].sort((a,b)=>parseInt(a.horizonYears)-parseInt(b.horizonYears)).map((g,i) => {
-                  const pc = PRIORITY_CONFIG[g.priority];
+              {/* Key numbers */}
+              <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px',marginBottom:'20px' }}>
+                <div style={{ background:'white',borderRadius:'14px',border:'2px solid #BFDBFE',padding:'14px 18px' }}>
+                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Start investing today with</div>
+                  <div style={{ fontSize:'28px',fontWeight:900,color:'#2563EB',lineHeight:1 }}>₹{lifetimePlan.baseMonthlySIP.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>per month · grows 10% every year</div>
+                </div>
+                <div style={{ background:'white',borderRadius:'14px',border:'1px solid #E2E8F0',padding:'14px 18px' }}>
+                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>In year {Math.floor(lifetimePlan.totalYears/2)}, your SIP becomes</div>
+                  <div style={{ fontSize:'22px',fontWeight:900,color:'#059669',lineHeight:1 }}>₹{(Math.ceil(lifetimePlan.baseMonthlySIP*Math.pow(1.10,Math.floor(lifetimePlan.totalYears/2))/100)*100).toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>after 10% annual step-ups</div>
+                </div>
+                <div style={{ background:'white',borderRadius:'14px',border:'1px solid #E2E8F0',padding:'14px 18px' }}>
+                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Portfolio phases</div>
+                  <div style={{ fontSize:'28px',fontWeight:900,color:'#D97706',lineHeight:1 }}>{lifetimePlan.phaseDescriptions.length}</div>
+                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>allocation shifts as goals are met</div>
+                </div>
+              </div>
+
+              {/* Goal roadmap */}
+              <div style={{ display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'18px' }}>
+                {[...lifetimePlan.goals].sort((a,b)=>parseInt(a.horizonYears)-parseInt(b.horizonYears)).map(g=>{
+                  const pc=PRIORITY_CONFIG[g.priority];
                   return (
                     <div key={g.id} style={{ display:'flex',alignItems:'center',gap:'6px',background:'white',border:`1.5px solid ${pc.border}`,borderRadius:'100px',padding:'5px 12px',boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
                       <span style={{ fontSize:'14px' }}>{g.emoji}</span>
@@ -1219,61 +1257,62 @@ export default function LifetimePlanPage() {
                 })}
               </div>
 
-              {/* Timeline visual */}
+              {/* Timeline */}
               <TimelineVisual plan={lifetimePlan} goals={goals} selectedPhaseIdx={selectedPhaseIdx} onSelectPhase={setSelectedPhaseIdx} />
             </div>
 
-            {/* ── PHASE DETAIL ── */}
-            {selectedPhase && (
-              <PhaseDetailPanel
-                phase={selectedPhase}
-                phaseKey={selectedPhaseKey}
-                resolvedFunds={selectedFunds}
-                goals={goals}
-                onFundDetail={setSelectedFundSlot}
-              />
+            {/* Phase detail */}
+            {selectedPhase&&(
+              <PhaseDetailPanel phase={selectedPhase} resolvedFunds={selectedFunds} onFundDetail={setSelectedFundSlot} />
             )}
 
-            {/* ── ALL PHASES SUMMARY ── */}
+            {/* All phases table */}
             <div style={{ background:'white',borderRadius:'16px',border:'1px solid #E2E8F0',overflow:'hidden' }}>
               <div style={{ padding:'16px 18px',borderBottom:'1px solid #F1F5F9',display:'flex',alignItems:'center',gap:'10px' }}>
                 <span style={{ fontSize:'16px' }}>🗂️</span>
                 <div>
                   <div style={{ fontSize:'14px',fontWeight:800,color:'#0F172A' }}>All phases at a glance</div>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',marginTop:'1px' }}>How your portfolio shifts as each goal is achieved</div>
+                  <div style={{ fontSize:'11px',color:'#94A3B8',marginTop:'1px' }}>SIP grows 10% each year. Portfolio rebalances when a goal is achieved.</div>
                 </div>
               </div>
               <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'500px' }}>
+                <table style={{ width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'560px' }}>
                   <thead>
                     <tr style={{ background:'#F8FAFC' }}>
-                      {['Phase','Active goals','Monthly SIP','Equity','Hybrid','Debt','Expected returns'].map((h,i) => (
+                      {['Phase','Active goals','Monthly SIP','Exposure blocks','Expected returns'].map((h,i)=>(
                         <th key={i} style={{ padding:'10px 14px',textAlign:'left',fontWeight:700,color:'#374151',borderBottom:'1px solid #E2E8F0',whiteSpace:'nowrap',fontSize:'11px' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {lifetimePlan.phaseDescriptions.map((phase,i) => {
-                      const equityPct = phase.plan.blocks.filter(b=>["Core Equity","High Growth","Tactical"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-                      const hybridPct = phase.plan.blocks.filter(b=>b.type==="Balanced Equity").reduce((s,b)=>s+b.pct,0);
-                      const debtPct   = phase.plan.blocks.filter(b=>["Capital Safety","Stability"].includes(b.type)).reduce((s,b)=>s+b.pct,0);
-                      const isSelected = selectedPhaseIdx===i;
+                    {lifetimePlan.phaseDescriptions.map((phase,i)=>{
+                      const isSelected=selectedPhaseIdx===i;
                       return (
-                        <tr key={i} onClick={() => { setSelectedPhaseIdx(i); resultRef.current?.scrollIntoView({behavior:'smooth',block:'start'}); }}
+                        <tr key={i} onClick={()=>{ setSelectedPhaseIdx(i); resultRef.current?.scrollIntoView({behavior:'smooth',block:'start'}); }}
                           style={{ borderBottom:'1px solid #F1F5F9',cursor:'pointer',background:isSelected?'#EFF6FF':'white',transition:'background 0.15s' }}
-                          onMouseEnter={e => { if(!isSelected) (e.currentTarget as HTMLTableRowElement).style.background='#F8FAFC'; }}
-                          onMouseLeave={e => { if(!isSelected) (e.currentTarget as HTMLTableRowElement).style.background='white'; }}>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#374151' }}>{phase.label}</td>
+                          onMouseEnter={e=>{ if(!isSelected)(e.currentTarget as HTMLTableRowElement).style.background='#F8FAFC'; }}
+                          onMouseLeave={e=>{ if(!isSelected)(e.currentTarget as HTMLTableRowElement).style.background='white'; }}>
+                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#374151',whiteSpace:'nowrap' }}>{phase.label}</td>
                           <td style={{ padding:'11px 14px' }}>
                             <div style={{ display:'flex',gap:'3px',flexWrap:'wrap' }}>
-                              {phase.activeGoalLabels.map((l,j) => <span key={j} style={{ fontSize:'11px',color:'#6B7280' }}>{l}</span>)}
+                              {phase.activeGoalLabels.map((l,j)=><span key={j} style={{ fontSize:'11px',color:'#6B7280' }}>{l}</span>)}
                             </div>
                           </td>
-                          <td style={{ padding:'11px 14px',fontWeight:800,color:'#2563EB' }}>₹{phase.totalSIP.toLocaleString('en-IN')}</td>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#2563EB' }}>{equityPct}%</td>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#7C3AED' }}>{hybridPct}%</td>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#059669' }}>{debtPct}%</td>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#374151' }}>{phase.plan.expectedReturnLo}–{phase.plan.expectedReturnHi}%</td>
+                          <td style={{ padding:'11px 14px',fontWeight:800,color:'#2563EB',whiteSpace:'nowrap' }}>
+                            ₹{phase.totalSIP.toLocaleString('en-IN')}
+                            {i>0&&<div style={{ fontSize:'9px',color:'#94A3B8',fontWeight:400 }}>+10%/yr step-up</div>}
+                          </td>
+                          {/* ── EXPOSURE BLOCKS — same nomenclature as single-goal page ── */}
+                          <td style={{ padding:'11px 14px' }}>
+                            <div style={{ display:'flex',flexWrap:'wrap',gap:'4px' }}>
+                              {phase.plan.blocks.map((b,j)=>(
+                                <span key={j} style={{ fontSize:'10px',fontWeight:700,color:b.color,background:b.bg,border:`1px solid ${b.border}`,borderRadius:'100px',padding:'2px 7px',whiteSpace:'nowrap' }}>
+                                  {b.emoji} {b.type} {b.pct}%
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#374151',whiteSpace:'nowrap' }}>{phase.plan.expectedReturnLo}–{phase.plan.expectedReturnHi}%</td>
                         </tr>
                       );
                     })}
@@ -1282,20 +1321,20 @@ export default function LifetimePlanPage() {
               </div>
             </div>
 
-            {/* ── HOW IT WORKS ── */}
+            {/* How it works */}
             <div style={{ background:'white',borderRadius:'16px',border:'1px solid #E2E8F0',padding:'18px 20px' }}>
               <div style={{ fontSize:'14px',fontWeight:800,color:'#0F172A',marginBottom:'12px',display:'flex',alignItems:'center',gap:'8px' }}>
                 <span>🧠</span> How we built this plan — in plain English
               </div>
               <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'10px' }}>
                 {[
-                  { step:'1',icon:'📋',color:'#2563EB',bg:'#EFF6FF',bd:'#BFDBFE',title:'Goals prioritised',body:`We sort your ${goals.length} goal${goals.length>1?'s':''} by time horizon (shortest first). Essential goals anchor the safety of the portfolio. Aspirational goals accept more risk for higher upside.` },
-                  { step:'2',icon:'⏱️',color:'#7C3AED',bg:'#F5F3FF',bd:'#DDD6FE',title:'Horizon blend',body:'For each phase, we blend your shortest remaining goal (60% weight, for safety) with the average remaining horizon (40%). This produces a realistic time bucket that balances capital protection and growth.' },
-                  { step:'3',icon:'🎚️',color:'#D97706',bg:'#FFFBEB',bd:'#FDE68A',title:'Weighted risk',body:'Your risk scores are averaged with priority weights: essential goals count 1.5×, important goals 1.0×, aspirational 0.6×. This ensures safety-focused goals drive the overall risk posture.' },
-                  { step:'4',icon:'🔬',color:'#059669',bg:'#ECFDF5',bd:'#A7F3D0',title:'Same fund engine',body:'The blended time bucket + risk intensity feeds into the exact same 4-layer exposure block engine as our single-goal page. Within each phase, every fund is chosen by alpha-based sub-category comparison — zero human bias.' },
-                  { step:'5',icon:'🔀',color:'#DC2626',bg:'#FEF2F2',bd:'#FECACA',title:'Phase transitions',body:'When a goal matures, it exits the portfolio. The remaining SIP is redistributed across the remaining goals. The allocation updates automatically — the portfolio becomes more growth-oriented as near-term obligations are cleared.' },
-                  { step:'6',icon:'💡',color:'#0891B2',bg:'#ECFEFF',bd:'#A5F3FC',title:'SIP redistribution',body:'Your starting SIP reflects all goals running simultaneously. As each goal is achieved, you can reduce your SIP or redirect it — the plan tells you the new required amount for each phase.' },
-                ].map((item,i) => (
+                  { step:'1',icon:'📋',color:'#2563EB',bg:'#EFF6FF',bd:'#BFDBFE', title:'Goals sorted by urgency', body:`We sort your ${goals.length} goal${goals.length>1?'s':''} by time horizon, shortest first. Your nearest goal gets funded first. Essential goals anchor safety; aspirational ones take more risk.` },
+                  { step:'2',icon:'💰',color:'#059669',bg:'#ECFDF5',bd:'#A7F3D0', title:'One fixed SIP, 10% step-up', body:'We calculate the total SIP you need today assuming it grows 10% every year — matching typical salary growth. This single number is your commitment. Nothing changes unless you want it to.' },
+                  { step:'3',icon:'🔀',color:'#D97706',bg:'#FFFBEB',bd:'#FDE68A', title:'SIP directed to nearest goal', body:'At any point, your SIP flows first to the goal that matures soonest. Whatever is surplus after meeting that goal\'s required share automatically flows to longer-horizon goals.' },
+                  { step:'4',icon:'⚖️',color:'#7C3AED',bg:'#F5F3FF',bd:'#DDD6FE', title:'Blended risk for the portfolio', body:'Your risk scores are weighted by priority: essential goals count 1.5×, important goals 1.0×, aspirational 0.6×. The blended risk + shortest active horizon determines the exposure block mix for each phase.' },
+                  { step:'5',icon:'🔬',color:'#0891B2',bg:'#ECFEFF',bd:'#A5F3FC', title:'Same 4-layer fund engine', body:'Each phase uses the identical exposure block engine as our single-goal page: Time Bucket → Risk Intensity → Exposure Blocks (Capital Safety, Stability, Balanced Equity, Core Equity, High Growth, Tactical) → Fund selection by alpha.' },
+                  { step:'6',icon:'🔁',color:'#DC2626',bg:'#FEF2F2',bd:'#FECACA', title:'Rebalance when a goal is met', body:'When a goal matures, it exits the portfolio. The SIP (now stepped up further) is redistributed proportionally across remaining goals. The allocation shifts — often becoming more growth-oriented as safety obligations are cleared.' },
+                ].map((item,i)=>(
                   <div key={i} style={{ background:item.bg,border:`1px solid ${item.bd}`,borderRadius:'12px',padding:'14px 16px' }}>
                     <div style={{ display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px' }}>
                       <span style={{ width:'22px',height:'22px',background:'white',border:`1px solid ${item.bd}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:800,color:item.color,flexShrink:0 }}>{item.step}</span>
@@ -1311,7 +1350,7 @@ export default function LifetimePlanPage() {
               </div>
             </div>
 
-            {/* CTA back to single goal */}
+            {/* CTA */}
             <div style={{ background:'linear-gradient(135deg,#EFF6FF,#F0FDF4)',border:'1px solid #BFDBFE',borderRadius:'16px',padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'16px' }}>
               <div>
                 <div style={{ fontSize:'16px',marginBottom:'4px' }}>⚡</div>
@@ -1326,7 +1365,7 @@ export default function LifetimePlanPage() {
         )}
       </div>
 
-      {selectedFundSlot && <FundDetailModal slot={selectedFundSlot} onClose={() => setSelectedFundSlot(null)} />}
+      {selectedFundSlot&&<FundDetailModal slot={selectedFundSlot} onClose={()=>setSelectedFundSlot(null)} />}
     </div>
   );
 }
