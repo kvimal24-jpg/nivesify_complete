@@ -160,7 +160,7 @@ type YearSnapshot = {
   year: number;
   activeGoals: string[];
   achievedGoals: string[];
-  totalSIP: number;         // stepped-up SIP at this year
+  totalSIP: number;
   blocks: ExposureBlock[];
   label: string;
 };
@@ -171,11 +171,10 @@ type PhaseDescription = {
   label: string;
   description: string;
   activeGoalLabels: string[];
-  achievedGoalLabels: string[];   // goals completed AT start of this phase
+  achievedGoalLabels: string[];
   plan: AllocationPlan;
-  totalSIP: number;               // stepped-up SIP for this phase (first year of phase)
-  baseSIP: number;                // year-0 SIP (shown for reference)
-  // per-goal SIP breakdown for clarity
+  totalSIP: number;
+  baseSIP: number;
   goalSIPs: { goalId: string; goalLabel: string; goalEmoji: string; sip: number }[];
 };
 
@@ -183,7 +182,7 @@ type LifetimePlan = {
   goals: GoalInput[];
   totalYears: number;
   timeline: YearSnapshot[];
-  baseMonthlySIP: number;         // year-0 SIP commitment
+  baseMonthlySIP: number;
   phaseDescriptions: PhaseDescription[];
   resolvedFundsByPhase: Map<string, ResolvedFundSlot[]>;
 };
@@ -334,7 +333,14 @@ function buildBox(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SINGLE-GOAL ENGINE — identical to quick-picks page
+// SINGLE-GOAL ENGINE — REVIEWED & REFINED (matching quick picks page)
+//
+// Key principles:
+// • 0-2Y: NO momentum/tactical — horizon too short for factor premium to express.
+//   Even Aggressive stays in large-cap quality + hybrids.
+// • 2-5Y: Tactical only for Aggressive and capped at 10%. Mid-cap fine for Growth+.
+// • 5-10Y: Tactical appropriate. Small-cap enters for Aggressive.
+// • 10Y+: Full spectrum.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function computeAllocationPlan(horizonYears: number, riskScore: number, targetAmount: number): AllocationPlan {
@@ -355,14 +361,21 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
     } else if (riskIntensity === "Balanced") {
       blocks = [
         { type:"Capital Safety", pct:55, emoji:"🛡️", description:"More than half in safe short-term debt.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Ultra Short",allocationPct:30},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:25}]},
-        { type:"Stability", pct:30, emoji:"⚓", description:"Conservative and balanced hybrid for some upside.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:15},{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15}]},
-        { type:"Core Equity", pct:15, emoji:"📈", description:"Large-cap for mild growth participation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15}]},
+        { type:"Stability", pct:25, emoji:"⚓", description:"Conservative and balanced hybrid for some upside without much volatility.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"hybrid",row:1,col:0,label:"Conservative Hybrid",allocationPct:15},{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:10}]},
+        { type:"Core Equity", pct:20, emoji:"📈", description:"Large-cap for mild growth participation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:12},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:8}]},
+      ];
+    } else if (riskIntensity === "Growth") {
+      blocks = [
+        { type:"Capital Safety", pct:35, emoji:"🛡️", description:"Safety anchor — liquid and short-term bonds protect principal over a short horizon.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:15}]},
+        { type:"Balanced Equity", pct:30, emoji:"⚖️", description:"Balanced advantage dynamically shifts equity-debt ratio — captures upside while managing short-term risk.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:18},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:12}]},
+        { type:"Core Equity", pct:35, emoji:"📈", description:"Large-cap quality equity — holds up better in short-term volatility.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:15}]},
       ];
     } else {
+      // Aggressive 0-2Y: Higher equity but no momentum — quality over speculation for short horizons
       blocks = [
-        { type:"Capital Safety", pct:40, emoji:"🛡️", description:"Base safety layer in liquid funds.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:20}]},
-        { type:"Balanced Equity", pct:35, emoji:"⚖️", description:"Balanced and aggressive hybrid for growth-safety balance.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:20},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15}]},
-        { type:"Core Equity", pct:25, emoji:"📈", description:"Large-cap equity for market participation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:15},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
+        { type:"Capital Safety", pct:20, emoji:"🛡️", description:"Minimal safety buffer. Liquid funds for liquidity needs.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20}]},
+        { type:"Balanced Equity", pct:35, emoji:"⚖️", description:"Aggressive and balanced hybrid — captures equity upside with built-in risk management.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:20},{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15}]},
+        { type:"Core Equity", pct:45, emoji:"📈", description:"Large-cap equity across core and value styles — high equity tilt without speculative exposure.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:25},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:12},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:8}]},
       ];
     }
   } else if (timeBucket === "2-5Y") {
@@ -381,15 +394,17 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
     } else if (riskIntensity === "Growth") {
       blocks = [
         { type:"Core Equity", pct:45, emoji:"📈", description:"Broad equity diversification across size and style.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:15},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
-        { type:"Balanced Equity", pct:30, emoji:"⚖️", description:"Multi-asset and aggressive hybrid for flexibility.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:15},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:15}]},
-        { type:"Stability", pct:25, emoji:"⚓", description:"Corporate bonds as ballast.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:25}]},
+        { type:"High Growth", pct:20, emoji:"🚀", description:"Mid-cap for meaningful return premium over medium horizon.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20}]},
+        { type:"Balanced Equity", pct:15, emoji:"⚖️", description:"Multi-asset allocation for tactical flexibility.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:15}]},
+        { type:"Stability", pct:20, emoji:"⚓", description:"Corporate bonds as ballast.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:20}]},
       ];
     } else {
+      // Aggressive 2-5Y: High equity, tactical capped at 10%, stronger stability buffer
       blocks = [
-        { type:"Core Equity", pct:40, emoji:"📈", description:"Large and flexi cap for core equity exposure.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20}]},
-        { type:"High Growth", pct:25, emoji:"🚀", description:"Mid-cap for higher return potential.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:25}]},
-        { type:"Tactical", pct:20, emoji:"⚡", description:"Momentum and aggressive hybrid for tactical alpha.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:10},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:10}]},
-        { type:"Stability", pct:15, emoji:"⚓", description:"Short-duration bonds as safety cushion.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:15}]},
+        { type:"Core Equity", pct:40, emoji:"📈", description:"Large and flexi cap for broad equity foundation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20}]},
+        { type:"High Growth", pct:30, emoji:"🚀", description:"Mid-cap exposure for aggressive return target.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:30}]},
+        { type:"Tactical", pct:10, emoji:"⚡", description:"Limited tactical allocation — captures factor alpha without outsized short-term risk.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:10}]},
+        { type:"Stability", pct:20, emoji:"⚓", description:"Crucial bond buffer for a medium-horizon aggressive portfolio.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:20}]},
       ];
     }
   } else if (timeBucket === "5-10Y") {
@@ -409,7 +424,7 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
       blocks = [
         { type:"Core Equity", pct:45, emoji:"📈", description:"Style-diversified equity across large, value, and flexi cap.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:18},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:17},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
         { type:"High Growth", pct:20, emoji:"🚀", description:"Mid-cap for meaningful return premium.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:20}]},
-        { type:"Tactical", pct:15, emoji:"⚡", description:"Momentum and multi-asset for alpha generation.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:8},{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:7}]},
+        { type:"Tactical", pct:15, emoji:"⚡", description:"Momentum and multi-asset — 5yr+ horizon allows factor premium to play out.", color:"#D97706", bg:"#FFFBEB", border:"#FDE68A", cells:[{matrix:"equity",row:0,col:2,label:"Momentum",allocationPct:8},{matrix:"hybrid",row:4,col:0,label:"Multi Asset Allocation",allocationPct:7}]},
         { type:"Stability", pct:20, emoji:"⚓", description:"Corporate bonds as stability anchor.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:20}]},
       ];
     } else {
@@ -521,28 +536,14 @@ function resolveAllFunds(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MULTI-GOAL LIFETIME ENGINE — FIXED SIP WITH 10% STEP-UP
-//
-// Logic:
-// 1. Compute raw SIP needed for each goal at year 0 (full horizon, assuming 10% annual step-up)
-// 2. The base SIP = sum of all goal SIPs (with step-up discount applied)
-// 3. At each phase, SIP = base × (1.10)^year  (the 10% annual step-up)
-// 4. Within each phase, allocate SIP proportionally to active goals by their required share
-// 5. Nearest goals get funded first (priority queue approach by horizon then priority)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// SIP with step-up: future value of a SIP that grows 10% each year
-// FV = SIP_month1 × Σ(t=1 to n) [(1 + r_monthly)^(n-t+1) × (1 + stepup_annual/12)^(t-1)]
-// Approximation: use equivalent flat SIP that produces same corpus with step-up
 function sipWithStepup(targetAmt: number, horizonMonths: number, annualReturn: number, annualStepup = 0.10): number {
   const r = annualReturn / 100 / 12;
-  const s = annualStepup / 12; // monthly step-up rate (approximate)
+  const s = annualStepup / 12;
   let fv = 0;
-  // simulate: each month SIP grows, accumulates with return
-  // base_sip × (1+s)^(t-1) invested at month t grows for (n-t) more months
-  // Total FV = base_sip × Σ_{t=0}^{n-1} [(1+s)^t × (1+r)^(n-t)]
-  // = base_sip × (1+r)^n × Σ_{t=0}^{n-1} [(1+s)^t / (1+r)^t]  — if r ≠ s
   if (Math.abs(r - s) < 0.0001) {
-    fv = horizonMonths * Math.pow(1 + r, horizonMonths); // degenerate case
+    fv = horizonMonths * Math.pow(1 + r, horizonMonths);
   } else {
     fv = (Math.pow(1 + r, horizonMonths) - Math.pow(1 + s, horizonMonths)) / (r - s);
   }
@@ -552,12 +553,10 @@ function sipWithStepup(targetAmt: number, horizonMonths: number, annualReturn: n
 function buildLifetimePlan(
   goals: GoalInput[], amfiRaw: AMFIFund[], fundAnalytics: FundAnalytics[], etfAnalytics: ETFAnalytics[], insights: InsightRow[]
 ): LifetimePlan {
-  const STEP_UP = 0.10; // 10% annual step-up
-
+  const STEP_UP = 0.10;
   const sortedGoals = [...goals].sort((a, b) => parseInt(a.horizonYears) - parseInt(b.horizonYears));
   const totalYears = Math.max(...goals.map(g => parseInt(g.horizonYears)));
 
-  // ── Step 1: Compute per-goal base SIP (year-0 amount with step-up built in) ──
   const goalBaseSIPs: Record<string, number> = {};
   sortedGoals.forEach(g => {
     const months = parseInt(g.horizonYears) * 12;
@@ -567,12 +566,7 @@ function buildLifetimePlan(
     goalBaseSIPs[g.id] = sipWithStepup(target, months, midRate, STEP_UP);
   });
 
-  // ── Step 2: Total base SIP = sum of all goals ──
-  const baseMonthlySIP = Math.ceil(
-    Object.values(goalBaseSIPs).reduce((s, v) => s + v, 0) / 100
-  ) * 100;
-
-  // ── Step 3: Build transition phases ──
+  const baseMonthlySIP = Math.ceil(Object.values(goalBaseSIPs).reduce((s, v) => s + v, 0) / 100) * 100;
   const transitionYears = Array.from(new Set([0, ...goals.map(g => parseInt(g.horizonYears))])).sort((a,b)=>a-b);
 
   const timeline: YearSnapshot[] = [];
@@ -581,7 +575,6 @@ function buildLifetimePlan(
 
   for (let i = 0; i < transitionYears.length; i++) {
     const year = transitionYears[i];
-
     const activeGoalIds = sortedGoals.filter(g => parseInt(g.horizonYears) > year).map(g => g.id);
     const achievedThisYear = sortedGoals.filter(g => parseInt(g.horizonYears) === year).map(g => g.id);
     const activeGoals = sortedGoals.filter(g => activeGoalIds.includes(g.id));
@@ -591,19 +584,13 @@ function buildLifetimePlan(
       break;
     }
 
-    // Stepped-up SIP at this year: base × (1.10)^year (rounded to nearest 100)
     const steppedup = Math.ceil(baseMonthlySIP * Math.pow(1 + STEP_UP, year) / 100) * 100;
-
-    // Per-goal SIP share at this phase (active goals only, re-proportioned by their base SIP)
     const activeBaseTotal = activeGoals.reduce((s, g) => s + goalBaseSIPs[g.id], 0);
     const goalSIPs = activeGoals.map(g => ({
-      goalId: g.id,
-      goalLabel: g.label,
-      goalEmoji: g.emoji,
+      goalId: g.id, goalLabel: g.label, goalEmoji: g.emoji,
       sip: Math.round(steppedup * (goalBaseSIPs[g.id] / (activeBaseTotal || 1)) / 100) * 100,
     }));
 
-    // Blended risk and horizon for allocation
     const priorityWeights = { essential:1.5, important:1.0, aspirational:0.6 };
     let weightedRisk = 0, totalWeight = 0;
     activeGoals.forEach(g => { const w=priorityWeights[g.priority]; weightedRisk+=g.riskScore*w; totalWeight+=w; });
@@ -625,17 +612,13 @@ function buildLifetimePlan(
       const phaseKey = `${year}-${nextYear}`;
       const funds = resolveAllFunds(blendedPlan, amfiRaw, fundAnalytics, etfAnalytics, insights);
       resolvedFundsByPhase.set(phaseKey, funds);
-
       phases.push({
         fromYear: year, toYear: nextYear,
         label: year === 0 ? "Starting Phase" : `After Year ${year}`,
         description: blendedPlan.label,
         activeGoalLabels: activeGoals.map(g=>`${g.emoji} ${g.label}`),
         achievedGoalLabels: achievedThisYear.map(id=>{const g=sortedGoals.find(g=>g.id===id);return g?`${g.emoji} ${g.label}`:'';}).filter(Boolean),
-        plan: blendedPlan,
-        totalSIP: steppedup,
-        baseSIP: baseMonthlySIP,
-        goalSIPs,
+        plan: blendedPlan, totalSIP: steppedup, baseSIP: baseMonthlySIP, goalSIPs,
       });
     }
   }
@@ -656,6 +639,222 @@ function fmtINR(n: number): string {
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GROWTH TRAJECTORY CHART
+// Pure SVG — no external deps. Shows invested vs portfolio value over time.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GrowthTrajectoryChart({ plan, goals }: { plan: LifetimePlan; goals: GoalInput[] }) {
+  const totalYears = plan.totalYears;
+  const W = 680, H = 260;
+  const PAD = { top: 20, right: 24, bottom: 44, left: 58 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  // Build yearly data points
+  type DataPoint = { year: number; invested: number; portfolioLow: number; portfolioMid: number; portfolioHigh: number; sipAtYear: number };
+  const points: DataPoint[] = [];
+
+  let cumulativeInvested = 0;
+  let portfolioValueMid = 0;
+  let portfolioValueLow = 0;
+  let portfolioValueHigh = 0;
+
+  for (let yr = 0; yr <= totalYears; yr++) {
+    // Find the phase active at this year
+    const phase = plan.phaseDescriptions.find(p => yr >= p.fromYear && yr < p.toYear) ?? plan.phaseDescriptions[plan.phaseDescriptions.length - 1];
+    const sipAtYear = phase ? Math.ceil(plan.baseMonthlySIP * Math.pow(1.10, yr) / 100) * 100 : 0;
+    const midRate = phase ? (phase.plan.expectedReturnLo + phase.plan.expectedReturnHi) / 2 : 10;
+    const loRate = phase ? phase.plan.expectedReturnLo : 8;
+    const hiRate = phase ? phase.plan.expectedReturnHi : 14;
+
+    if (yr > 0) {
+      // Grow existing portfolio for 1 year, then add 12 months of SIP
+      const monthlyMid = midRate / 100 / 12;
+      const monthlyLo = loRate / 100 / 12;
+      const monthlyHi = hiRate / 100 / 12;
+      portfolioValueMid = portfolioValueMid * Math.pow(1 + midRate/100, 1) + sipAtYear * 12;
+      portfolioValueLow = portfolioValueLow * Math.pow(1 + loRate/100, 1) + sipAtYear * 12;
+      portfolioValueHigh = portfolioValueHigh * Math.pow(1 + hiRate/100, 1) + sipAtYear * 12;
+      cumulativeInvested += sipAtYear * 12;
+    }
+
+    points.push({ year: yr, invested: cumulativeInvested, portfolioLow: portfolioValueLow, portfolioMid: portfolioValueMid, portfolioHigh: portfolioValueHigh, sipAtYear });
+  }
+
+  const maxVal = Math.max(...points.map(p => p.portfolioHigh));
+  const yTicks = 5;
+  const yStep = maxVal / yTicks;
+
+  function xPos(yr: number) { return PAD.left + (yr / totalYears) * chartW; }
+  function yPos(val: number) { return PAD.top + chartH - (val / maxVal) * chartH; }
+
+  function makePath(getter: (p: DataPoint) => number) {
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(p.year).toFixed(1)},${yPos(getter(p)).toFixed(1)}`).join(' ');
+  }
+
+  function makeAreaPath(getterTop: (p: DataPoint) => number, getterBot: (p: DataPoint) => number) {
+    const top = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(p.year).toFixed(1)},${yPos(getterTop(p)).toFixed(1)}`).join(' ');
+    const bot = [...points].reverse().map((p, i) => `${i === 0 ? 'L' : 'L'}${xPos(p.year).toFixed(1)},${yPos(getterBot(p)).toFixed(1)}`).join(' ');
+    return `${top} ${bot} Z`;
+  }
+
+  // Goal milestone markers
+  const achievedGoalYears = plan.timeline.filter(s => s.achievedGoals.length > 0);
+  const goalMap = new Map(goals.map(g => [g.id, g]));
+
+  // Y-axis formatter
+  function fmtY(v: number) {
+    if (v >= 10000000) return `₹${(v/10000000).toFixed(0)}Cr`;
+    if (v >= 100000) return `₹${(v/100000).toFixed(0)}L`;
+    return `₹${(v/1000).toFixed(0)}K`;
+  }
+
+  // X ticks
+  const xTickCount = Math.min(totalYears, 6);
+  const xTicks = Array.from({length: xTickCount + 1}, (_, i) => Math.round(i * totalYears / xTickCount));
+
+  return (
+    <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '20px 20px 12px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>Portfolio Growth Trajectory</div>
+          <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>Projected value over {totalYears} years with 10% annual SIP step-up</div>
+        </div>
+        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+          {[
+            { color: '#2563EB', dash: false, fill: false, label: 'Invested capital' },
+            { color: '#10B981', dash: false, fill: true,  label: 'Portfolio (likely)' },
+            { color: '#10B981', dash: true,  fill: false, label: 'Range (low–high)' },
+          ].map((l, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="20" height="10">
+                {l.fill
+                  ? <rect x="0" y="2" width="20" height="6" rx="2" fill={l.color} opacity="0.2" />
+                  : <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth={l.dash ? 1.5 : 2} strokeDasharray={l.dash ? '4,3' : 'none'} />
+                }
+                {!l.fill && <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth="2" strokeDasharray={l.dash ? '4,3' : 'none'} />}
+              </svg>
+              <span style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', minWidth: '320px' }}>
+          <defs>
+            <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10B981" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#10B981" stopOpacity="0.02" />
+            </linearGradient>
+            <linearGradient id="investedGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2563EB" stopOpacity="0.10" />
+              <stop offset="100%" stopColor="#2563EB" stopOpacity="0.01" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          {Array.from({length: yTicks + 1}, (_, i) => {
+            const val = i * yStep;
+            const y = yPos(val);
+            return (
+              <g key={i}>
+                <line x1={PAD.left} y1={y} x2={PAD.left + chartW} y2={y} stroke="#F1F5F9" strokeWidth="1" />
+                <text x={PAD.left - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily="system-ui">{fmtY(val)}</text>
+              </g>
+            );
+          })}
+
+          {/* Phase transition lines */}
+          {plan.phaseDescriptions.slice(1).map((phase, i) => (
+            <line key={i} x1={xPos(phase.fromYear)} y1={PAD.top} x2={xPos(phase.fromYear)} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1" strokeDasharray="4,4" />
+          ))}
+
+          {/* Range area (low–high) */}
+          <path d={makeAreaPath(p => p.portfolioHigh, p => p.portfolioLow)} fill="url(#portfolioGrad)" opacity="0.8" />
+
+          {/* High line */}
+          <path d={makePath(p => p.portfolioHigh)} fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.5" />
+          {/* Low line */}
+          <path d={makePath(p => p.portfolioLow)} fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.5" />
+
+          {/* Invested area */}
+          <path d={makeAreaPath(p => p.invested, () => 0)} fill="url(#investedGrad)" />
+          {/* Invested line */}
+          <path d={makePath(p => p.invested)} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" />
+
+          {/* Portfolio mid line */}
+          <path d={makePath(p => p.portfolioMid)} fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Goal milestone markers */}
+          {achievedGoalYears.map((snap, i) => {
+            const x = xPos(snap.year);
+            const midPt = points.find(p => p.year === snap.year);
+            const y = midPt ? yPos(midPt.portfolioMid) : PAD.top;
+            const goalsHere = snap.achievedGoals.map(id => goalMap.get(id)).filter(Boolean);
+            return (
+              <g key={i}>
+                <line x1={x} y1={y} x2={x} y2={PAD.top + chartH} stroke="#D97706" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.7" />
+                <circle cx={x} cy={y} r="5" fill="#D97706" opacity="0.9" />
+                <circle cx={x} cy={y} r="8" fill="#D97706" opacity="0.15" />
+                {goalsHere.map((g, j) => (
+                  <text key={j} x={x} y={PAD.top + chartH + 28 + j * 11} textAnchor="middle" fontSize="10" fill="#D97706" fontWeight="700" fontFamily="system-ui">{g!.emoji}</text>
+                ))}
+              </g>
+            );
+          })}
+
+          {/* X axis ticks */}
+          {xTicks.map((yr, i) => (
+            <g key={i}>
+              <line x1={xPos(yr)} y1={PAD.top + chartH} x2={xPos(yr)} y2={PAD.top + chartH + 4} stroke="#CBD5E1" strokeWidth="1" />
+              <text x={xPos(yr)} y={PAD.top + chartH + 14} textAnchor="middle" fontSize="9" fill="#94A3B8" fontFamily="system-ui">Yr {yr}</text>
+            </g>
+          ))}
+
+          {/* Axis lines */}
+          <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1" />
+          <line x1={PAD.left} y1={PAD.top + chartH} x2={PAD.left + chartW} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1" />
+
+          {/* Final value callout */}
+          {(() => {
+            const last = points[points.length - 1];
+            const x = xPos(last.year);
+            const y = yPos(last.portfolioMid);
+            return (
+              <g>
+                <rect x={x - 36} y={y - 22} width="72" height="18" rx="6" fill="#10B981" opacity="0.95" />
+                <text x={x} y={y - 9} textAnchor="middle" fontSize="9.5" fill="white" fontWeight="800" fontFamily="system-ui">{fmtY(last.portfolioMid)}</text>
+              </g>
+            );
+          })()}
+        </svg>
+      </div>
+
+      {/* Bottom summary row */}
+      <div style={{ display: 'flex', gap: '16px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid #F8FAFC', flexWrap: 'wrap' }}>
+        {(() => {
+          const last = points[points.length - 1];
+          const wealth = last.portfolioMid - last.invested;
+          const mult = last.invested > 0 ? (last.portfolioMid / last.invested).toFixed(1) : '—';
+          return [
+            { label: 'Total invested', value: fmtINR(last.invested), color: '#2563EB' },
+            { label: 'Estimated portfolio', value: fmtINR(last.portfolioMid), color: '#10B981' },
+            { label: 'Wealth created', value: fmtINR(wealth), color: '#059669' },
+            { label: 'Money multiplier', value: `${mult}×`, color: '#D97706' },
+          ].map((s, i) => (
+            <div key={i} style={{ flex: '1 1 100px' }}>
+              <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 600 }}>{s.label}</div>
+              <div style={{ fontSize: '16px', fontWeight: 900, color: s.color }}>{s.value}</div>
+            </div>
+          ));
+        })()}
+      </div>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -876,11 +1075,10 @@ function TimelineVisual({ plan, goals, selectedPhaseIdx, onSelectPhase }: {
 function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
   phase: PhaseDescription; resolvedFunds: ResolvedFundSlot[]; onFundDetail: (s:ResolvedFundSlot)=>void;
 }) {
-  const [showFunds, setShowFunds] = useState(false);
+  const [showFunds, setShowFunds] = useState(true);
 
   return (
     <div style={{ background:'white',border:'1px solid #E2E8F0',borderRadius:'16px',overflow:'hidden' }}>
-      {/* Header */}
       <div style={{ background:'linear-gradient(135deg,#EFF6FF,#F0FDF4)',padding:'16px 18px',borderBottom:'1px solid #E2E8F0' }}>
         <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'10px' }}>
           <div>
@@ -888,8 +1086,6 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
               {phase.fromYear===0?'From today':`Year ${phase.fromYear} → Year ${phase.toYear}`}
             </div>
             <h3 style={{ fontSize:'16px',fontWeight:800,color:'#0F172A',margin:'0 0 6px' }}>{phase.description}</h3>
-
-            {/* Goals achieved chip (if any) */}
             {phase.achievedGoalLabels.length > 0 && (
               <div style={{ display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'6px' }}>
                 {phase.achievedGoalLabels.map((lbl,i)=>(
@@ -897,16 +1093,12 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
                 ))}
               </div>
             )}
-
-            {/* Active goals */}
             <div style={{ display:'flex',gap:'5px',flexWrap:'wrap' }}>
               {phase.activeGoalLabels.map((lbl,i)=>(
                 <span key={i} style={{ fontSize:'11px',padding:'2px 8px',borderRadius:'100px',background:'#F8FAFC',border:'1px solid #E2E8F0',color:'#374151',fontWeight:600 }}>{lbl}</span>
               ))}
             </div>
           </div>
-
-          {/* SIP box */}
           <div style={{ background:'white',border:'2px solid #BFDBFE',borderRadius:'14px',padding:'12px 18px',textAlign:'center',minWidth:'140px' }}>
             <div style={{ fontSize:'10px',color:'#94A3B8',fontWeight:600,marginBottom:'2px' }}>Monthly SIP</div>
             <div style={{ fontSize:'26px',fontWeight:900,color:'#2563EB',lineHeight:1 }}>₹{phase.totalSIP.toLocaleString('en-IN')}</div>
@@ -919,7 +1111,6 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
         </div>
       </div>
 
-      {/* Per-goal SIP breakdown */}
       {phase.goalSIPs.length > 1 && (
         <div style={{ padding:'12px 18px',borderBottom:'1px solid #F1F5F9',background:'#FAFAFA' }}>
           <div style={{ fontSize:'10px',fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px' }}>Where your SIP goes this phase</div>
@@ -937,18 +1128,13 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
         </div>
       )}
 
-      {/* Exposure blocks — same style as single-goal page */}
       <div style={{ padding:'14px 18px',borderBottom:'1px solid #F1F5F9' }}>
         <div style={{ fontSize:'11px',fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'8px' }}>Exposure breakdown</div>
-
-        {/* Stacked bar */}
         <div style={{ display:'flex',borderRadius:'10px',overflow:'hidden',height:'12px',marginBottom:'10px' }}>
           {phase.plan.blocks.map((b,i)=>(
             <div key={i} style={{ width:`${b.pct}%`,background:b.color,opacity:0.85 }} title={`${b.type} ${b.pct}%`} />
           ))}
         </div>
-
-        {/* Block legend — identical to single-goal page */}
         <div style={{ display:'flex',flexWrap:'wrap',gap:'10px' }}>
           {phase.plan.blocks.map((b,i)=>(
             <div key={i} style={{ display:'flex',alignItems:'center',gap:'5px' }}>
@@ -961,7 +1147,6 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
         </div>
       </div>
 
-      {/* Stats row */}
       <div style={{ padding:'12px 18px',borderBottom:'1px solid #F1F5F9',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))',gap:'8px' }}>
         {[
           { label:'Return range', value:`${phase.plan.expectedReturnLo}–${phase.plan.expectedReturnHi}%`, color:'#2563EB' },
@@ -976,7 +1161,6 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
         ))}
       </div>
 
-      {/* Fund list */}
       <div style={{ padding:'0 18px' }}>
         <button onClick={()=>setShowFunds(!showFunds)}
           style={{ width:'100%',background:showFunds?'#EFF6FF':'white',border:'none',padding:'14px 0',fontSize:'12px',fontWeight:700,color:'#1E40AF',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',fontFamily:'inherit' }}>
@@ -1108,7 +1292,7 @@ export default function LifetimePlanPage() {
         <div style={{ maxWidth:'1152px',margin:'0 auto' }}><AnalysisTabs /></div>
       </div>
 
-      {/* HERO */}
+      {/* HERO — redesigned: removed verbose text blocks, made it clean and visual */}
       <section style={{ background:'linear-gradient(155deg,#FFFBEB 0%,#F0FDF4 50%,#EFF6FF 100%)',borderBottom:'1px solid #E2E8F0',position:'relative',overflow:'hidden' }}>
         <div style={{ position:'absolute',inset:0,backgroundImage:'radial-gradient(circle at 1px 1px,rgba(217,119,6,0.06) 1px,transparent 0)',backgroundSize:'28px 28px',pointerEvents:'none' }} />
         <div style={{ position:'absolute',top:-80,right:-60,width:'380px',height:'380px',background:'radial-gradient(circle,rgba(217,119,6,0.08) 0%,transparent 70%)',pointerEvents:'none' }} />
@@ -1117,25 +1301,27 @@ export default function LifetimePlanPage() {
             <span style={{ width:'7px',height:'7px',background:'#D97706',borderRadius:'50%' }} />
             <span style={{ fontSize:'11px',fontWeight:700,color:'#78350F',letterSpacing:'0.08em',textTransform:'uppercase' }}>Lifetime Wealth Plan · All Goals, One Portfolio</span>
           </div>
-          <h1 style={{ fontSize:'clamp(1.8rem,5vw,3rem)',fontWeight:800,color:'#0F172A',lineHeight:1.1,letterSpacing:'-0.03em',marginBottom:'14px',maxWidth:'720px' }}>
+          <h1 style={{ fontSize:'clamp(1.8rem,5vw,3rem)',fontWeight:800,color:'#0F172A',lineHeight:1.1,letterSpacing:'-0.03em',marginBottom:'14px',maxWidth:'680px' }}>
             Every goal you have,<br />
             <span style={{ background:'linear-gradient(90deg,#D97706 0%,#059669 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>
               one plan that grows with you.
             </span>
           </h1>
-          <p style={{ fontSize:'clamp(13px,2vw,15px)',color:'#475569',lineHeight:1.75,maxWidth:'540px',marginBottom:'24px' }}>
-            Car in 3 years. Home in 6. Child's college in 12. Retirement in 25. Most people invest in silos — one fund for this, another for that. We build a single living portfolio that covers all your goals, shifts as each one is achieved, and is always backed by live fund data.
+          <p style={{ fontSize:'clamp(13px,2vw,15px)',color:'#475569',lineHeight:1.75,maxWidth:'500px',marginBottom:'32px' }}>
+            Car in 3 years. Home in 6. Retirement in 25. One SIP that steps up every year — covering every goal, shifting as each is achieved.
           </p>
-          <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'10px',maxWidth:'700px' }}>
+
+          {/* Clean aesthetic feature pills — no verbose text */}
+          <div style={{ display:'flex',gap:'10px',flexWrap:'wrap' }}>
             {[
-              { icon:'🔄', title:'Fixed SIP, 10% step-up', desc:'You commit to one SIP today. Every year it grows 10% — matching your salary growth. No surprises.' },
-              { icon:'🎯', title:'Nearest goal gets funded first', desc:'Your SIP is always directed to the goal that needs it soonest. Surplus automatically flows to longer-horizon goals.' },
-              { icon:'📊', title:'Same live fund engine', desc:'Every fund pick uses the identical alpha-based engine powering our full matrix. No compromises.' },
-            ].map((b,i)=>(
-              <div key={i} style={{ background:'rgba(255,255,255,0.7)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.8)',borderRadius:'14px',padding:'14px 16px',boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
-                <div style={{ fontSize:'20px',marginBottom:'6px' }}>{b.icon}</div>
-                <div style={{ fontSize:'12px',fontWeight:800,color:'#1F2937',marginBottom:'3px' }}>{b.title}</div>
-                <div style={{ fontSize:'11px',color:'#64748B',lineHeight:1.5 }}>{b.desc}</div>
+              { icon:'🔄', label:'Fixed SIP · 10% annual step-up', color:'#059669', bg:'rgba(5,150,105,0.08)', border:'rgba(5,150,105,0.2)' },
+              { icon:'🎯', label:'Nearest goal funded first', color:'#D97706', bg:'rgba(217,119,6,0.08)', border:'rgba(217,119,6,0.2)' },
+              { icon:'📊', label:'Live fund engine · Same as matrix', color:'#2563EB', bg:'rgba(37,99,235,0.08)', border:'rgba(37,99,235,0.2)' },
+              { icon:'⚖️', label:'Blended risk by priority', color:'#7C3AED', bg:'rgba(124,58,237,0.08)', border:'rgba(124,58,237,0.2)' },
+            ].map((f, i) => (
+              <div key={i} style={{ display:'inline-flex',alignItems:'center',gap:'7px',background:f.bg,border:`1px solid ${f.border}`,borderRadius:'100px',padding:'7px 14px' }}>
+                <span style={{ fontSize:'14px' }}>{f.icon}</span>
+                <span style={{ fontSize:'11px',fontWeight:700,color:f.color,whiteSpace:'nowrap' }}>{f.label}</span>
               </div>
             ))}
           </div>
@@ -1218,7 +1404,7 @@ export default function LifetimePlanPage() {
             {/* Plan overview */}
             <div style={{ background:'linear-gradient(135deg,#FFFBEB,#F0FDF4)',borderRadius:'20px',border:'1px solid #E2E8F0',padding:'clamp(18px,3vw,26px)' }}>
               <div style={{ fontSize:'11px',fontWeight:700,color:'#94A3B8',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'8px' }}>Your lifetime wealth plan</div>
-              <h2 style={{ fontSize:'clamp(18px,3vw,24px)',fontWeight:800,color:'#0F172A',margin:'0 0 6px' }}>
+              <h2 style={{ fontSize:'clamp(18px,3vw,24px)',fontWeight:800,color:'#0F172A',margin:'0 0 16px' }}>
                 {goals.length} goal{goals.length>1?'s':''} · {lifetimePlan.totalYears}-year journey
               </h2>
 
@@ -1242,7 +1428,7 @@ export default function LifetimePlanPage() {
               </div>
 
               {/* Goal roadmap */}
-              <div style={{ display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'18px' }}>
+              <div style={{ display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'20px' }}>
                 {[...lifetimePlan.goals].sort((a,b)=>parseInt(a.horizonYears)-parseInt(b.horizonYears)).map(g=>{
                   const pc=PRIORITY_CONFIG[g.priority];
                   return (
@@ -1260,6 +1446,9 @@ export default function LifetimePlanPage() {
               {/* Timeline */}
               <TimelineVisual plan={lifetimePlan} goals={goals} selectedPhaseIdx={selectedPhaseIdx} onSelectPhase={setSelectedPhaseIdx} />
             </div>
+
+            {/* ── GROWTH TRAJECTORY CHART — added below plan overview ── */}
+            <GrowthTrajectoryChart plan={lifetimePlan} goals={goals} />
 
             {/* Phase detail */}
             {selectedPhase&&(
@@ -1302,7 +1491,6 @@ export default function LifetimePlanPage() {
                             ₹{phase.totalSIP.toLocaleString('en-IN')}
                             {i>0&&<div style={{ fontSize:'9px',color:'#94A3B8',fontWeight:400 }}>+10%/yr step-up</div>}
                           </td>
-                          {/* ── EXPOSURE BLOCKS — same nomenclature as single-goal page ── */}
                           <td style={{ padding:'11px 14px' }}>
                             <div style={{ display:'flex',flexWrap:'wrap',gap:'4px' }}>
                               {phase.plan.blocks.map((b,j)=>(
@@ -1330,10 +1518,10 @@ export default function LifetimePlanPage() {
                 {[
                   { step:'1',icon:'📋',color:'#2563EB',bg:'#EFF6FF',bd:'#BFDBFE', title:'Goals sorted by urgency', body:`We sort your ${goals.length} goal${goals.length>1?'s':''} by time horizon, shortest first. Your nearest goal gets funded first. Essential goals anchor safety; aspirational ones take more risk.` },
                   { step:'2',icon:'💰',color:'#059669',bg:'#ECFDF5',bd:'#A7F3D0', title:'One fixed SIP, 10% step-up', body:'We calculate the total SIP you need today assuming it grows 10% every year — matching typical salary growth. This single number is your commitment. Nothing changes unless you want it to.' },
-                  { step:'3',icon:'🔀',color:'#D97706',bg:'#FFFBEB',bd:'#FDE68A', title:'SIP directed to nearest goal', body:'At any point, your SIP flows first to the goal that matures soonest. Whatever is surplus after meeting that goal\'s required share automatically flows to longer-horizon goals.' },
+                  { step:'3',icon:'🔀',color:'#D97706',bg:'#FFFBEB',bd:'#FDE68A', title:'SIP directed to nearest goal', body:"At any point, your SIP flows first to the goal that matures soonest. Whatever is surplus after meeting that goal's required share automatically flows to longer-horizon goals." },
                   { step:'4',icon:'⚖️',color:'#7C3AED',bg:'#F5F3FF',bd:'#DDD6FE', title:'Blended risk for the portfolio', body:'Your risk scores are weighted by priority: essential goals count 1.5×, important goals 1.0×, aspirational 0.6×. The blended risk + shortest active horizon determines the exposure block mix for each phase.' },
-                  { step:'5',icon:'🔬',color:'#0891B2',bg:'#ECFEFF',bd:'#A5F3FC', title:'Same 4-layer fund engine', body:'Each phase uses the identical exposure block engine as our single-goal page: Time Bucket → Risk Intensity → Exposure Blocks (Capital Safety, Stability, Balanced Equity, Core Equity, High Growth, Tactical) → Fund selection by alpha.' },
-                  { step:'6',icon:'🔁',color:'#DC2626',bg:'#FEF2F2',bd:'#FECACA', title:'Rebalance when a goal is met', body:'When a goal matures, it exits the portfolio. The SIP (now stepped up further) is redistributed proportionally across remaining goals. The allocation shifts — often becoming more growth-oriented as safety obligations are cleared.' },
+                  { step:'5',icon:'🔬',color:'#0891B2',bg:'#ECFEFF',bd:'#A5F3FC', title:'Horizon-aware fund engine', body:'Each phase uses the same 4-layer engine as our single-goal page. Critically, tactical and momentum exposure is only introduced when the effective horizon supports it (5yr+). Short-horizon phases stay quality-focused.' },
+                  { step:'6',icon:'🔁',color:'#DC2626',bg:'#FEF2F2',bd:'#FECACA', title:'Rebalance when a goal is met', body:'When a goal matures, it exits the portfolio. The SIP (now stepped up further) is redistributed proportionally across remaining goals. The allocation often becomes more growth-oriented as safety obligations are cleared.' },
                 ].map((item,i)=>(
                   <div key={i} style={{ background:item.bg,border:`1px solid ${item.bd}`,borderRadius:'12px',padding:'14px 16px' }}>
                     <div style={{ display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px' }}>

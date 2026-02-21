@@ -101,15 +101,15 @@ type ExposureBlockType =
 
 type MatrixCell = {
   matrix: "equity" | "hybrid" | "debt";
-  row: number;  // for equity: 0=Large,1=Mid,2=Small,3=FlexiMix; for debt: 0=VeryShort,1=1-3Y,2=3-5Y,3=5Y+; for hybrid: row=subCatIndex
-  col: number;  // for equity: 0=Value,1=Core,2=Momentum,3=ManagerBest; for debt: 0=Safest,1=Balanced,2=HighYield; for hybrid: always 0
+  row: number;
+  col: number;
   label: string;
-  allocationPct: number; // % within the exposure block
+  allocationPct: number;
 };
 
 type ExposureBlock = {
   type: ExposureBlockType;
-  pct: number; // % of total portfolio
+  pct: number;
   emoji: string;
   description: string;
   color: string;
@@ -139,7 +139,7 @@ type ResolvedFundSlot = {
   blockBorder: string;
   blockPct: number;
   cellLabel: string;
-  cellAllocationPct: number; // % of total portfolio
+  cellAllocationPct: number;
   box: BoxResult;
   fundName: string;
   isActive: boolean;
@@ -286,27 +286,34 @@ const DEBT_CELL_MAP: Record<string, [number, number][]> = {
 const HYBRID_ORDER = ["Aggressive Hybrid","Conservative Hybrid","Equity Savings","Arbitrage","Multi Asset Allocation","Balanced Advantage","Balanced Hybrid"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4-LAYER ALLOCATION ENGINE
+// 4-LAYER ALLOCATION ENGINE — REVIEWED & REFINED
+//
+// Key principles applied:
+// • 0-2Y: NO momentum/tactical exposure — horizon too short to recover from factor drawdowns.
+//   Even "Aggressive" stays in large-cap equity + hybrids. Volatility tolerance ≠ recklessness.
+// • 2-5Y: Tactical block only for Aggressive, but capped at 10% (not 20%) and paired with
+//   stronger stability buffer. Momentum needs 4-5yr minimum to show risk-adjusted benefit.
+//   Mid-cap is fine here for Growth/Aggressive — it's a different animal than momentum.
+// • 5-10Y: Tactical appropriate for Growth/Aggressive. Small-cap entry only at 5Y+.
+// • 10Y+: Full spectrum including tactical and small-cap.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function computeAllocationPlan(horizonYears: number, riskScore: number, targetAmount: number): AllocationPlan {
-  // Layer 1 — Time Bucket
   const timeBucket: AllocationPlan["timeBucket"] =
     horizonYears <= 2 ? "0-2Y" :
     horizonYears <= 5 ? "2-5Y" :
     horizonYears <= 10 ? "5-10Y" : "10Y+";
 
-  // Layer 2 — Risk Intensity
   const riskIntensity: AllocationPlan["riskIntensity"] =
     riskScore <= 3 ? "Conservative" :
     riskScore <= 5 ? "Balanced" :
     riskScore <= 7 ? "Growth" : "Aggressive";
 
-  // Layer 3 — Exposure Blocks
-  // Each block has % of portfolio and which matrix cells to use
   let blocks: ExposureBlock[] = [];
 
   // ── SHORT TERM (0-2Y) ──
+  // No tactical/momentum. Even aggressive stays quality-focused.
+  // Reason: momentum funds need 3yr+ to express the factor premium; before that it's pure noise risk.
   if (timeBucket === "0-2Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -331,38 +338,59 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
             { matrix: "debt", row: 0, col: 0, label: "Liquid / Ultra Short Funds", allocationPct: 30 },
             { matrix: "debt", row: 1, col: 0, label: "Short Duration Bonds", allocationPct: 25 },
           ]},
-        { type: "Stability", pct: 30, emoji: "⚓", description: "Conservative and balanced hybrid funds to add some upside without much volatility.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
+        { type: "Stability", pct: 25, emoji: "⚓", description: "Conservative and balanced hybrid funds to add some upside without much volatility.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
           cells: [
             { matrix: "hybrid", row: 1, col: 0, label: "Conservative Hybrid", allocationPct: 15 },
-            { matrix: "hybrid", row: 5, col: 0, label: "Balanced Advantage Fund", allocationPct: 15 },
+            { matrix: "hybrid", row: 5, col: 0, label: "Balanced Advantage Fund", allocationPct: 10 },
           ]},
-        { type: "Core Equity", pct: 15, emoji: "📈", description: "Some large-cap exposure for mild growth participation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
+        { type: "Core Equity", pct: 20, emoji: "📈", description: "Large-cap exposure for mild growth participation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
-            { matrix: "equity", row: 0, col: 1, label: "Large Cap Core", allocationPct: 15 },
+            { matrix: "equity", row: 0, col: 1, label: "Large Cap Core", allocationPct: 12 },
+            { matrix: "equity", row: 0, col: 0, label: "Large Cap Value", allocationPct: 8 },
+          ]},
+      ];
+    } else if (riskIntensity === "Growth") {
+      // No tactical here — 2yr horizon is too short. Use Balanced Equity + large-cap equity.
+      blocks = [
+        { type: "Capital Safety", pct: 35, emoji: "🛡️", description: "Safety anchor — liquid and short-term bonds to protect principal over a short horizon.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC",
+          cells: [
+            { matrix: "debt", row: 0, col: 0, label: "Liquid / Money Market", allocationPct: 20 },
+            { matrix: "debt", row: 1, col: 0, label: "Short Duration Bonds", allocationPct: 15 },
+          ]},
+        { type: "Balanced Equity", pct: 30, emoji: "⚖️", description: "Balanced advantage dynamically shifts equity-debt ratio — captures upside while managing short-term risk.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",
+          cells: [
+            { matrix: "hybrid", row: 5, col: 0, label: "Balanced Advantage Fund", allocationPct: 18 },
+            { matrix: "hybrid", row: 0, col: 0, label: "Aggressive Hybrid", allocationPct: 12 },
+          ]},
+        { type: "Core Equity", pct: 35, emoji: "📈", description: "Diversified large-cap equity — quality companies that hold up better in short-term volatility.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
+          cells: [
+            { matrix: "equity", row: 0, col: 1, label: "Large Cap Core", allocationPct: 20 },
+            { matrix: "equity", row: 0, col: 0, label: "Large Cap Value", allocationPct: 15 },
           ]},
       ];
     } else {
-      // Growth / Aggressive, short term
+      // Aggressive, 0-2Y: Higher equity but still no momentum/tactical — quality over speculation for short horizons.
       blocks = [
-        { type: "Capital Safety", pct: 40, emoji: "🛡️", description: "Base safety layer in liquid and short-term bond funds.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC",
+        { type: "Capital Safety", pct: 20, emoji: "🛡️", description: "Minimal safety buffer. Liquid funds for liquidity needs.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC",
           cells: [
             { matrix: "debt", row: 0, col: 0, label: "Liquid / Money Market", allocationPct: 20 },
-            { matrix: "debt", row: 1, col: 0, label: "Short Duration Bonds", allocationPct: 20 },
           ]},
-        { type: "Balanced Equity", pct: 35, emoji: "⚖️", description: "Balanced hybrid and aggressive hybrid for growth-safety balance.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",
+        { type: "Balanced Equity", pct: 35, emoji: "⚖️", description: "Aggressive and balanced hybrid — captures equity upside with built-in risk management for 2yr timeframe.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",
           cells: [
-            { matrix: "hybrid", row: 5, col: 0, label: "Balanced Advantage Fund", allocationPct: 20 },
-            { matrix: "hybrid", row: 0, col: 0, label: "Aggressive Hybrid", allocationPct: 15 },
+            { matrix: "hybrid", row: 0, col: 0, label: "Aggressive Hybrid", allocationPct: 20 },
+            { matrix: "hybrid", row: 5, col: 0, label: "Balanced Advantage Fund", allocationPct: 15 },
           ]},
-        { type: "Core Equity", pct: 25, emoji: "📈", description: "Large-cap equity for market participation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
+        { type: "Core Equity", pct: 45, emoji: "📈", description: "Large-cap equity across core and value styles — high equity tilt for an aggressive short-horizon investor.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
-            { matrix: "equity", row: 0, col: 1, label: "Large Cap Core", allocationPct: 15 },
-            { matrix: "equity", row: 0, col: 0, label: "Large Cap Value", allocationPct: 10 },
+            { matrix: "equity", row: 0, col: 1, label: "Large Cap Core", allocationPct: 25 },
+            { matrix: "equity", row: 0, col: 0, label: "Large Cap Value", allocationPct: 12 },
+            { matrix: "equity", row: 3, col: 1, label: "Flexi Cap", allocationPct: 8 },
           ]},
       ];
     }
 
   // ── MEDIUM TERM (2-5Y) ──
+  // Tactical only for Aggressive and capped at 10%. Mid-cap fine from Growth upward.
   } else if (timeBucket === "2-5Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -407,41 +435,45 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
             { matrix: "equity", row: 3, col: 1, label: "Flexi Cap", allocationPct: 15 },
             { matrix: "equity", row: 0, col: 0, label: "Large Cap Value", allocationPct: 10 },
           ]},
-        { type: "Balanced Equity", pct: 30, emoji: "⚖️", description: "Multi-asset and aggressive hybrid for tactical flexibility.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",
+        { type: "High Growth", pct: 20, emoji: "🚀", description: "Mid-cap for meaningful return premium over 3-5 year horizon.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",
+          cells: [
+            { matrix: "equity", row: 1, col: 1, label: "Mid Cap", allocationPct: 20 },
+          ]},
+        { type: "Balanced Equity", pct: 15, emoji: "⚖️", description: "Multi-asset allocation for tactical flexibility.", color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE",
           cells: [
             { matrix: "hybrid", row: 4, col: 0, label: "Multi Asset Allocation", allocationPct: 15 },
-            { matrix: "hybrid", row: 0, col: 0, label: "Aggressive Hybrid", allocationPct: 15 },
           ]},
-        { type: "Stability", pct: 25, emoji: "⚓", description: "Corporate bonds as a ballast against equity volatility.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
+        { type: "Stability", pct: 20, emoji: "⚓", description: "Corporate bonds as a ballast against equity volatility.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
           cells: [
-            { matrix: "debt", row: 1, col: 0, label: "Corporate Bond / Banking PSU", allocationPct: 25 },
+            { matrix: "debt", row: 1, col: 0, label: "Corporate Bond / Banking PSU", allocationPct: 20 },
           ]},
       ];
     } else {
-      // Aggressive, medium
+      // Aggressive, 2-5Y: Max equity but tactical capped at 10% — momentum needs 5yr+ to be reliable.
+      // Added higher stability buffer vs original to avoid 3yr aggressive being reckless.
       blocks = [
-        { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap for diversified core equity exposure.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
+        { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap for broad equity foundation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
             { matrix: "equity", row: 0, col: 1, label: "Large Cap Core", allocationPct: 20 },
             { matrix: "equity", row: 3, col: 1, label: "Flexi Cap", allocationPct: 20 },
           ]},
-        { type: "High Growth", pct: 25, emoji: "🚀", description: "Mid-cap exposure for higher return potential.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",
+        { type: "High Growth", pct: 30, emoji: "🚀", description: "Mid-cap exposure for aggressive return target over medium horizon.", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA",
           cells: [
-            { matrix: "equity", row: 1, col: 1, label: "Mid Cap", allocationPct: 25 },
+            { matrix: "equity", row: 1, col: 1, label: "Mid Cap", allocationPct: 30 },
           ]},
-        { type: "Tactical", pct: 20, emoji: "⚡", description: "Momentum and aggressive hybrid for tactical alpha.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",
+        { type: "Tactical", pct: 10, emoji: "⚡", description: "Limited tactical allocation — just enough to capture factor alpha without outsized short-term risk.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",
           cells: [
-            { matrix: "equity", row: 0, col: 2, label: "Momentum", allocationPct: 10 },
             { matrix: "hybrid", row: 0, col: 0, label: "Aggressive Hybrid", allocationPct: 10 },
           ]},
-        { type: "Stability", pct: 15, emoji: "⚓", description: "Short-duration bonds as a small safety cushion.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
+        { type: "Stability", pct: 20, emoji: "⚓", description: "Short-duration bonds as a crucial safety cushion for a medium-horizon aggressive portfolio.", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0",
           cells: [
-            { matrix: "debt", row: 1, col: 0, label: "Short Duration Bonds", allocationPct: 15 },
+            { matrix: "debt", row: 1, col: 0, label: "Short Duration Bonds", allocationPct: 20 },
           ]},
       ];
     }
 
   // ── MEDIUM-LONG TERM (5-10Y) ──
+  // Tactical appropriate here. Small-cap enters only for Growth/Aggressive.
   } else if (timeBucket === "5-10Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -492,7 +524,7 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           cells: [
             { matrix: "equity", row: 1, col: 1, label: "Mid Cap", allocationPct: 20 },
           ]},
-        { type: "Tactical", pct: 15, emoji: "⚡", description: "Momentum and multi-asset for alpha generation.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",
+        { type: "Tactical", pct: 15, emoji: "⚡", description: "Momentum and multi-asset for alpha generation — 5yr+ horizon allows factor premium to play out.", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A",
           cells: [
             { matrix: "equity", row: 0, col: 2, label: "Momentum", allocationPct: 8 },
             { matrix: "hybrid", row: 4, col: 0, label: "Multi Asset Allocation", allocationPct: 7 },
@@ -503,7 +535,7 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           ]},
       ];
     } else {
-      // Aggressive, 5-10Y
+      // Aggressive, 5-10Y: Full spectrum including small-cap and tactical
       blocks = [
         { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap — the foundation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
@@ -656,16 +688,16 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
   const plainEnglishMap: Record<string, string> = {
     "Conservative 0-2Y": "You're keeping your money safe — like a careful saver who wants to sleep well at night. Almost everything goes into bonds and conservative funds.",
     "Balanced 0-2Y": "A cautious investor who wants slightly more than a savings account. Mostly bonds, with a small equity boost.",
-    "Growth 0-2Y": "You're willing to accept some short-term swings for better returns. Roughly half in safe assets, half in growth.",
-    "Aggressive 0-2Y": "A risk-taker even for short horizons. High equity, but your timeline is short — be ready for some volatility.",
+    "Growth 0-2Y": "You're willing to accept some short-term swings for better returns. Balanced hybrids bridge growth and safety — no reckless bets on a 2yr horizon.",
+    "Aggressive 0-2Y": "High equity tilt for a short horizon — large-cap quality over speculation. Hybrids provide built-in risk management while keeping equity exposure high.",
     "Conservative 2-5Y": "Think of this as a balanced parent saving for a child's near-term goal. Safety comes first, with some equity upside.",
     "Balanced 2-5Y": "A seasoned investor diversifying sensibly — hybrid funds bridge safety and growth, equity adds long-term punch.",
-    "Growth 2-5Y": "Growth-focused with medium-term discipline. Equity leads, debt cushions the fall.",
-    "Aggressive 2-5Y": "Confident investor taking meaningful risk for higher returns. Mid-caps and momentum in the mix.",
+    "Growth 2-5Y": "Growth-focused with medium-term discipline. Equity leads with mid-cap kicker, multi-asset adds flexibility, bonds cushion volatility.",
+    "Aggressive 2-5Y": "Confident investor with high equity conviction. Mid-cap leads the charge, but a meaningful bond buffer acknowledges the 5yr ceiling — no momentum bets yet.",
     "Conservative 5-10Y": "A thoughtful investor letting time do the work. Equity takes the lead with a safety net of bonds.",
     "Balanced 5-10Y": "A classic 5-year investor — equity-led growth, balanced by hybrids and bonds.",
-    "Growth 5-10Y": "Growth-mode with disciplined diversification across size and style. Mid-caps add meaningful return premium.",
-    "Aggressive 5-10Y": "Swinging for long-term wealth creation. High equity across all caps with tactical alpha overlay.",
+    "Growth 5-10Y": "Growth-mode with disciplined diversification. Mid-caps add meaningful return premium. Tactical overlay kicks in — horizon is long enough for momentum to work.",
+    "Aggressive 5-10Y": "Swinging for long-term wealth creation. High equity across all caps with tactical alpha overlay. Small-cap enters — the 5yr+ horizon justifies the volatility.",
     "Conservative 10Y+": "Long-term wealth builder playing it steady. Time is your biggest asset — let compounding do the work.",
     "Balanced 10Y+": "A wealth-building plan for life. Equity-led with mid-cap kicker and bonds for smoother ride.",
     "Growth 10Y+": "Serious long-term investor. Full equity diversification with mid + small cap for compounding power.",
@@ -699,7 +731,6 @@ function resolveAllFunds(
   const results: ResolvedFundSlot[] = [];
   const seenFunds = new Set<string>();
 
-  // Build equity grid
   const equityGridMap: AMFIFund[][][] = Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => []));
   for (const fund of amfiRaw) {
     if (shouldExclude(fund)) continue;
@@ -708,12 +739,10 @@ function resolveAllFunds(
     if (row !== null) equityGridMap[row][col].push(fund);
   }
 
-  // Build hybrid map
   const hybridFunds = amfiRaw.filter(f => f.Category === "Hybrid");
   const hybridBySubCat: Record<string, AMFIFund[]> = {};
   hybridFunds.forEach(f => { if (!hybridBySubCat[f.Sub_Category]) hybridBySubCat[f.Sub_Category] = []; hybridBySubCat[f.Sub_Category].push(f); });
 
-  // Build debt grid
   const debtGridMap: AMFIFund[][][] = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => []));
   for (const fund of amfiRaw) {
     if (fund.Category !== "Debt") continue;
@@ -737,8 +766,6 @@ function resolveAllFunds(
 
       if (!box.empty && box.selectedFund) {
         const fundName = 'Fund_Name' in box.selectedFund ? box.selectedFund.Fund_Name : (box.selectedFund as ETFAnalytics).ETF_Name;
-
-        // Skip duplicate fund names
         if (seenFunds.has(fundName)) continue;
         seenFunds.add(fundName);
 
@@ -795,7 +822,7 @@ const GOAL_PRESETS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FUND DETAIL MODAL (reusing same logic as main page)
+// FUND DETAIL MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: () => void }) {
@@ -803,7 +830,6 @@ function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }} onClick={onClose}>
       <div style={{ background: 'white', borderRadius: '24px', maxWidth: '700px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 40px 100px rgba(0,0,0,0.2)', border: '1px solid #E2E8F0' }} onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
         <div style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(8px)', padding: '18px 22px', borderBottom: '1px solid #F1F5F9', zIndex: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
             <div style={{ minWidth: 0 }}>
@@ -822,8 +848,6 @@ function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: (
         </div>
 
         <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          {/* Key stats */}
           {slot.stats && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
               {[
@@ -841,7 +865,6 @@ function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: (
             </div>
           )}
 
-          {/* Why this fund */}
           <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '12px', padding: '14px 16px', display: 'flex', gap: '10px' }}>
             <span style={{ fontSize: '18px', flexShrink: 0 }}>💡</span>
             <div>
@@ -855,7 +878,6 @@ function FundDetailModal({ slot, onClose }: { slot: ResolvedFundSlot; onClose: (
             </div>
           </div>
 
-          {/* Head-to-head */}
           {slot.box.candidateSubCategories.length > 1 && (
             <div>
               <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>Sub-categories compared for this slot</h4>
@@ -896,14 +918,12 @@ function FundSlotCard({ slot, sipAmount, onDetail }: { slot: ResolvedFundSlot; s
       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 24px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
 
-      {/* SIP badge */}
       {slotSIP > 0 && (
         <div style={{ position: 'absolute', top: 12, right: 12, background: slot.blockBg, border: `1px solid ${slot.blockBorder}`, borderRadius: '100px', padding: '3px 10px', fontSize: '10px', fontWeight: 700, color: slot.blockColor }}>
           ₹{slotSIP.toLocaleString('en-IN')}/mo
         </div>
       )}
 
-      {/* Type badges */}
       <div style={{ display: 'flex', gap: '5px', marginBottom: '8px', flexWrap: 'wrap', paddingRight: slotSIP > 0 ? '90px' : '0' }}>
         <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '100px', background: slot.isActive ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)', color: slot.isActive ? '#059669' : '#2563EB', border: `1px solid ${slot.isActive ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.2)'}` }}>
           {slot.isActive ? '● ACTIVE' : '◆ INDEX'}
@@ -911,10 +931,8 @@ function FundSlotCard({ slot, sipAmount, onDetail }: { slot: ResolvedFundSlot; s
         <span style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 500, alignSelf: 'center' }}>{slot.subCategory}</span>
       </div>
 
-      {/* Fund name */}
       <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3, marginBottom: '10px' }}>{slot.fundName}</div>
 
-      {/* Stats row */}
       {slot.stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', marginBottom: '10px' }}>
           {[
@@ -966,14 +984,12 @@ function ExposureBar({ blocks }: { blocks: ExposureBlock[] }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function QuickFundPicksPage() {
-  // Data state
   const [amfiRaw, setAmfiRaw] = useState<AMFIFund[]>([]);
   const [fundAnalytics, setFundAnalytics] = useState<FundAnalytics[]>([]);
   const [etfAnalytics, setEtfAnalytics] = useState<ETFAnalytics[]>([]);
   const [insights, setInsights] = useState<InsightRow[]>([]);
   const [dataReady, setDataReady] = useState(false);
 
-  // Form state
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [goalName, setGoalName] = useState("");
   const [targetLakh, setTargetLakh] = useState("");
@@ -981,19 +997,17 @@ export default function QuickFundPicksPage() {
   const [riskScore, setRiskScore] = useState(5);
   const [generating, setGenerating] = useState(false);
 
-  // Result state
   const [plan, setPlan] = useState<AllocationPlan | null>(null);
   const [resolvedFunds, setResolvedFunds] = useState<ResolvedFundSlot[]>([]);
   const [projections, setProjections] = useState<{ low: number; mid: number; high: number; invested: number } | null>(null);
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
 
-  // UI toggles
-  const [showFunds, setShowFunds] = useState(false);
-  const [showAllocation, setShowAllocation] = useState(false);
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  // All sections open by default
+  const [showFunds, setShowFunds] = useState(true);
+  const [showAllocation, setShowAllocation] = useState(true);
+  const [showHowItWorks, setShowHowItWorks] = useState(true);
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Load all data
   useEffect(() => {
     Promise.all([
       fetch("/api/amfi-raw").then(r => r.json()),
@@ -1023,9 +1037,10 @@ export default function QuickFundPicksPage() {
     setGenerating(true);
     setPlan(null);
     setResolvedFunds([]);
-    setShowFunds(false);
-    setShowAllocation(false);
-    setShowHowItWorks(false);
+    // Reset sections to open when regenerating
+    setShowFunds(true);
+    setShowAllocation(true);
+    setShowHowItWorks(true);
 
     setTimeout(() => {
       const horizon = parseInt(horizonYears);
@@ -1107,7 +1122,6 @@ export default function QuickFundPicksPage() {
           <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', marginBottom: '20px' }}>Your goal details</div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-            {/* Goal name */}
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '6px' }}>What are you saving for? <span style={{ color: '#DC2626' }}>*</span></label>
               <input value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="e.g. My First Car, Daughter's College, Europe Trip…"
@@ -1115,7 +1129,6 @@ export default function QuickFundPicksPage() {
                 onFocus={e => (e.target.style.borderColor = '#3B82F6')} onBlur={e => (e.target.style.borderColor = '#E2E8F0')} />
             </div>
 
-            {/* Target amount */}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '6px' }}>Target amount needed <span style={{ color: '#DC2626' }}>*</span></label>
               <div style={{ position: 'relative' }}>
@@ -1128,7 +1141,6 @@ export default function QuickFundPicksPage() {
               <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '3px' }}>Enter in Lakhs. "10" = ₹10 Lakhs</div>
             </div>
 
-            {/* Horizon */}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '6px' }}>In how many years? <span style={{ color: '#DC2626' }}>*</span></label>
               <input type="number" value={horizonYears} onChange={e => setHorizonYears(e.target.value)} placeholder="Years" min="1" max="40"
@@ -1178,7 +1190,6 @@ export default function QuickFundPicksPage() {
             {/* ── RESULT HEADER ── */}
             <div style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%)', borderRadius: '24px 24px 0 0', border: '1px solid #E2E8F0', borderBottom: 'none', padding: 'clamp(20px,3vw,28px) clamp(16px,3vw,28px) 20px' }}>
 
-              {/* Plain English summary */}
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '100px', padding: '4px 12px', marginBottom: '12px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#1D4ED8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{plan.label}</span>
               </div>
@@ -1186,7 +1197,7 @@ export default function QuickFundPicksPage() {
               <h2 style={{ fontSize: 'clamp(18px,3vw,24px)', fontWeight: 800, color: '#0F172A', margin: '0 0 6px', lineHeight: 1.2 }}>{goalName}</h2>
               <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px', lineHeight: 1.6, maxWidth: '600px', fontStyle: 'italic' }}>"{plan.plainEnglish}"</p>
 
-              {/* 3 headline KPIs */}
+              {/* 4 headline KPIs */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '16px' }}>
                 {[
                   { label: 'Invest each month', value: `₹${plan.suggestedMonthlySIP.toLocaleString('en-IN')}`, sub: 'Suggested SIP to reach your goal', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -1202,7 +1213,7 @@ export default function QuickFundPicksPage() {
                 ))}
               </div>
 
-              {/* Simple projection traffic light */}
+              {/* Projection traffic light */}
               <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px 18px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
                   Where your ₹{plan.suggestedMonthlySIP.toLocaleString('en-IN')}/month SIP could reach in {horizonYears} years
@@ -1273,8 +1284,54 @@ export default function QuickFundPicksPage() {
               )}
             </div>
 
-            {/* ── HOW WE DESIGNED THIS ── */}
-            <div style={{ background: 'white', border: '1px solid #E2E8F0', borderTop: 'none', padding: '0 clamp(16px,3vw,28px)' }}>
+            {/* ── RECOMMENDED FUNDS ── */}
+            <div style={{ background: 'white', border: '1px solid #E2E8F0', borderTop: 'none', padding: '0 clamp(16px,3vw,28px) clamp(16px,3vw,24px)' }}>
+              <button onClick={() => setShowFunds(!showFunds)}
+                style={{ width: '100%', background: showFunds ? '#EFF6FF' : 'white', border: 'none', borderTop: '1px solid #F1F5F9', padding: '16px 0', fontSize: '13px', fontWeight: 700, color: '#1E40AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>📋 Recommended funds ({resolvedFunds.length} picks from live data)</span>
+                <span style={{ fontSize: '11px', color: '#60A5FA', fontWeight: 500 }}>{showFunds ? '▲ Hide funds' : '▼ Show funds'}</span>
+              </button>
+
+              {showFunds && (
+                <div style={{ paddingBottom: '20px' }}>
+                  {resolvedFunds.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px', color: '#94A3B8', fontSize: '13px' }}>Fund data is still loading. Please try again in a moment.</div>
+                  ) : (
+                    <>
+                      {plan.blocks.map(block => {
+                        const blockFunds = resolvedFunds.filter(f => f.exposureBlock === block.type);
+                        if (blockFunds.length === 0) return null;
+                        return (
+                          <div key={block.type} style={{ marginBottom: '22px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingTop: '4px' }}>
+                              <span style={{ fontSize: '18px' }}>{block.emoji}</span>
+                              <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{block.type} Exposure</span>
+                              <span style={{ fontSize: '12px', color: block.color, fontWeight: 700, background: block.bg, border: `1px solid ${block.border}`, padding: '2px 10px', borderRadius: '100px' }}>{block.pct}% of portfolio</span>
+                              <span style={{ fontSize: '11px', color: '#94A3B8' }}>≈ ₹{Math.round(plan.suggestedMonthlySIP * block.pct / 100 / 100) * 100}/mo</span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                              {blockFunds.map((slot, i) => (
+                                <FundSlotCard key={i} slot={slot} sipAmount={plan.suggestedMonthlySIP} onDetail={() => setSelectedFundSlot(slot)} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '12px', padding: '14px 16px', fontSize: '12px', color: '#1E3A8A', lineHeight: 1.65, display: 'flex', gap: '10px' }}>
+                        <span style={{ fontSize: '16px', flexShrink: 0 }}>💡</span>
+                        <div>
+                          <strong>How to split your SIP:</strong> Your suggested total SIP is ₹{plan.suggestedMonthlySIP.toLocaleString('en-IN')}/month. Each fund card shows the recommended monthly amount based on its allocation weight. You don't need all funds — 1–2 from each exposure block is enough for proper diversification. Every fund here is chosen by the same live engine that powers our full matrix.
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── HOW WE DESIGNED THIS — MOVED TO BOTTOM ── */}
+            <div style={{ background: 'white', border: '1px solid #E2E8F0', borderTop: 'none', borderRadius: '0 0 24px 24px', padding: '0 clamp(16px,3vw,28px) clamp(16px,3vw,24px)' }}>
               <button onClick={() => setShowHowItWorks(!showHowItWorks)}
                 style={{ width: '100%', background: 'white', border: 'none', borderTop: '1px solid #F1F5F9', padding: '16px 0', fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>🧠 How did we design this allocation?</span>
@@ -1288,12 +1345,12 @@ export default function QuickFundPicksPage() {
                       {
                         step: '1', icon: '⏱️', color: '#2563EB', bg: '#EFF6FF', bd: '#BFDBFE',
                         title: 'Time Bucket',
-                        body: `Your ${horizonYears}-year horizon places you in the "${plan.timeBucket}" bucket. ${plan.timeBucket === "0-2Y" ? "Capital protection dominates — there's no time to recover from equity losses." : plan.timeBucket === "2-5Y" ? "A balanced approach — enough time for some equity, but we keep a safety net." : plan.timeBucket === "5-10Y" ? "Equity can lead — 5+ years is enough for market cycles to play out." : "Equity compounding is your superpower. Time eliminates most risk."}`
+                        body: `Your ${horizonYears}-year horizon places you in the "${plan.timeBucket}" bucket. ${plan.timeBucket === "0-2Y" ? "Capital protection dominates — there's no time to recover from equity losses. Even aggressive profiles avoid momentum/tactical here." : plan.timeBucket === "2-5Y" ? "A balanced approach — enough time for some equity. Tactical exposure is capped for shorter horizons; momentum needs 5yr+ to reliably express the factor premium." : plan.timeBucket === "5-10Y" ? "Equity can lead — 5+ years is enough for market cycles to play out. Tactical exposure becomes appropriate here." : "Equity compounding is your superpower. Time eliminates most risk — full spectrum including small-cap and momentum."}`
                       },
                       {
                         step: '2', icon: '🎚️', color: '#7C3AED', bg: '#F5F3FF', bd: '#DDD6FE',
                         title: 'Risk Intensity',
-                        body: `Your risk score of ${riskScore}/10 maps to "${plan.riskIntensity}". ${plan.riskIntensity === "Conservative" ? "We keep equity low and use conservative hybrids and bonds to dampen swings." : plan.riskIntensity === "Balanced" ? "A blend of growth and safety — equity is meaningful but bonds/hybrids cushion volatility." : plan.riskIntensity === "Growth" ? "Equity leads the portfolio. Mid-caps and tactical exposure added for return premium." : "Maximum equity concentration. High short-term volatility, but strongest long-term compounding."}`
+                        body: `Your risk score of ${riskScore}/10 maps to "${plan.riskIntensity}". ${plan.riskIntensity === "Conservative" ? "We keep equity low and use conservative hybrids and bonds to dampen swings." : plan.riskIntensity === "Balanced" ? "A blend of growth and safety — equity is meaningful but bonds/hybrids cushion volatility." : plan.riskIntensity === "Growth" ? "Equity leads the portfolio. Mid-caps and tactical exposure added for return premium where the horizon supports it." : "Maximum equity concentration — but always respecting the horizon. Short-horizon aggressive profiles use large-cap quality, not speculation."}`
                       },
                       {
                         step: '3', icon: '🗂️', color: '#D97706', bg: '#FFFBEB', bd: '#FDE68A',
@@ -1320,54 +1377,6 @@ export default function QuickFundPicksPage() {
                   <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '12px 16px', fontSize: '12px', color: '#92400E', lineHeight: 1.6 }}>
                     <strong>Note:</strong> All return projections are based on historical performance data and are not guarantees of future returns. Please consult a SEBI-registered investment advisor before making investment decisions.
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── RECOMMENDED FUNDS ── */}
-            <div style={{ background: 'white', border: '1px solid #E2E8F0', borderTop: 'none', borderRadius: '0 0 24px 24px', padding: '0 clamp(16px,3vw,28px) clamp(16px,3vw,24px)' }}>
-              <button onClick={() => setShowFunds(!showFunds)}
-                style={{ width: '100%', background: showFunds ? '#EFF6FF' : 'white', border: 'none', borderTop: '1px solid #F1F5F9', padding: '16px 0', fontSize: '13px', fontWeight: 700, color: '#1E40AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>📋 See the funds recommended for you ({resolvedFunds.length} picks from live data)</span>
-                <span style={{ fontSize: '11px', color: '#60A5FA', fontWeight: 500 }}>{showFunds ? '▲ Hide funds' : '▼ Show funds'}</span>
-              </button>
-
-              {showFunds && (
-                <div style={{ paddingBottom: '20px' }}>
-                  {resolvedFunds.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '24px', color: '#94A3B8', fontSize: '13px' }}>Fund data is still loading. Please try again in a moment.</div>
-                  ) : (
-                    <>
-                      {/* Group by exposure block */}
-                      {plan.blocks.map(block => {
-                        const blockFunds = resolvedFunds.filter(f => f.exposureBlock === block.type);
-                        if (blockFunds.length === 0) return null;
-                        return (
-                          <div key={block.type} style={{ marginBottom: '22px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingTop: '4px' }}>
-                              <span style={{ fontSize: '18px' }}>{block.emoji}</span>
-                              <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{block.type} Exposure</span>
-                              <span style={{ fontSize: '12px', color: block.color, fontWeight: 700, background: block.bg, border: `1px solid ${block.border}`, padding: '2px 10px', borderRadius: '100px' }}>{block.pct}% of portfolio</span>
-                              <span style={{ fontSize: '11px', color: '#94A3B8' }}>≈ ₹{Math.round(plan.suggestedMonthlySIP * block.pct / 100 / 100) * 100}/mo</span>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
-                              {blockFunds.map((slot, i) => (
-                                <FundSlotCard key={i} slot={slot} sipAmount={plan.suggestedMonthlySIP} onDetail={() => setSelectedFundSlot(slot)} />
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* How to use */}
-                      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '12px', padding: '14px 16px', fontSize: '12px', color: '#1E3A8A', lineHeight: 1.65, display: 'flex', gap: '10px' }}>
-                        <span style={{ fontSize: '16px', flexShrink: 0 }}>💡</span>
-                        <div>
-                          <strong>How to split your SIP:</strong> Your suggested total SIP is ₹{plan.suggestedMonthlySIP.toLocaleString('en-IN')}/month. Each fund card shows the recommended monthly amount based on its allocation weight. You don't need all funds — 1–2 from each exposure block is enough for proper diversification. Every fund here is chosen by the same live engine that powers our full matrix.
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
             </div>
