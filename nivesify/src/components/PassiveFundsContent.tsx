@@ -34,6 +34,83 @@ export type PassiveFundsContentProps = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SORTING HOOK (identical pattern to active page)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SortDir = "asc" | "desc";
+
+function useSort<T>(
+  data: T[],
+  defaultKey: keyof T | null = null,
+  defaultDir: SortDir = "desc",
+) {
+  const [sortKey, setSortKey] = useState<keyof T | null>(defaultKey);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
+
+  const toggle = (key: keyof T) => {
+    setSortKey((prev) => {
+      if (prev === key) { setSortDir((d) => (d === "asc" ? "desc" : "asc")); return key; }
+      setSortDir("desc");
+      return key;
+    });
+  };
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return data;
+    return [...data].sort((a, b) => {
+      const av = a[sortKey] as unknown as number | string | null;
+      const bv = b[sortKey] as unknown as number | string | null;
+      if (av === null || av === undefined) return 1;
+      if (bv === null || bv === undefined) return -1;
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [data, sortKey, sortDir]);
+
+  return { sorted, sortKey, sortDir, toggle };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SORTABLE COLUMN HEADER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function STH({
+  label, colKey, right, sortKey, sortDir, onSort,
+}: {
+  label: string; colKey: string; right?: boolean;
+  sortKey: string | null; sortDir: SortDir; onSort: (k: string) => void;
+}) {
+  const active = sortKey === colKey;
+  return (
+    <th
+      onClick={() => onSort(colKey)}
+      style={{
+        padding: "10px 12px",
+        textAlign: right ? "right" : "left",
+        fontWeight: 700,
+        fontSize: "10px",
+        color: active ? "#0F172A" : "#94A3B8",
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        background: "#F8FAFC",
+        borderBottom: `2px solid ${active ? "#CBD5E1" : "#E2E8F0"}`,
+        cursor: "pointer",
+        userSelect: "none",
+        transition: "color 0.15s",
+      }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+        {label}
+        <span style={{ fontSize: "9px", color: active ? "#64748B" : "#CBD5E1", letterSpacing: 0 }}>
+          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </span>
+    </th>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FORMATTERS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -53,10 +130,10 @@ const fmtAum = (v: number | null | undefined) =>
   v != null ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(v) : "—";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUB-COMPONENTS
+// DISPLAY HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ReturnPair({ fund, bench }: { fund: number | null | undefined; bench: number | null | undefined }) {
+function ReturnPair({ fund, bench }: { fund?: number | null; bench?: number | null }) {
   if (fund == null || bench == null) return <span style={{ color: "#CBD5E1" }}>—</span>;
   const beat = fund >= bench;
   return (
@@ -68,18 +145,13 @@ function ReturnPair({ fund, bench }: { fund: number | null | undefined; bench: n
   );
 }
 
-function TdCell({ v }: { v: number | null | undefined }) {
+function TdCell({ v }: { v?: number | null }) {
   if (v == null || Number.isNaN(v)) return <span style={{ color: "#CBD5E1" }}>—</span>;
   const abs = Math.abs(v);
   const color = abs <= 0.5 ? "#059669" : abs <= 1.5 ? "#D97706" : "#DC2626";
   return <span style={{ fontWeight: 700, color }}>{fmtPct(v)}</span>;
 }
 
-const TH = ({ children, right }: { children: React.ReactNode; right?: boolean }) => (
-  <th style={{ padding: "10px 12px", textAlign: right ? "right" : "left", fontWeight: 700, fontSize: "10px", color: "#64748B", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", background: "#F8FAFC", borderBottom: "2px solid #E2E8F0" }}>
-    {children}
-  </th>
-);
 const TD = ({ children, right, muted }: { children: React.ReactNode; right?: boolean; muted?: boolean }) => (
   <td style={{ padding: "10px 12px", textAlign: right ? "right" : "left", color: muted ? "#94A3B8" : undefined, fontSize: "12px", borderBottom: "1px solid #F1F5F9", verticalAlign: "middle" }}>
     {children}
@@ -91,6 +163,36 @@ function StatCell({ label, children }: { label: string; children: React.ReactNod
     <div style={{ background: "#F8FAFC", borderRadius: "8px", padding: "8px 10px", border: "1px solid #F1F5F9" }}>
       <div style={{ fontSize: "8.5px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "3px" }}>{label}</div>
       <div style={{ fontSize: "12px" }}>{children}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE SEARCH (per-table filter input)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TableSearch({ value, onChange, placeholder = "Filter…" }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <span style={{ position: "absolute", left: "9px", fontSize: "11px", color: "#94A3B8", pointerEvents: "none" }}>⌕</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          paddingLeft: "26px", paddingRight: value ? "28px" : "10px",
+          paddingTop: "5px", paddingBottom: "5px",
+          fontSize: "11px", borderRadius: "8px",
+          border: "1.5px solid #E2E8F0", background: "white",
+          color: "#374151", outline: "none", width: "160px",
+          transition: "border-color 0.15s, width 0.2s",
+        }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "#94A3B8"; e.currentTarget.style.width = "200px"; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.width = "160px"; }}
+      />
+      {value && (
+        <button onClick={() => onChange("")} style={{ position: "absolute", right: "7px", background: "none", border: "none", cursor: "pointer", fontSize: "11px", color: "#94A3B8", lineHeight: 1, padding: "2px" }}>✕</button>
+      )}
     </div>
   );
 }
@@ -117,6 +219,16 @@ export default function PassiveFundsContent({
   manifest,
 }: PassiveFundsContentProps) {
 
+  // ── Benchmark table sort + filter ──
+  const [bmFilter, setBmFilter] = useState("");
+  const bmData = useMemo(() =>
+    bmFilter.trim()
+      ? benchmarkStats.filter((r) => r.Benchmark.toLowerCase().includes(bmFilter.toLowerCase()))
+      : benchmarkStats,
+    [benchmarkStats, bmFilter]);
+  const bmSort = useSort<BenchmarkStat>(bmData, "Total_AUM", "desc");
+  const bmToggle = (k: string) => bmSort.toggle(k as keyof BenchmarkStat);
+
   // ── Screener state ──
   const [query, setQuery] = useState("");
   const [benchmark, setBenchmark] = useState("All");
@@ -129,51 +241,49 @@ export default function PassiveFundsContent({
   const benchmarks = useMemo(() =>
     Array.from(new Set(etfs.map((e) => e.Benchmark_Name).filter(Boolean))).sort() as string[], [etfs]);
 
-  const filtered = useMemo(() => {
+  const screenerFiltered = useMemo(() => {
     const aumMin = minAum.trim() === "" ? null : Number(minAum);
     const tdMax = maxTd.trim() === "" ? null : Number(maxTd);
-    return [...etfs]
-      .filter((e) => {
-        if (benchmark !== "All" && e.Benchmark_Name !== benchmark) return false;
-        if (aumMin !== null && (e.Fund_AUM ?? 0) < aumMin) return false;
-        if (tdMax !== null && Math.abs(e.Tracking_Diff_3Y ?? 999) > tdMax) return false;
-        if (query.trim()) {
-          const q = query.toLowerCase();
-          if (!String(e.ETF_Name ?? "").toLowerCase().includes(q) &&
-              !String(e.AMC ?? "").toLowerCase().includes(q)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => (b.ETF_Score ?? 0) - (a.ETF_Score ?? 0));
+    return etfs.filter((e) => {
+      if (benchmark !== "All" && e.Benchmark_Name !== benchmark) return false;
+      if (aumMin !== null && (e.Fund_AUM ?? 0) < aumMin) return false;
+      if (tdMax !== null && Math.abs(e.Tracking_Diff_3Y ?? 999) > tdMax) return false;
+      if (query.trim()) {
+        const q = query.toLowerCase();
+        if (!String(e.ETF_Name ?? "").toLowerCase().includes(q) &&
+            !String(e.AMC ?? "").toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
   }, [etfs, query, benchmark, minAum, maxTd]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageSlice = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const screenerSort = useSort<ETFAnalytics>(screenerFiltered, "ETF_Score", "desc");
+  const screenerToggle = (k: string) => screenerSort.toggle(k as keyof ETFAnalytics);
 
-  useEffect(() => { setPage(0); }, [query, benchmark, minAum, maxTd]);
+  const totalPages = Math.max(1, Math.ceil(screenerSort.sorted.length / PAGE_SIZE));
+  const pageSlice = screenerSort.sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  useEffect(() => { setPage(0); }, [query, benchmark, minAum, maxTd, screenerSort.sortKey, screenerSort.sortDir]);
 
   const resetFilters = () => { setQuery(""); setBenchmark("All"); setMinAum(""); setMaxTd(""); };
   const hasFilters = !!(query || benchmark !== "All" || minAum || maxTd);
 
-  // Sorted benchmark table
-  const sortedBenchmarks = [...benchmarkStats].sort((a, b) => (b.Total_AUM ?? 0) - (a.Total_AUM ?? 0));
-
   return (
     <>
       {/* ══════════════════════════════════════
-          SECTION 3 — BENCHMARK SCOREBOARD
+          SECTION 3 — BENCHMARK SCOREBOARD TABLE
       ══════════════════════════════════════ */}
 
-      {/* Benchmark discipline table */}
       <div style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: "20px", overflow: "hidden", marginBottom: "20px" }}>
-        <div style={{ padding: "16px 20px 14px", borderBottom: "1.5px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+        <div style={{ padding: "14px 20px 12px", borderBottom: "1.5px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: "14px", color: "#0F172A" }}>Benchmark discipline table</div>
             <div style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>
               <span style={{ color: "#059669", fontWeight: 700 }}>Green</span> = tight tracking ·{" "}
-              <span style={{ color: "#DC2626", fontWeight: 700 }}>Red</span> = high leakage · Sorted by total AUM
+              <span style={{ color: "#DC2626", fontWeight: 700 }}>Red</span> = high leakage · Click any column to sort
             </div>
           </div>
+          <TableSearch value={bmFilter} onChange={setBmFilter} placeholder="Filter benchmark…" />
         </div>
 
         {/* Desktop */}
@@ -181,46 +291,54 @@ export default function PassiveFundsContent({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <TH>Benchmark / Index</TH>
-                <TH right>Trackers</TH>
-                <TH right>Total AUM (Cr)</TH>
-                <TH right>Median TD 3Y</TH>
-                <TH right>Best TD 3Y</TH>
-                <TH right>Best Fund</TH>
-                <TH right>Avg 1Y Return</TH>
-                <TH right>Avg 3Y Return</TH>
+                {[
+                  { label: "Benchmark",    key: "Benchmark",       right: false },
+                  { label: "Trackers",     key: "Tracker_Count",   right: true  },
+                  { label: "Total AUM",    key: "Total_AUM",       right: true  },
+                  { label: "Median TD 3Y", key: "Median_TD_3Y",    right: true  },
+                  { label: "Best TD 3Y",   key: "Best_TD_3Y",      right: true  },
+                  { label: "Best Fund",    key: "Best_Fund",       right: false },
+                  { label: "Avg 1Y Rtn",   key: "Avg_Fund_Return_1Y", right: true },
+                  { label: "Avg 3Y Rtn",   key: "Avg_Fund_Return_3Y", right: true },
+                ].map((c) => (
+                  <STH key={c.key} label={c.label} colKey={c.key} right={c.right}
+                    sortKey={bmSort.sortKey as string | null} sortDir={bmSort.sortDir} onSort={bmToggle} />
+                ))}
               </tr>
             </thead>
             <tbody>
-              {sortedBenchmarks.map((row, i) => (
+              {bmSort.sorted.map((row, i) => (
                 <tr key={`bm-${row.Benchmark}`} style={{ background: rowBg(i) }}>
                   <TD><span style={{ fontWeight: 600, color: "#0F172A", maxWidth: "200px", display: "block" }}>{row.Benchmark}</span></TD>
                   <TD right muted>{row.Tracker_Count}</TD>
                   <TD right muted>{fmtAum(row.Total_AUM)}</TD>
                   <TD right><TdCell v={row.Median_TD_3Y} /></TD>
                   <TD right><TdCell v={row.Best_TD_3Y} /></TD>
-                  <TD right><span style={{ fontSize: "11px", color: "#475569", maxWidth: "160px", display: "block", textAlign: "right" }}>{row.Best_Fund}</span></TD>
+                  <TD><span style={{ fontSize: "11px", color: "#475569", maxWidth: "180px", display: "block" }}>{row.Best_Fund}</span></TD>
                   <TD right><span style={{ fontWeight: 600, color: "#0F172A" }}>{fmtPct(row.Avg_Fund_Return_1Y)}</span></TD>
                   <TD right><span style={{ fontWeight: 600, color: "#0F172A" }}>{fmtPct(row.Avg_Fund_Return_3Y)}</span></TD>
                 </tr>
               ))}
+              {bmSort.sorted.length === 0 && (
+                <tr><td colSpan={8} style={{ padding: "24px", textAlign: "center", color: "#94A3B8", fontSize: "12px" }}>No benchmarks match "{bmFilter}"</td></tr>
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Mobile cards */}
         <div className="passive-table-mobile" style={{ padding: "12px" }}>
-          {sortedBenchmarks.map((row, i) => (
+          {bmSort.sorted.map((row, i) => (
             <div key={`mbm-${row.Benchmark}`} style={{ background: rowBg(i), borderRadius: "12px", padding: "12px 14px", marginBottom: "8px", border: "1px solid #F1F5F9" }}>
               <div style={{ fontSize: "13px", fontWeight: 700, color: "#0F172A", marginBottom: "4px", lineHeight: 1.3 }}>{row.Benchmark}</div>
-              <div style={{ fontSize: "10px", color: "#94A3B8", marginBottom: "8px" }}>Best fund: {row.Best_Fund}</div>
+              <div style={{ fontSize: "10px", color: "#94A3B8", marginBottom: "8px" }}>Best: {row.Best_Fund}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                <StatCell label="Total AUM (Cr)"><span style={{ fontWeight: 600, color: "#64748B" }}>{fmtAum(row.Total_AUM)}</span></StatCell>
+                <StatCell label="Total AUM"><span style={{ fontWeight: 600, color: "#64748B" }}>{fmtAum(row.Total_AUM)}</span></StatCell>
                 <StatCell label="Trackers"><span style={{ fontWeight: 600, color: "#64748B" }}>{row.Tracker_Count}</span></StatCell>
                 <StatCell label="Median TD 3Y"><TdCell v={row.Median_TD_3Y} /></StatCell>
                 <StatCell label="Best TD 3Y"><TdCell v={row.Best_TD_3Y} /></StatCell>
-                <StatCell label="Avg 1Y Return"><span style={{ fontWeight: 600, color: "#0F172A" }}>{fmtPct(row.Avg_Fund_Return_1Y)}</span></StatCell>
-                <StatCell label="Avg 3Y Return"><span style={{ fontWeight: 600, color: "#0F172A" }}>{fmtPct(row.Avg_Fund_Return_3Y)}</span></StatCell>
+                <StatCell label="Avg 1Y Rtn"><span style={{ fontWeight: 600, color: "#0F172A" }}>{fmtPct(row.Avg_Fund_Return_1Y)}</span></StatCell>
+                <StatCell label="Avg 3Y Rtn"><span style={{ fontWeight: 600, color: "#0F172A" }}>{fmtPct(row.Avg_Fund_Return_3Y)}</span></StatCell>
               </div>
             </div>
           ))}
@@ -230,6 +348,7 @@ export default function PassiveFundsContent({
       {/* ══════════════════════════════════════
           SECTION 4 — TOP PICKS
       ══════════════════════════════════════ */}
+
       <div id="top-picks" style={{ marginTop: "56px", scrollMarginTop: "80px" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(8,145,178,0.08)", border: "1px solid rgba(8,145,178,0.2)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#0891B2", letterSpacing: "0.09em", textTransform: "uppercase" }}>Section 4 · Top Picks</span>
@@ -262,9 +381,9 @@ export default function PassiveFundsContent({
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "5px" }}>
                       {[
                         { label: "AUM (Cr)", value: fmtAum(etf.Fund_AUM), color: "#0F172A" },
-                        { label: "Score", value: fmt(etf.ETF_Score, 2), color: "#0F172A" },
-                        { label: "TD 3Y", value: fmtPct(etf.Tracking_Diff_3Y), color: Math.abs(etf.Tracking_Diff_3Y ?? 999) <= 0.5 ? "#059669" : Math.abs(etf.Tracking_Diff_3Y ?? 999) <= 1.5 ? "#D97706" : "#DC2626" },
-                        { label: "TD 1Y", value: fmtPct(etf.Tracking_Diff_1Y), color: Math.abs(etf.Tracking_Diff_1Y ?? 999) <= 0.5 ? "#059669" : Math.abs(etf.Tracking_Diff_1Y ?? 999) <= 1.5 ? "#D97706" : "#DC2626" },
+                        { label: "Score",    value: fmt(etf.ETF_Score, 2), color: "#0F172A" },
+                        { label: "TD 3Y",    value: fmtPct(etf.Tracking_Diff_3Y), color: Math.abs(etf.Tracking_Diff_3Y ?? 999) <= 0.5 ? "#059669" : Math.abs(etf.Tracking_Diff_3Y ?? 999) <= 1.5 ? "#D97706" : "#DC2626" },
+                        { label: "TD 1Y",    value: fmtPct(etf.Tracking_Diff_1Y), color: Math.abs(etf.Tracking_Diff_1Y ?? 999) <= 0.5 ? "#059669" : Math.abs(etf.Tracking_Diff_1Y ?? 999) <= 1.5 ? "#D97706" : "#DC2626" },
                       ].map((s, si) => (
                         <div key={si} style={{ background: "white", borderRadius: "8px", padding: "6px 7px" }}>
                           <div style={{ fontSize: "7.5px", color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "2px" }}>{s.label}</div>
@@ -286,6 +405,7 @@ export default function PassiveFundsContent({
       {/* ══════════════════════════════════════
           SECTION 5 — FULL SCREENER
       ══════════════════════════════════════ */}
+
       <div id="screener" style={{ marginTop: "56px", scrollMarginTop: "80px" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(15,23,42,0.06)", border: "1px solid rgba(15,23,42,0.12)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#334155", letterSpacing: "0.09em", textTransform: "uppercase" }}>Section 5 · Fund Screener</span>
@@ -294,18 +414,16 @@ export default function PassiveFundsContent({
           Search &amp; filter every passive fund
         </h2>
         <p style={{ fontSize: "13px", color: "#64748B", lineHeight: 1.7, maxWidth: "560px", marginBottom: "24px" }}>
-          Filter by benchmark, AUM, and tracking difference. Ranked by composite ETF score. Click any row for a full snapshot.
+          Filter by benchmark, AUM, and tracking difference. Click any column header to sort. Click a row for the full snapshot.
         </p>
 
         {/* Filter panel */}
         <div style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: "20px", padding: "clamp(16px,3vw,24px)", marginBottom: "20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: "12px", marginBottom: "16px" }}>
-
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={labelStyle}>Search fund or AMC</label>
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. Mirae, HDFC Nifty 50…" style={{ ...inputStyle, fontSize: "13px" }} />
             </div>
-
             <div>
               <label style={labelStyle}>Benchmark / Index</label>
               <select value={benchmark} onChange={(e) => setBenchmark(e.target.value)} style={inputStyle}>
@@ -313,21 +431,18 @@ export default function PassiveFundsContent({
                 {benchmarks.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
-
             <div>
               <label style={labelStyle}>Min AUM (Cr)</label>
               <input type="number" value={minAum} onChange={(e) => setMinAum(e.target.value)} placeholder="e.g. 500" style={inputStyle} />
             </div>
-
             <div>
               <label style={labelStyle}>Max tracking diff 3Y (%)</label>
               <input type="number" value={maxTd} onChange={(e) => setMaxTd(e.target.value)} placeholder="e.g. 1" style={inputStyle} />
             </div>
           </div>
-
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", paddingTop: "12px", borderTop: "1px solid #F1F5F9" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "13px", fontWeight: 800, color: "#0F172A" }}>{filtered.length} funds matched</span>
+              <span style={{ fontSize: "13px", fontWeight: 800, color: "#0F172A" }}>{screenerFiltered.length} funds matched</span>
               <span style={{ fontSize: "11px", color: "#94A3B8" }}>Data as of {manifest?.reportDate ?? "latest"}</span>
             </div>
             {hasFilters && (
@@ -338,21 +453,26 @@ export default function PassiveFundsContent({
           </div>
         </div>
 
-        {/* Desktop table */}
+        {/* Desktop screener table — sortable */}
         <div className="passive-table-desktop" style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: "20px", overflow: "hidden", marginBottom: "16px" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <TH>Fund</TH>
-                  <TH>Benchmark</TH>
-                  <TH right>AUM (Cr)</TH>
-                  <TH right>1Y Fund/Idx</TH>
-                  <TH right>3Y Fund/Idx</TH>
-                  <TH right>TD 1Y</TH>
-                  <TH right>TD 3Y</TH>
-                  <TH right>Score</TH>
-                  <TH right>Rank</TH>
+                  {[
+                    { label: "Fund",       key: "ETF_Name",              right: false },
+                    { label: "Benchmark",  key: "Benchmark_Name",        right: false },
+                    { label: "AUM (Cr)",   key: "Fund_AUM",              right: true  },
+                    { label: "1Y Fd/Idx",  key: "Fund_Return_1Y",        right: true  },
+                    { label: "3Y Fd/Idx",  key: "Fund_Return_3Y",        right: true  },
+                    { label: "TD 1Y",      key: "Tracking_Diff_1Y",      right: true  },
+                    { label: "TD 3Y",      key: "Tracking_Diff_3Y",      right: true  },
+                    { label: "Score",      key: "ETF_Score",             right: true  },
+                    { label: "Rank",       key: "Rank_within_Benchmark", right: true  },
+                  ].map((c) => (
+                    <STH key={c.key} label={c.label} colKey={c.key} right={c.right}
+                      sortKey={screenerSort.sortKey as string | null} sortDir={screenerSort.sortDir} onSort={screenerToggle} />
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -379,24 +499,20 @@ export default function PassiveFundsContent({
                   </tr>
                 ))}
                 {pageSlice.length === 0 && (
-                  <tr><td colSpan={9} style={{ padding: "32px", textAlign: "center", color: "#94A3B8", fontSize: "13px" }}>No funds match your filters. Try relaxing the criteria.</td></tr>
+                  <tr><td colSpan={9} style={{ padding: "32px", textAlign: "center", color: "#94A3B8", fontSize: "13px" }}>No funds match your filters.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Mobile cards */}
+        {/* Mobile screener cards */}
         <div className="passive-table-mobile" style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
           {pageSlice.length === 0 && (
             <div style={{ textAlign: "center", padding: "32px 16px", color: "#94A3B8", fontSize: "13px", background: "white", borderRadius: "16px", border: "1.5px solid #E2E8F0" }}>No funds match your filters.</div>
           )}
           {pageSlice.map((etf, i) => (
-            <div
-              key={`m-${etf.AMC}-${etf.ETF_Name}-${i}`}
-              onClick={() => setSelected(etf)}
-              style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: "16px", padding: "14px", cursor: "pointer" }}
-            >
+            <div key={`m-${etf.AMC}-${etf.ETF_Name}-${i}`} onClick={() => setSelected(etf)} style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: "16px", padding: "14px", cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", gap: "8px" }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#0F172A", lineHeight: 1.3 }}>{etf.ETF_Name}</div>
@@ -410,8 +526,8 @@ export default function PassiveFundsContent({
                 <StatCell label="Score"><span style={{ fontWeight: 800, color: "#0F172A" }}>{fmt(etf.ETF_Score, 2)}</span></StatCell>
                 <StatCell label="TD 3Y"><TdCell v={etf.Tracking_Diff_3Y} /></StatCell>
                 <StatCell label="TD 1Y"><TdCell v={etf.Tracking_Diff_1Y} /></StatCell>
-                <StatCell label="3Y Fund/Idx"><ReturnPair fund={etf.Fund_Return_3Y} bench={etf.Benchmark_Return_3Y} /></StatCell>
-                <StatCell label="1Y Fund/Idx"><ReturnPair fund={etf.Fund_Return_1Y} bench={etf.Benchmark_Return_1Y} /></StatCell>
+                <StatCell label="3Y Fd/Idx"><ReturnPair fund={etf.Fund_Return_3Y} bench={etf.Benchmark_Return_3Y} /></StatCell>
+                <StatCell label="1Y Fd/Idx"><ReturnPair fund={etf.Fund_Return_1Y} bench={etf.Benchmark_Return_1Y} /></StatCell>
                 <StatCell label="AUM (Cr)"><span style={{ fontWeight: 600, color: "#64748B" }}>{fmtAum(etf.Fund_AUM)}</span></StatCell>
               </div>
             </div>
@@ -421,7 +537,7 @@ export default function PassiveFundsContent({
         {/* Pagination */}
         {totalPages > 1 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-            <span style={{ fontSize: "12px", color: "#64748B" }}>Page {page + 1} of {totalPages} · {filtered.length} funds</span>
+            <span style={{ fontSize: "12px", color: "#64748B" }}>Page {page + 1} of {totalPages} · {screenerFiltered.length} funds</span>
             <div style={{ display: "flex", gap: "8px" }}>
               <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} style={{ padding: "8px 18px", borderRadius: "10px", border: "1.5px solid #E2E8F0", background: "white", fontSize: "12px", fontWeight: 600, color: page === 0 ? "#CBD5E1" : "#374151", cursor: page === 0 ? "not-allowed" : "pointer" }}>← Prev</button>
               <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={{ padding: "8px 18px", borderRadius: "10px", border: "1.5px solid #E2E8F0", background: "white", fontSize: "12px", fontWeight: 600, color: page >= totalPages - 1 ? "#CBD5E1" : "#374151", cursor: page >= totalPages - 1 ? "not-allowed" : "pointer" }}>Next →</button>
@@ -434,14 +550,8 @@ export default function PassiveFundsContent({
           FUND DETAIL MODAL
       ══════════════════════════════════════ */}
       {selected && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", padding: "16px" }}
-          onClick={() => setSelected(null)}
-        >
-          <div
-            style={{ maxWidth: "500px", width: "100%", background: "white", borderRadius: "24px", padding: "24px", boxShadow: "0 24px 60px rgba(15,23,42,0.3)", maxHeight: "90vh", overflowY: "auto" }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", padding: "16px" }} onClick={() => setSelected(null)}>
+          <div style={{ maxWidth: "500px", width: "100%", background: "white", borderRadius: "24px", padding: "24px", boxShadow: "0 24px 60px rgba(15,23,42,0.3)", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", gap: "12px" }}>
               <div>
                 <div style={{ fontSize: "10px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>Tracker snapshot</div>
@@ -452,20 +562,9 @@ export default function PassiveFundsContent({
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px,1fr))", gap: "10px" }}>
               {[
-                { section: "Identity", bg: "#EFF6FF", border: "#BFDBFE", items: [
-                  ["Benchmark", selected.Benchmark_Name ?? "—"],
-                  ["Rank in benchmark", String(selected.Rank_within_Benchmark ?? "—")],
-                ]},
-                { section: "Tracking", bg: "#F0FDF4", border: "#A7F3D0", items: [
-                  ["TD 1Y", fmtPct(selected.Tracking_Diff_1Y)],
-                  ["TD 3Y", fmtPct(selected.Tracking_Diff_3Y)],
-                  ["ETF Score", fmt(selected.ETF_Score, 2)],
-                ]},
-                { section: "Scale & Returns", bg: "#FFFBEB", border: "#FDE68A", items: [
-                  ["AUM (Cr)", fmtAum(selected.Fund_AUM)],
-                  ["1Y Fund/Index", selected.Fund_Return_1Y != null && selected.Benchmark_Return_1Y != null ? `${selected.Fund_Return_1Y.toFixed(1)} / ${selected.Benchmark_Return_1Y.toFixed(1)}` : "—"],
-                  ["3Y Fund/Index", selected.Fund_Return_3Y != null && selected.Benchmark_Return_3Y != null ? `${selected.Fund_Return_3Y.toFixed(1)} / ${selected.Benchmark_Return_3Y.toFixed(1)}` : "—"],
-                ]},
+                { section: "Identity",        bg: "#EFF6FF", border: "#BFDBFE", items: [["Benchmark", selected.Benchmark_Name ?? "—"], ["Rank in benchmark", String(selected.Rank_within_Benchmark ?? "—")]] },
+                { section: "Tracking",        bg: "#F0FDF4", border: "#A7F3D0", items: [["TD 1Y", fmtPct(selected.Tracking_Diff_1Y)], ["TD 3Y", fmtPct(selected.Tracking_Diff_3Y)], ["ETF Score", fmt(selected.ETF_Score, 2)]] },
+                { section: "Scale & Returns", bg: "#FFFBEB", border: "#FDE68A", items: [["AUM (Cr)", fmtAum(selected.Fund_AUM)], ["1Y Fund/Index", selected.Fund_Return_1Y != null && selected.Benchmark_Return_1Y != null ? `${selected.Fund_Return_1Y.toFixed(1)} / ${selected.Benchmark_Return_1Y.toFixed(1)}` : "—"], ["3Y Fund/Index", selected.Fund_Return_3Y != null && selected.Benchmark_Return_3Y != null ? `${selected.Fund_Return_3Y.toFixed(1)} / ${selected.Benchmark_Return_3Y.toFixed(1)}` : "—"]] },
               ].map((sec) => (
                 <div key={sec.section} style={{ background: sec.bg, border: `1px solid ${sec.border}`, borderRadius: "14px", padding: "14px" }}>
                   <div style={{ fontSize: "10px", fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "10px" }}>{sec.section}</div>
@@ -482,7 +581,6 @@ export default function PassiveFundsContent({
         </div>
       )}
 
-      {/* Responsive CSS */}
       <style>{`
         .passive-table-desktop { display: block; }
         .passive-table-mobile  { display: none;  }
@@ -490,6 +588,8 @@ export default function PassiveFundsContent({
           .passive-table-desktop { display: none  !important; }
           .passive-table-mobile  { display: block !important; }
         }
+        th { transition: color 0.15s; }
+        th:hover { color: #374151 !important; }
       `}</style>
     </>
   );

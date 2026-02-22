@@ -3,32 +3,84 @@
 import React, { useState, useEffect, useRef } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUB-NAV TABS
+// SHARED HERO NAVIGATION — identical shell used by all 3 planning pages
 // ─────────────────────────────────────────────────────────────────────────────
-const SUB_TABS = [
-  { label: "Why Mutual Funds",    href: "/why-mutual-fund",        active: false },
-  { label: "Smart Fund Finder",   href: "/mutual-fund-match",      active: true  },
-  { label: "MF Industry Analysis",href: "/mutual-fund-analysis",   active: false },
-  { label: "Active Funds",        href: "/active-funds",           active: false },
-  { label: "Passive Funds",       href: "/index-funds",            active: false },
+
+const MF_TABS = [
+  { label: "Why Mutual Funds",     href: "/why-mutual-fund",        active: false },
+  { label: "Smart Fund Finder",    href: "/mutual-fund-match",      active: true  },
+  { label: "MF Industry Analysis", href: "/mutual-fund-analysis",   active: false },
+  { label: "Active Funds",         href: "/active-funds",           active: false },
+  { label: "Passive Funds",        href: "/index-funds",            active: false },
 ];
 
-function SubNavTabs() {
+const PLANNING_TOOLS = [
+  { label: "Smart Fund Finder", href: "/mutual-fund-match",          emoji: "🔍", desc: "Best fund in every category"  },
+  { label: "Quick Goal Picks",  href: "/find-my-fund-quick-picks",   emoji: "⚡", desc: "Fund plan for one goal"        },
+  { label: "Lifetime Plan",     href: "/find-my-fund-lifetime-plan", emoji: "🌱", desc: "All goals, one portfolio"      },
+];
+
+function MFWorldTabs({ activePage }: { activePage: string }) {
   return (
-    <div style={{ display: "flex", gap: "4px", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "2px" }}>
-      {SUB_TABS.map((tab) => (
-        <a key={tab.href} href={tab.href} style={{
-          flexShrink: 0, textDecoration: "none", padding: "6px 14px", borderRadius: "100px",
-          fontSize: "12px", fontWeight: tab.active ? 700 : 500,
-          color: tab.active ? "#3B82F6" : "rgba(255,255,255,0.6)",
-          background: tab.active ? "rgba(255,255,255,0.12)" : "transparent",
-          border: tab.active ? "1px solid rgba(255,255,255,0.25)" : "1px solid transparent",
-          transition: "all 0.2s", whiteSpace: "nowrap", letterSpacing: "0.01em",
-        }}
-          onMouseEnter={e => { if (!tab.active) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.9)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)"; } }}
-          onMouseLeave={e => { if (!tab.active) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; } }}
-        >{tab.label}</a>
-      ))}
+    <div style={{
+      display: "flex", gap: "4px", overflowX: "auto",
+      WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+      msOverflowStyle: "none", paddingBottom: "2px",
+    }}>
+      {MF_TABS.map((tab) => {
+        const isActive = tab.href === activePage;
+        return (
+          <a key={tab.href} href={tab.href} style={{
+            flexShrink: 0, textDecoration: "none",
+            padding: "6px 14px", borderRadius: "100px",
+            fontSize: "12px", fontWeight: isActive ? 700 : 500,
+            color: isActive ? "#3B82F6" : "rgba(255,255,255,0.6)",
+            background: isActive ? "rgba(255,255,255,0.12)" : "transparent",
+            border: isActive ? "1px solid rgba(255,255,255,0.25)" : "1px solid transparent",
+            transition: "all 0.2s", whiteSpace: "nowrap", letterSpacing: "0.01em",
+          }}
+            onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.9)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)"; } }}
+            onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; } }}
+          >{tab.label}</a>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlanningToolsStrip({ activeTool }: { activeTool: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+      <span style={{
+        fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)",
+        letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap",
+      }}>Fund Planning Tools</span>
+      <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.12)" }} />
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+        {PLANNING_TOOLS.map((tool) => {
+          const isActive = tool.href === activeTool;
+          return (
+            <a key={tool.href} href={tool.href} style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              textDecoration: "none", padding: "5px 12px", borderRadius: "100px",
+              fontSize: "11px", fontWeight: isActive ? 700 : 500,
+              color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.55)",
+              background: isActive ? "rgba(59,130,246,0.25)" : "rgba(255,255,255,0.05)",
+              border: isActive ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.1)",
+              transition: "all 0.2s", whiteSpace: "nowrap",
+            }}
+              onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.85)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.1)"; } }}
+              onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.55)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.05)"; } }}
+            >
+              <span style={{ fontSize: "12px" }}>{tool.emoji}</span>
+              {tool.label}
+              {isActive && (
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#3B82F6" }} />
+              )}
+            </a>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -370,7 +422,6 @@ function GridCell({ box, onClick }: { box: BoxResult; onClick: () => void }) {
 // ──────────────────────────────────────────────────────────────
 
 function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) {
-  // Prevent body scroll when modal is open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
@@ -382,7 +433,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
         onClick={onClose}>
         <div style={{ background: 'white', borderRadius: '20px 20px 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)', width: '100%', maxWidth: '560px', border: '1px solid #E2E8F0', maxHeight: '85vh', overflowY: 'auto', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
           onClick={e => e.stopPropagation()}>
-          {/* Pull bar */}
           <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
             <div style={{ width: '40px', height: '4px', background: '#E2E8F0', borderRadius: '2px' }} />
           </div>
@@ -423,12 +473,10 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
       <div style={{ background: 'white', borderRadius: '20px 20px 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.18)', width: '100%', maxWidth: '860px', maxHeight: '92vh', overflowY: 'auto', border: '1px solid #E2E8F0', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         onClick={e => e.stopPropagation()}>
 
-        {/* Pull bar */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0', position: 'sticky', top: 0, background: 'white', zIndex: 10 }}>
           <div style={{ width: '40px', height: '4px', background: '#E2E8F0', borderRadius: '2px' }} />
         </div>
 
-        {/* Sticky header */}
         <div style={{ position: 'sticky', top: '24px', background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(8px)', padding: '12px 20px 14px', borderBottom: '1px solid #F1F5F9', zIndex: 9 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ minWidth: 0 }}>
@@ -452,8 +500,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
         </div>
 
         <div style={{ padding: 'clamp(14px, 4vw, 24px)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          {/* Stats */}
           {box.fundStats && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
               {[
@@ -472,7 +518,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
             </div>
           )}
 
-          {/* Why this fund */}
           <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '10px' }}>
             <span style={{ fontSize: '18px', flexShrink: 0 }}>💡</span>
             <div>
@@ -485,7 +530,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
             </div>
           </div>
 
-          {/* All fund types evaluated */}
           <div>
             <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', marginBottom: '10px' }}>
               All fund types evaluated ({box.allConsideredSubCategories.length} total)
@@ -506,7 +550,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
             <p style={{ fontSize: '11px', color: '#94A3B8' }}>Blue ticked = had enough history · Grey = skipped (not enough data)</p>
           </div>
 
-          {/* Head to head */}
           <div>
             <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', marginBottom: '10px' }}>Head-to-head: which type gave better returns?</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -536,7 +579,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
             </div>
           </div>
 
-          {/* Methodology */}
           <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '14px 16px' }}>
             <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#374151', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>📐</span> How we shortlisted this fund
@@ -550,7 +592,6 @@ function DetailModal({ box, onClose }: { box: BoxResult; onClose: () => void }) 
               ))}
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -567,43 +608,46 @@ function SectionPanel({ rows, cols, boxes, onCellClick }: {
   return (
     <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #E2E8F0', WebkitOverflowScrolling: 'touch', overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '380px', fontSize: '11px' }}>
-        <thead>
-          <tr>
-            <th style={{ padding: '11px 10px', width: '100px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', fontSize: '10px', color: '#94A3B8', fontWeight: 600, textAlign: 'left' }}>Size ↓</th>
-            {cols.map((c, i) => (
-              <th key={i} style={{ padding: '10px 10px', textAlign: 'center', background: 'linear-gradient(180deg, #EFF6FF 0%, #DBEAFE 100%)', borderBottom: '1px solid #BFDBFE', borderRight: i < cols.length - 1 ? '1px solid #DBEAFE' : 'none', minWidth: '120px' }}>
-                <div style={{ fontWeight: 800, color: '#1E40AF', fontSize: '10px' }}>{c.label}</div>
-                <div style={{ fontSize: '9px', color: '#60A5FA', fontWeight: 500, marginTop: '2px' }}>{c.subtitle}</div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, rowIdx) => (
-            <tr key={rowIdx}>
-              <th style={{ padding: '11px 10px', textAlign: 'left', background: '#F8FAFC', borderBottom: rowIdx < rows.length - 1 ? '1px solid #E2E8F0' : 'none', borderRight: '1px solid #E2E8F0', verticalAlign: 'top' }}>
-                <div style={{ fontWeight: 800, fontSize: '10px', color: '#374151' }}>{r.label}</div>
-                <div style={{ fontSize: '8px', color: '#9CA3AF', fontWeight: 400, marginTop: '3px', lineHeight: 1.4 }}>{r.subtitle}</div>
-              </th>
-              {cols.map((_, colIdx) => (
-                <td key={colIdx}
-                  style={{ padding: '10px 10px', borderBottom: rowIdx < rows.length - 1 ? '1px solid #F1F5F9' : 'none', borderRight: colIdx < cols.length - 1 ? '1px solid #F1F5F9' : 'none', verticalAlign: 'top', background: 'white', cursor: 'pointer', transition: 'background 0.15s' }}
-                  onClick={() => onCellClick(boxes[rowIdx][colIdx])}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F0F9FF')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'white')}
-                >
-                  <GridCell box={boxes[rowIdx][colIdx]} onClick={() => onCellClick(boxes[rowIdx][colIdx])} />
-                </td>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '380px', fontSize: '11px' }}>
+          <thead>
+            <tr>
+              <th style={{ padding: '11px 10px', width: '100px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', fontSize: '10px', color: '#94A3B8', fontWeight: 600, textAlign: 'left' }}>Size ↓</th>
+              {cols.map((c, i) => (
+                <th key={i} style={{ padding: '10px 10px', textAlign: 'center', background: 'linear-gradient(180deg, #EFF6FF 0%, #DBEAFE 100%)', borderBottom: '1px solid #BFDBFE', borderRight: i < cols.length - 1 ? '1px solid #DBEAFE' : 'none', minWidth: '120px' }}>
+                  <div style={{ fontWeight: 800, color: '#1E40AF', fontSize: '10px' }}>{c.label}</div>
+                  <div style={{ fontSize: '9px', color: '#60A5FA', fontWeight: 500, marginTop: '2px' }}>{c.subtitle}</div>
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r, rowIdx) => (
+              <tr key={rowIdx}>
+                <th style={{ padding: '11px 10px', textAlign: 'left', background: '#F8FAFC', borderBottom: rowIdx < rows.length - 1 ? '1px solid #E2E8F0' : 'none', borderRight: '1px solid #E2E8F0', verticalAlign: 'top' }}>
+                  <div style={{ fontWeight: 800, fontSize: '10px', color: '#374151' }}>{r.label}</div>
+                  <div style={{ fontSize: '8px', color: '#9CA3AF', fontWeight: 400, marginTop: '3px', lineHeight: 1.4 }}>{r.subtitle}</div>
+                </th>
+                {cols.map((_, colIdx) => (
+                  <td key={colIdx}
+                    style={{ padding: '10px 10px', borderBottom: rowIdx < rows.length - 1 ? '1px solid #F1F5F9' : 'none', borderRight: colIdx < cols.length - 1 ? '1px solid #F1F5F9' : 'none', verticalAlign: 'top', background: 'white', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onClick={() => onCellClick(boxes[rowIdx][colIdx])}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#F0F9FF')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                  >
+                    <GridCell box={boxes[rowIdx][colIdx]} onClick={() => onCellClick(boxes[rowIdx][colIdx])} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
+
+// ──────────────────────────────────────────────────────────────
+// HERO — UPDATED with unified nav pattern
 // ──────────────────────────────────────────────────────────────
 
 function HeroSection() {
@@ -621,10 +665,18 @@ function HeroSection() {
       <div style={{ position: 'relative', maxWidth: '1100px', margin: '0 auto', padding: 'clamp(28px, 5vw, 52px) clamp(16px, 4vw, 24px) clamp(24px, 4vw, 40px)' }}>
 
         {/* Breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '18px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
           <a href="/" style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>Nivesify</a>
           <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>/</span>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Mutual Fund World</span>
+          <a href="/mutual-fund-match" style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>Mutual Fund World</a>
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>/</span>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Smart Fund Finder</span>
+        </div>
+
+        {/* Badge */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '100px', padding: '5px 13px', marginBottom: '14px' }}>
+          <span style={{ fontSize: '13px' }}>🔍</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#93C5FD', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Smart Fund Finder</span>
         </div>
 
         {/* Headline */}
@@ -634,22 +686,27 @@ function HeroSection() {
             We've done the homework.
           </span>
         </h1>
-        <p style={{ fontSize: 'clamp(12px, 2vw, 14px)', color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, maxWidth: '520px', marginBottom: '24px' }}>
+        <p style={{ fontSize: 'clamp(12px, 2vw, 14px)', color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, maxWidth: '520px', marginBottom: '22px' }}>
           Our engine looks at every mutual fund in India, scores them on real performance, and shows you the best one in each category — live, unbiased, explained in full.
         </p>
 
-        {/* ── SUB-NAV TABS ── */}
-        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '6px 8px', display: 'block', width: '100%', maxWidth: 'fit-content', boxSizing: 'border-box', overflow: 'hidden' }}>
-          <SubNavTabs />
+        {/* Row 1: MF World tabs */}
+        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '6px 8px', display: 'inline-block', width: '100%', maxWidth: 'fit-content', boxSizing: 'border-box', marginBottom: '10px' }}>
+          <MFWorldTabs activePage="/mutual-fund-match" />
         </div>
 
-        {/* Trust stats strip */}
-        <div style={{ display: 'flex', gap: 'clamp(16px, 3vw, 32px)', flexWrap: 'wrap', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        {/* Row 2: Fund Planning Tools strip */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '6px' }}>
+          <PlanningToolsStrip activeTool="/mutual-fund-match" />
+        </div>
+
+        {/* Trust stats */}
+        <div style={{ display: 'flex', gap: 'clamp(16px, 3vw, 32px)', flexWrap: 'wrap', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           {[
             { v: '1,500+', l: 'Funds analysed', c: '#60A5FA' },
-            { v: '3', l: 'Asset classes', c: '#34D399' },
-            { v: '0%', l: 'Human bias', c: '#A78BFA' },
-            { v: 'Live', l: 'Always updated', c: '#FCD34D' },
+            { v: '3',      l: 'Asset classes',  c: '#34D399' },
+            { v: '0%',     l: 'Human bias',     c: '#A78BFA' },
+            { v: 'Live',   l: 'Always updated', c: '#FCD34D' },
           ].map((m, i) => (
             <div key={i}>
               <div style={{ fontSize: 'clamp(15px, 2.5vw, 18px)', fontWeight: 800, color: m.c, lineHeight: 1 }}>{m.v}</div>
@@ -663,7 +720,7 @@ function HeroSection() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// HOW IT WORKS STRIP (below hero, above sections)
+// HOW IT WORKS STRIP
 // ──────────────────────────────────────────────────────────────
 
 function HowItWorksStrip() {
@@ -691,6 +748,70 @@ function HowItWorksStrip() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// PLANNING TOOLS CTA STRIP — new, links to quick-goal + lifetime
+// ──────────────────────────────────────────────────────────────
+
+function PlanningToolsCTA() {
+  return (
+    <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 clamp(12px, 3vw, 24px)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #0C4A2E 100%)', borderRadius: '20px', padding: 'clamp(20px, 3vw, 28px) clamp(20px, 3vw, 32px)', position: 'relative', overflow: 'hidden' }}>
+        {/* bg decoration */}
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)', backgroundSize: '24px 24px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+        <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px' }}>Fund Planning Tools</div>
+            <div style={{ fontSize: 'clamp(15px, 2.5vw, 18px)', fontWeight: 800, color: 'white', marginBottom: '4px' }}>Know your goal? Build your fund plan.</div>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxWidth: '420px' }}>
+              The matrix shows what's best in each category. These tools turn that into a personalised plan for your specific goal — one fund or a lifetime portfolio.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Quick Goal */}
+            <a href="/find-my-fund-quick-picks" style={{
+              display: 'flex', flexDirection: 'column', gap: '4px',
+              background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)',
+              borderRadius: '16px', padding: '14px 18px', textDecoration: 'none',
+              minWidth: '160px', transition: 'all 0.2s', cursor: 'pointer',
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.2)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(16,185,129,0.12)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)'; }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '2px' }}>
+                <span style={{ fontSize: '18px' }}>⚡</span>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#34D399' }}>Quick Goal Picks</span>
+              </div>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>Tell us one goal — car, home, education. Get a fund plan in seconds.</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#34D399', marginTop: '4px' }}>Build my fund plan →</span>
+            </a>
+
+            {/* Lifetime Plan */}
+            <a href="/find-my-fund-lifetime-plan" style={{
+              display: 'flex', flexDirection: 'column', gap: '4px',
+              background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)',
+              borderRadius: '16px', padding: '14px 18px', textDecoration: 'none',
+              minWidth: '160px', transition: 'all 0.2s', cursor: 'pointer',
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(217,119,6,0.2)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(217,119,6,0.12)'; (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)'; }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '2px' }}>
+                <span style={{ fontSize: '18px' }}>🌱</span>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#FCD34D' }}>Lifetime Plan</span>
+              </div>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>All your goals — car, home, retirement — one portfolio, one SIP.</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#FCD34D', marginTop: '4px' }}>Build my lifetime plan →</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -758,11 +879,16 @@ export default function FindMyFundPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#1F2937', fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif" }}>
 
-      {/* HERO with tabs */}
+      {/* HERO with unified nav */}
       <HeroSection />
 
       {/* How it works */}
       <HowItWorksStrip />
+
+      {/* Planning Tools CTA — NEW */}
+      <div style={{ padding: 'clamp(16px, 3vw, 24px) 0 0' }}>
+        <PlanningToolsCTA />
+      </div>
 
       {/* ── SHARE FUNDS (Equity) ── */}
       <section style={{ padding: 'clamp(16px, 4vw, 28px) clamp(12px, 3vw, 24px)' }}>
@@ -807,19 +933,15 @@ export default function FindMyFundPage() {
         *::-webkit-scrollbar { display: none; }
         html { scroll-behavior: smooth; }
         img, iframe, table { max-width: 100%; }
-        @media (max-width: 640px) {
-          section { padding-left: 12px !important; padding-right: 12px !important; }
-        }
-        @media (max-width: 480px) {
-          th, td { font-size: 10px !important; padding: 8px 7px !important; }
-        }
+        @media (max-width: 640px) { section { padding-left: 12px !important; padding-right: 12px !important; } }
+        @media (max-width: 480px) { th, td { font-size: 10px !important; padding: 8px 7px !important; } }
       `}</style>
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────────
-// BALANCED FUNDS (Hybrid)
+// BALANCED FUNDS (Hybrid) — unchanged from original
 // ──────────────────────────────────────────────────────────────
 
 function HybridMatrixSection({ reportDate }: { reportDate: string }) {
@@ -855,63 +977,62 @@ function HybridMatrixSection({ reportDate }: { reportDate: string }) {
         <div style={{ background: 'white', borderRadius: '20px', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0', padding: 'clamp(16px, 3vw, 28px) clamp(14px, 3vw, 28px)' }}>
           <SectionHeader num="2" title="Balanced Funds" subtitle="Mix of shares and bonds · Lower swings, steadier journey" reportDate={reportDate} />
           <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '14px', lineHeight: 1.6 }}>
-            These funds blend shares and bonds in different proportions. Great if you want growth without the full ups-and-downs of a pure share fund. Tap any row for the full picture.
+            These funds blend shares and bonds in different proportions. Great if you want growth without the full ups-and-downs of a pure share fund.
           </p>
-
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[...Array(5)].map((_, i) => <div key={i} style={{ height: '52px', background: '#F1F5F9', borderRadius: '10px' }} />)}
             </div>
           ) : (
-            <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '380px' }}>
-                <thead>
-                  <tr style={{ background: 'linear-gradient(90deg, #EFF6FF, #F0FDF4)' }}>
-                    <th style={{ padding: '11px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 800, color: '#1E40AF', borderBottom: '1px solid #E2E8F0', minWidth: '130px' }}>Fund Type</th>
-                    <th style={{ padding: '11px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 800, color: '#065F46', borderBottom: '1px solid #E2E8F0' }}>Best Fund</th>
-                    <th style={{ padding: '11px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 800, color: '#374151', borderBottom: '1px solid #E2E8F0', width: '80px' }}>3Y</th>
-                    <th style={{ padding: '11px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 800, color: '#374151', borderBottom: '1px solid #E2E8F0', width: '80px' }}>vs Market</th>
-                    <th style={{ padding: '11px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 800, color: '#374151', borderBottom: '1px solid #E2E8F0', width: '65px' }}>Rank</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rowDefs.map((row, idx) => {
-                    const box = hybridBoxes[idx];
-                    const fund = box?.selectedFund;
-                    const fundName = fund ? ('Fund_Name' in fund ? fund.Fund_Name : fund.ETF_Name) : null;
-                    const stats = box?.fundStats;
-                    return (
-                      <tr key={row.label}
-                        style={{ borderBottom: idx < rowDefs.length - 1 ? '1px solid #F1F5F9' : 'none', cursor: 'pointer', background: 'white', transition: 'background 0.15s' }}
-                        onClick={() => box && setModalBox(box)}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#F0F9FF')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'white')}
-                      >
-                        <td style={{ padding: '12px 12px', fontWeight: 700, color: '#374151', fontSize: '12px' }}>{row.label}</td>
-                        <td style={{ padding: '12px 12px' }}>
-                          {fundName ? (
-                            <div>
-                              <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '12px', lineHeight: 1.3 }}>{fundName}</div>
-                              {box?.leadingSubCategory && <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>{box.leadingSubCategory}</div>}
-                            </div>
-                          ) : <span style={{ fontSize: '12px', color: '#CBD5E1' }}>No qualifying fund yet</span>}
-                        </td>
-                        <td style={{ padding: '12px 12px', textAlign: 'center', fontWeight: 700, color: '#1F2937', fontSize: '12px' }}>
-                          {stats?.return3Y != null ? `${stats.return3Y.toFixed(1)}%` : '—'}
-                        </td>
-                        <td style={{ padding: '12px 12px', textAlign: 'center', fontWeight: 700, fontSize: '12px' }}>
-                          {stats?.alpha3Y != null ? <span style={{ color: stats.alpha3Y > 0 ? '#059669' : '#DC2626' }}>{stats.alpha3Y > 0 ? '+' : ''}{stats.alpha3Y.toFixed(1)}%</span> : '—'}
-                        </td>
-                        <td style={{ padding: '12px 12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>{stats?.rank ? `#${stats.rank}` : '—'}</div>
-                          <div style={{ fontSize: '9px', color: '#93C5FD', marginTop: '1px' }}>see why →</div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '380px' }}>
+                  <thead>
+                    <tr style={{ background: 'linear-gradient(90deg, #EFF6FF, #F0FDF4)' }}>
+                      <th style={{ padding: '11px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 800, color: '#1E40AF', borderBottom: '1px solid #E2E8F0', minWidth: '130px' }}>Fund Type</th>
+                      <th style={{ padding: '11px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 800, color: '#065F46', borderBottom: '1px solid #E2E8F0' }}>Best Fund</th>
+                      <th style={{ padding: '11px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 800, color: '#374151', borderBottom: '1px solid #E2E8F0', width: '80px' }}>3Y</th>
+                      <th style={{ padding: '11px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 800, color: '#374151', borderBottom: '1px solid #E2E8F0', width: '80px' }}>vs Market</th>
+                      <th style={{ padding: '11px 12px', textAlign: 'center', fontSize: '11px', fontWeight: 800, color: '#374151', borderBottom: '1px solid #E2E8F0', width: '65px' }}>Rank</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rowDefs.map((row, idx) => {
+                      const box = hybridBoxes[idx];
+                      const fund = box?.selectedFund;
+                      const fundName = fund ? ('Fund_Name' in fund ? fund.Fund_Name : fund.ETF_Name) : null;
+                      const stats = box?.fundStats;
+                      return (
+                        <tr key={row.label}
+                          style={{ borderBottom: idx < rowDefs.length - 1 ? '1px solid #F1F5F9' : 'none', cursor: 'pointer', background: 'white', transition: 'background 0.15s' }}
+                          onClick={() => box && setModalBox(box)}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#F0F9FF')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                        >
+                          <td style={{ padding: '12px 12px', fontWeight: 700, color: '#374151', fontSize: '12px' }}>{row.label}</td>
+                          <td style={{ padding: '12px 12px' }}>
+                            {fundName ? (
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '12px', lineHeight: 1.3 }}>{fundName}</div>
+                                {box?.leadingSubCategory && <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>{box.leadingSubCategory}</div>}
+                              </div>
+                            ) : <span style={{ fontSize: '12px', color: '#CBD5E1' }}>No qualifying fund yet</span>}
+                          </td>
+                          <td style={{ padding: '12px 12px', textAlign: 'center', fontWeight: 700, color: '#1F2937', fontSize: '12px' }}>
+                            {stats?.return3Y != null ? `${stats.return3Y.toFixed(1)}%` : '—'}
+                          </td>
+                          <td style={{ padding: '12px 12px', textAlign: 'center', fontWeight: 700, fontSize: '12px' }}>
+                            {stats?.alpha3Y != null ? <span style={{ color: stats.alpha3Y > 0 ? '#059669' : '#DC2626' }}>{stats.alpha3Y > 0 ? '+' : ''}{stats.alpha3Y.toFixed(1)}%</span> : '—'}
+                          </td>
+                          <td style={{ padding: '12px 12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>{stats?.rank ? `#${stats.rank}` : '—'}</div>
+                            <div style={{ fontSize: '9px', color: '#93C5FD', marginTop: '1px' }}>see why →</div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -923,7 +1044,7 @@ function HybridMatrixSection({ reportDate }: { reportDate: string }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// BOND FUNDS (Debt)
+// BOND FUNDS (Debt) — unchanged from original
 // ──────────────────────────────────────────────────────────────
 
 function DebtMatrixSection({ reportDate }: { reportDate: string }) {
@@ -934,9 +1055,9 @@ function DebtMatrixSection({ reportDate }: { reportDate: string }) {
     { label: "5 Years+",         subtitle: "Long-term bonds, rate sensitive" },
   ];
   const colDefs: GridDef = [
-    { label: "Safest",           subtitle: "Govt bonds, AAA-rated" },
-    { label: "Balanced Risk",    subtitle: "Mix of high & mid-rated" },
-    { label: "Higher Yield",     subtitle: "Lower-rated, higher returns" },
+    { label: "Safest",        subtitle: "Govt bonds, AAA-rated" },
+    { label: "Balanced Risk", subtitle: "Mix of high & mid-rated" },
+    { label: "Higher Yield",  subtitle: "Lower-rated, higher returns" },
   ];
 
   const [loading, setLoading]     = React.useState(true);
