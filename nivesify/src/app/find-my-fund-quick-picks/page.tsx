@@ -1,10 +1,165 @@
 "use client";
 
-import AnalysisTabs from "@/components/AnalysisTabs";
 import React, { useState, useEffect, useRef } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TYPES (matching main page exactly)
+// SHARED HERO NAVIGATION — identical shell to fund-match page
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MF_TABS = [
+  { label: "Why Mutual Funds",     href: "/why-mutual-fund",        active: false },
+  { label: "Smart Fund Finder",    href: "/mutual-fund-match",      active: false },
+  { label: "MF Industry Analysis", href: "/mutual-fund-analysis",   active: false },
+  { label: "Active Funds",         href: "/active-funds",           active: false },
+  { label: "Passive Funds",        href: "/index-funds",            active: false },
+];
+
+const PLANNING_TOOLS = [
+  { label: "Smart Fund Finder", href: "/mutual-fund-match",          emoji: "🔍", desc: "Best fund in every category"  },
+  { label: "Quick Goal Picks",  href: "/find-my-fund-quick-picks",   emoji: "⚡", desc: "Fund plan for one goal"        },
+  { label: "Lifetime Plan",     href: "/find-my-fund-lifetime-plan", emoji: "🌱", desc: "All goals, one portfolio"      },
+];
+
+function MFWorldTabs({ activePage }: { activePage: string }) {
+  return (
+    <div style={{
+      display: "flex", gap: "4px", overflowX: "auto",
+      WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+      msOverflowStyle: "none", paddingBottom: "2px",
+    }}>
+      {MF_TABS.map((tab) => {
+        const isActive = tab.href === activePage;
+        return (
+          <a key={tab.href} href={tab.href} style={{
+            flexShrink: 0, textDecoration: "none",
+            padding: "6px 14px", borderRadius: "100px",
+            fontSize: "12px", fontWeight: isActive ? 700 : 500,
+            color: isActive ? "#3B82F6" : "rgba(255,255,255,0.6)",
+            background: isActive ? "rgba(255,255,255,0.12)" : "transparent",
+            border: isActive ? "1px solid rgba(255,255,255,0.25)" : "1px solid transparent",
+            transition: "all 0.2s", whiteSpace: "nowrap", letterSpacing: "0.01em",
+          }}
+            onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.9)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)"; } }}
+            onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; } }}
+          >{tab.label}</a>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlanningToolsStrip({ activeTool }: { activeTool: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+      <span style={{
+        fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)",
+        letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap",
+      }}>Fund Planning Tools</span>
+      <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.12)" }} />
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+        {PLANNING_TOOLS.map((tool) => {
+          const isActive = tool.href === activeTool;
+          return (
+            <a key={tool.href} href={tool.href} style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              textDecoration: "none", padding: "5px 12px", borderRadius: "100px",
+              fontSize: "11px", fontWeight: isActive ? 700 : 500,
+              color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.55)",
+              background: isActive ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.05)",
+              border: isActive ? "1px solid rgba(16,185,129,0.45)" : "1px solid rgba(255,255,255,0.1)",
+              transition: "all 0.2s", whiteSpace: "nowrap",
+            }}
+              onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.85)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.1)"; } }}
+              onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.55)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.05)"; } }}
+            >
+              <span style={{ fontSize: "12px" }}>{tool.emoji}</span>
+              {tool.label}
+              {isActive && (
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#10B981" }} />
+              )}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HERO SECTION — dark, aligned with fund-match page
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HeroSection() {
+  return (
+    <section style={{
+      background: "linear-gradient(155deg, #0F172A 0%, #1E3A5F 55%, #064E3B 100%)",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* dot grid */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)", backgroundSize: "28px 28px" }} />
+      <div style={{ position: "absolute", top: "-80px", right: "-40px", width: "400px", height: "400px", background: "radial-gradient(circle, rgba(16,185,129,0.14) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "-60px", left: "5%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      <div style={{ position: "relative", maxWidth: "1100px", margin: "0 auto", padding: "clamp(28px, 5vw, 52px) clamp(16px, 4vw, 24px) clamp(24px, 4vw, 40px)" }}>
+
+        {/* Breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <a href="/" style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>Nivesify</a>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>/</span>
+          <a href="/mutual-fund-match" style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>Mutual Fund World</a>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>/</span>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Quick Goal Picks</span>
+        </div>
+
+        {/* Badge */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "7px", background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "100px", padding: "5px 13px", marginBottom: "14px" }}>
+          <span style={{ fontSize: "13px" }}>⚡</span>
+          <span style={{ fontSize: "11px", fontWeight: 700, color: "#6EE7B7", letterSpacing: "0.06em", textTransform: "uppercase" }}>Quick Goal Picks</span>
+        </div>
+
+        {/* Headline */}
+        <h1 style={{ fontSize: "clamp(1.6rem, 5vw, 2.9rem)", fontWeight: 800, color: "white", lineHeight: 1.1, letterSpacing: "-0.025em", marginBottom: "10px", maxWidth: "680px" }}>
+          Tell us your goal.<br />
+          <span style={{ background: "linear-gradient(90deg, #34D399 0%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            We'll build your fund plan.
+          </span>
+        </h1>
+        <p style={{ fontSize: "clamp(12px, 2vw, 14px)", color: "rgba(255,255,255,0.6)", lineHeight: 1.75, maxWidth: "520px", marginBottom: "22px" }}>
+          Enter any financial goal — car, home, retirement, or anything else. We use the same live engine that powers our full matrix to build a science-backed, diversified fund plan in seconds.
+        </p>
+
+        {/* Row 1: MF World tabs */}
+        <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", padding: "6px 8px", display: "inline-block", width: "100%", maxWidth: "fit-content", boxSizing: "border-box", marginBottom: "10px" }}>
+          <MFWorldTabs activePage="/mutual-fund-match" />
+        </div>
+
+        {/* Row 2: Fund Planning Tools strip */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.08)", marginTop: "6px" }}>
+          <PlanningToolsStrip activeTool="/find-my-fund-quick-picks" />
+        </div>
+
+        {/* Trust stats */}
+        <div style={{ display: "flex", gap: "clamp(16px, 3vw, 32px)", flexWrap: "wrap", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          {[
+            { v: "1,500+", l: "Funds analysed",    c: "#34D399" },
+            { v: "6",      l: "Goal presets",       c: "#60A5FA" },
+            { v: "4",      l: "Risk profiles",      c: "#A78BFA" },
+            { v: "Live",   l: "Always updated",     c: "#FCD34D" },
+          ].map((m, i) => (
+            <div key={i}>
+              <div style={{ fontSize: "clamp(15px, 2.5vw, 18px)", fontWeight: 800, color: m.c, lineHeight: 1 }}>{m.v}</div>
+              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", marginTop: "3px", fontWeight: 500 }}>{m.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
 type InsightRow = {
@@ -86,10 +241,6 @@ type BoxResult = {
     aum: number;
   };
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// EXPOSURE BLOCK TYPES
-// ─────────────────────────────────────────────────────────────────────────────
 
 type ExposureBlockType =
   | "Capital Safety"
@@ -286,16 +437,7 @@ const DEBT_CELL_MAP: Record<string, [number, number][]> = {
 const HYBRID_ORDER = ["Aggressive Hybrid","Conservative Hybrid","Equity Savings","Arbitrage","Multi Asset Allocation","Balanced Advantage","Balanced Hybrid"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4-LAYER ALLOCATION ENGINE — REVIEWED & REFINED
-//
-// Key principles applied:
-// • 0-2Y: NO momentum/tactical exposure — horizon too short to recover from factor drawdowns.
-//   Even "Aggressive" stays in large-cap equity + hybrids. Volatility tolerance ≠ recklessness.
-// • 2-5Y: Tactical block only for Aggressive, but capped at 10% (not 20%) and paired with
-//   stronger stability buffer. Momentum needs 4-5yr minimum to show risk-adjusted benefit.
-//   Mid-cap is fine here for Growth/Aggressive — it's a different animal than momentum.
-// • 5-10Y: Tactical appropriate for Growth/Aggressive. Small-cap entry only at 5Y+.
-// • 10Y+: Full spectrum including tactical and small-cap.
+// 4-LAYER ALLOCATION ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function computeAllocationPlan(horizonYears: number, riskScore: number, targetAmount: number): AllocationPlan {
@@ -311,9 +453,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
 
   let blocks: ExposureBlock[] = [];
 
-  // ── SHORT TERM (0-2Y) ──
-  // No tactical/momentum. Even aggressive stays quality-focused.
-  // Reason: momentum funds need 3yr+ to express the factor premium; before that it's pure noise risk.
   if (timeBucket === "0-2Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -350,7 +489,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           ]},
       ];
     } else if (riskIntensity === "Growth") {
-      // No tactical here — 2yr horizon is too short. Use Balanced Equity + large-cap equity.
       blocks = [
         { type: "Capital Safety", pct: 35, emoji: "🛡️", description: "Safety anchor — liquid and short-term bonds to protect principal over a short horizon.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC",
           cells: [
@@ -369,7 +507,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           ]},
       ];
     } else {
-      // Aggressive, 0-2Y: Higher equity but still no momentum/tactical — quality over speculation for short horizons.
       blocks = [
         { type: "Capital Safety", pct: 20, emoji: "🛡️", description: "Minimal safety buffer. Liquid funds for liquidity needs.", color: "#0891B2", bg: "#ECFEFF", border: "#A5F3FC",
           cells: [
@@ -389,8 +526,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
       ];
     }
 
-  // ── MEDIUM TERM (2-5Y) ──
-  // Tactical only for Aggressive and capped at 10%. Mid-cap fine from Growth upward.
   } else if (timeBucket === "2-5Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -449,8 +584,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           ]},
       ];
     } else {
-      // Aggressive, 2-5Y: Max equity but tactical capped at 10% — momentum needs 5yr+ to be reliable.
-      // Added higher stability buffer vs original to avoid 3yr aggressive being reckless.
       blocks = [
         { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap for broad equity foundation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
@@ -472,8 +605,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
       ];
     }
 
-  // ── MEDIUM-LONG TERM (5-10Y) ──
-  // Tactical appropriate here. Small-cap enters only for Growth/Aggressive.
   } else if (timeBucket === "5-10Y") {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -535,7 +666,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           ]},
       ];
     } else {
-      // Aggressive, 5-10Y: Full spectrum including small-cap and tactical
       blocks = [
         { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap — the foundation.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
@@ -559,7 +689,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
       ];
     }
 
-  // ── LONG TERM (10Y+) ──
   } else {
     if (riskIntensity === "Conservative") {
       blocks = [
@@ -621,7 +750,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
           ]},
       ];
     } else {
-      // Aggressive, 10Y+
       blocks = [
         { type: "Core Equity", pct: 40, emoji: "📈", description: "Large and flexi cap — foundational equity.", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE",
           cells: [
@@ -646,7 +774,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
     }
   }
 
-  // Expected returns (weighted by blocks)
   const blockReturnMap: Record<ExposureBlockType, { lo: number; hi: number }> = {
     "Capital Safety": { lo: 5.5, hi: 7.5 },
     "Stability": { lo: 7.0, hi: 9.0 },
@@ -1002,7 +1129,6 @@ export default function QuickFundPicksPage() {
   const [projections, setProjections] = useState<{ low: number; mid: number; high: number; invested: number } | null>(null);
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
 
-  // All sections open by default
   const [showFunds, setShowFunds] = useState(true);
   const [showAllocation, setShowAllocation] = useState(true);
   const [showHowItWorks, setShowHowItWorks] = useState(true);
@@ -1037,7 +1163,6 @@ export default function QuickFundPicksPage() {
     setGenerating(true);
     setPlan(null);
     setResolvedFunds([]);
-    // Reset sections to open when regenerating
     setShowFunds(true);
     setShowAllocation(true);
     setShowHowItWorks(true);
@@ -1070,33 +1195,7 @@ export default function QuickFundPicksPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", color: '#1F2937' }}>
 
-      {/* NAV */}
-      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', zIndex: 30, position: 'sticky', top: 0 }}>
-        <div style={{ maxWidth: '1152px', margin: '0 auto' }}>
-          <AnalysisTabs />
-        </div>
-      </div>
-
-      {/* HERO */}
-      <section style={{ background: 'linear-gradient(155deg, #F0FDF4 0%, #EFF6FF 55%, #FFFBEB 100%)', borderBottom: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(16,185,129,0.06) 1px, transparent 0)', backgroundSize: '28px 28px', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: -80, right: -80, width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative', maxWidth: '1100px', margin: '0 auto', padding: 'clamp(32px,5vw,52px) clamp(16px,4vw,24px) clamp(36px,5vw,56px)' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '100px', padding: '5px 14px', marginBottom: '16px' }}>
-            <span style={{ width: '7px', height: '7px', background: '#10B981', borderRadius: '50%' }} />
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#065F46', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Personalised Fund Plan · Built on Live Data</span>
-          </div>
-          <h1 style={{ fontSize: 'clamp(1.8rem,5vw,3rem)', fontWeight: 800, color: '#0F172A', lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '14px', maxWidth: '700px' }}>
-            Tell us your goal.<br />
-            <span style={{ background: 'linear-gradient(90deg, #059669 0%, #2563EB 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              We'll build your fund plan.
-            </span>
-          </h1>
-          <p style={{ fontSize: 'clamp(13px,2vw,15px)', color: '#475569', lineHeight: 1.75, maxWidth: '520px', marginBottom: '0' }}>
-            Enter any financial goal — car, home, retirement, or anything else. We use the same live engine that powers our full matrix to build a science-backed, diversified fund plan in seconds.
-          </p>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* FORM */}
       <div style={{ maxWidth: '820px', margin: '0 auto', padding: 'clamp(24px,4vw,44px) clamp(12px,3vw,24px)' }}>
@@ -1330,7 +1429,7 @@ export default function QuickFundPicksPage() {
               )}
             </div>
 
-            {/* ── HOW WE DESIGNED THIS — MOVED TO BOTTOM ── */}
+            {/* ── HOW WE DESIGNED THIS ── */}
             <div style={{ background: 'white', border: '1px solid #E2E8F0', borderTop: 'none', borderRadius: '0 0 24px 24px', padding: '0 clamp(16px,3vw,28px) clamp(16px,3vw,24px)' }}>
               <button onClick={() => setShowHowItWorks(!showHowItWorks)}
                 style={{ width: '100%', background: 'white', border: 'none', borderTop: '1px solid #F1F5F9', padding: '16px 0', fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit' }}>
