@@ -1,7 +1,162 @@
 "use client";
 
-import AnalysisTabs from "@/components/AnalysisTabs";
 import React, { useState, useEffect, useRef } from "react";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED HERO NAVIGATION — identical shell to quick-goal page
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MF_TABS = [
+  { label: "Why Mutual Funds",     href: "/why-mutual-fund",        active: false },
+  { label: "Smart Fund Finder",    href: "/mutual-fund-match",      active: false },
+  { label: "MF Industry Analysis", href: "/mutual-fund-analysis",   active: false },
+  { label: "Active Funds",         href: "/active-funds",           active: false },
+  { label: "Passive Funds",        href: "/index-funds",            active: false },
+];
+
+const PLANNING_TOOLS = [
+  { label: "Smart Fund Finder", href: "/mutual-fund-match",          emoji: "🔍", desc: "Best fund in every category"  },
+  { label: "Quick Goal Picks",  href: "/find-my-fund-quick-picks",   emoji: "⚡", desc: "Fund plan for one goal"        },
+  { label: "Lifetime Plan",     href: "/find-my-fund-lifetime-plan", emoji: "🌱", desc: "All goals, one portfolio"      },
+];
+
+function MFWorldTabs({ activePage }: { activePage: string }) {
+  return (
+    <div style={{
+      display: "flex", gap: "4px", overflowX: "auto",
+      WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+      msOverflowStyle: "none", paddingBottom: "2px",
+    }}>
+      {MF_TABS.map((tab) => {
+        const isActive = tab.href === activePage;
+        return (
+          <a key={tab.href} href={tab.href} style={{
+            flexShrink: 0, textDecoration: "none",
+            padding: "6px 14px", borderRadius: "100px",
+            fontSize: "12px", fontWeight: isActive ? 700 : 500,
+            color: isActive ? "#3B82F6" : "rgba(255,255,255,0.6)",
+            background: isActive ? "rgba(255,255,255,0.12)" : "transparent",
+            border: isActive ? "1px solid rgba(255,255,255,0.25)" : "1px solid transparent",
+            transition: "all 0.2s", whiteSpace: "nowrap", letterSpacing: "0.01em",
+          }}
+            onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.9)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.07)"; } }}
+            onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; } }}
+          >{tab.label}</a>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlanningToolsStrip({ activeTool }: { activeTool: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+      <span style={{
+        fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)",
+        letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap",
+      }}>Fund Planning Tools</span>
+      <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.12)" }} />
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+        {PLANNING_TOOLS.map((tool) => {
+          const isActive = tool.href === activeTool;
+          return (
+            <a key={tool.href} href={tool.href} style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              textDecoration: "none", padding: "5px 12px", borderRadius: "100px",
+              fontSize: "11px", fontWeight: isActive ? 700 : 500,
+              color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.55)",
+              background: isActive ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.05)",
+              border: isActive ? "1px solid rgba(16,185,129,0.45)" : "1px solid rgba(255,255,255,0.1)",
+              transition: "all 0.2s", whiteSpace: "nowrap",
+            }}
+              onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.85)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.1)"; } }}
+              onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.55)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.05)"; } }}
+            >
+              <span style={{ fontSize: "12px" }}>{tool.emoji}</span>
+              {tool.label}
+              {isActive && (
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#10B981" }} />
+              )}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HERO SECTION — dark gradient, matching quick-goal page shell
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HeroSection() {
+  return (
+    <section style={{
+      background: "linear-gradient(155deg, #0F172A 0%, #1E3A5F 55%, #064E3B 100%)",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* dot grid */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)", backgroundSize: "28px 28px" }} />
+      <div style={{ position: "absolute", top: "-80px", right: "-40px", width: "400px", height: "400px", background: "radial-gradient(circle, rgba(217,119,6,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "-60px", left: "5%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      <div style={{ position: "relative", maxWidth: "1100px", margin: "0 auto", padding: "clamp(28px, 5vw, 52px) clamp(16px, 4vw, 24px) clamp(24px, 4vw, 40px)" }}>
+
+        {/* Breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <a href="/" style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>Nivesify</a>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>/</span>
+          <a href="/mutual-fund-match" style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>Mutual Fund World</a>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "11px" }}>/</span>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Lifetime Plan</span>
+        </div>
+
+        {/* Badge */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "7px", background: "rgba(217,119,6,0.15)", border: "1px solid rgba(217,119,6,0.35)", borderRadius: "100px", padding: "5px 13px", marginBottom: "14px" }}>
+          <span style={{ fontSize: "13px" }}>🌱</span>
+          <span style={{ fontSize: "11px", fontWeight: 700, color: "#FCD34D", letterSpacing: "0.06em", textTransform: "uppercase" }}>Lifetime Wealth Plan</span>
+        </div>
+
+        {/* Headline */}
+        <h1 style={{ fontSize: "clamp(1.6rem, 5vw, 2.9rem)", fontWeight: 800, color: "white", lineHeight: 1.1, letterSpacing: "-0.025em", marginBottom: "10px", maxWidth: "680px" }}>
+          Every goal you have.<br />
+          <span style={{ background: "linear-gradient(90deg, #FCD34D 0%, #34D399 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            One plan that grows with you.
+          </span>
+        </h1>
+        <p style={{ fontSize: "clamp(12px, 2vw, 14px)", color: "rgba(255,255,255,0.6)", lineHeight: 1.75, maxWidth: "520px", marginBottom: "22px" }}>
+          Car in 3 years. Home in 6. Retirement in 25. Add all your goals — we'll build a single SIP that steps up every year, shifting allocation as each goal is achieved.
+        </p>
+
+        {/* Row 1: MF World tabs */}
+        <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "14px", padding: "6px 8px", display: "inline-block", width: "100%", maxWidth: "fit-content", boxSizing: "border-box", marginBottom: "10px" }}>
+          <MFWorldTabs activePage="/mutual-fund-match" />
+        </div>
+
+        {/* Row 2: Fund Planning Tools strip */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.08)", marginTop: "6px" }}>
+          <PlanningToolsStrip activeTool="/find-my-fund-lifetime-plan" />
+        </div>
+
+        {/* Trust stats */}
+        <div style={{ display: "flex", gap: "clamp(16px, 3vw, 32px)", flexWrap: "wrap", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          {[
+            { v: "10",    l: "Goal templates",   c: "#FCD34D" },
+            { v: "4",     l: "Priority levels",  c: "#34D399" },
+            { v: "10%",   l: "Annual step-up",   c: "#60A5FA" },
+            { v: "Live",  l: "Always updated",   c: "#A78BFA" },
+          ].map((m, i) => (
+            <div key={i}>
+              <div style={{ fontSize: "clamp(15px, 2.5vw, 18px)", fontWeight: 800, color: m.c, lineHeight: 1 }}>{m.v}</div>
+              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", marginTop: "3px", fontWeight: 500 }}>{m.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES — identical to single-goal page
@@ -333,14 +488,7 @@ function buildBox(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SINGLE-GOAL ENGINE — REVIEWED & REFINED (matching quick picks page)
-//
-// Key principles:
-// • 0-2Y: NO momentum/tactical — horizon too short for factor premium to express.
-//   Even Aggressive stays in large-cap quality + hybrids.
-// • 2-5Y: Tactical only for Aggressive and capped at 10%. Mid-cap fine for Growth+.
-// • 5-10Y: Tactical appropriate. Small-cap enters for Aggressive.
-// • 10Y+: Full spectrum.
+// SINGLE-GOAL ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function computeAllocationPlan(horizonYears: number, riskScore: number, targetAmount: number): AllocationPlan {
@@ -367,11 +515,10 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
     } else if (riskIntensity === "Growth") {
       blocks = [
         { type:"Capital Safety", pct:35, emoji:"🛡️", description:"Safety anchor — liquid and short-term bonds protect principal over a short horizon.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20},{matrix:"debt",row:1,col:0,label:"Short Duration Bonds",allocationPct:15}]},
-        { type:"Balanced Equity", pct:30, emoji:"⚖️", description:"Balanced advantage dynamically shifts equity-debt ratio — captures upside while managing short-term risk.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:18},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:12}]},
+        { type:"Balanced Equity", pct:30, emoji:"⚖️", description:"Balanced advantage dynamically shifts equity-debt ratio.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:18},{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:12}]},
         { type:"Core Equity", pct:35, emoji:"📈", description:"Large-cap quality equity — holds up better in short-term volatility.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:15}]},
       ];
     } else {
-      // Aggressive 0-2Y: Higher equity but no momentum — quality over speculation for short horizons
       blocks = [
         { type:"Capital Safety", pct:20, emoji:"🛡️", description:"Minimal safety buffer. Liquid funds for liquidity needs.", color:"#0891B2", bg:"#ECFEFF", border:"#A5F3FC", cells:[{matrix:"debt",row:0,col:0,label:"Liquid / Money Market",allocationPct:20}]},
         { type:"Balanced Equity", pct:35, emoji:"⚖️", description:"Aggressive and balanced hybrid — captures equity upside with built-in risk management.", color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE", cells:[{matrix:"hybrid",row:0,col:0,label:"Aggressive Hybrid",allocationPct:20},{matrix:"hybrid",row:5,col:0,label:"Balanced Advantage Fund",allocationPct:15}]},
@@ -399,7 +546,6 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
         { type:"Stability", pct:20, emoji:"⚓", description:"Corporate bonds as ballast.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond / Banking PSU",allocationPct:20}]},
       ];
     } else {
-      // Aggressive 2-5Y: High equity, tactical capped at 10%, stronger stability buffer
       blocks = [
         { type:"Core Equity", pct:40, emoji:"📈", description:"Large and flexi cap for broad equity foundation.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:20},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:20}]},
         { type:"High Growth", pct:30, emoji:"🚀", description:"Mid-cap exposure for aggressive return target.", color:"#DC2626", bg:"#FEF2F2", border:"#FECACA", cells:[{matrix:"equity",row:1,col:1,label:"Mid Cap",allocationPct:30}]},
@@ -435,7 +581,7 @@ function computeAllocationPlan(horizonYears: number, riskScore: number, targetAm
         { type:"Stability", pct:10, emoji:"⚓", description:"Minimal debt buffer.", color:"#059669", bg:"#ECFDF5", border:"#A7F3D0", cells:[{matrix:"debt",row:1,col:0,label:"Corporate Bond",allocationPct:10}]},
       ];
     }
-  } else { // 10Y+
+  } else {
     if (riskIntensity === "Conservative") {
       blocks = [
         { type:"Core Equity", pct:50, emoji:"📈", description:"Compounding engine — diversified large, value, and flexi cap.", color:"#2563EB", bg:"#EFF6FF", border:"#BFDBFE", cells:[{matrix:"equity",row:0,col:1,label:"Large Cap Core",allocationPct:22},{matrix:"equity",row:3,col:1,label:"Flexi Cap",allocationPct:18},{matrix:"equity",row:0,col:0,label:"Large Cap Value",allocationPct:10}]},
@@ -535,7 +681,7 @@ function resolveAllFunds(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MULTI-GOAL LIFETIME ENGINE — FIXED SIP WITH 10% STEP-UP
+// MULTI-GOAL LIFETIME ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function sipWithStepup(targetAmt: number, horizonMonths: number, annualReturn: number, annualStepup = 0.10): number {
@@ -642,10 +788,7 @@ function generateId(): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PROJECTION ENGINE — single source of truth used by chart AND hero summary cards
-// Month-by-month simulation: SIP invested at start of each month, then compounded.
-// Phase lookup uses the actual phaseDescriptions from the plan engine so rates
-// are always in sync with the exposure blocks shown in the table.
+// PROJECTION ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ProjectionPoint = {
@@ -662,16 +805,13 @@ type ProjectionPoint = {
 
 function buildProjectionPoints(plan: LifetimePlan): ProjectionPoint[] {
   let portMid = 0, portLo = 0, portHi = 0, invested = 0;
-  // Year 0 baseline
   const pts: ProjectionPoint[] = [{ year:0, invested:0, portfolioLow:0, portfolioMid:0, portfolioHigh:0, monthlySIP:0, loRate:0, hiRate:0, midRate:0 }];
 
   for (let yr = 1; yr <= plan.totalYears; yr++) {
-    // Phase that was active during this year (yr-1 to yr)
     const phase = [...plan.phaseDescriptions].reverse().find(p => p.fromYear < yr) ?? plan.phaseDescriptions[0];
     const loRate  = phase.plan.expectedReturnLo;
     const hiRate  = phase.plan.expectedReturnHi;
     const midRate = (loRate + hiRate) / 2;
-    // SIP for year yr uses the step-up from year yr-1 (step-up at start of each new year)
     const monthlySIP = Math.ceil(plan.baseMonthlySIP * Math.pow(1.10, yr - 1) / 100) * 100;
     const rMid = midRate / 100 / 12;
     const rLo  = loRate  / 100 / 12;
@@ -690,7 +830,6 @@ function buildProjectionPoints(plan: LifetimePlan): ProjectionPoint[] {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GROWTH TRAJECTORY CHART
-// Pure SVG. All numbers flow from buildProjectionPoints — zero separate calcs.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; goals: GoalInput[]; points: ProjectionPoint[] }) {
@@ -703,7 +842,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
 
-  // Y-axis: scale to portfolioHigh of last point, rounded up cleanly with minimal headroom
   const rawMax = Math.max(...points.map(p => p.portfolioHigh));
   function niceMax(v: number) {
     const mag = Math.pow(10, Math.floor(Math.log10(v)));
@@ -711,7 +849,7 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
     const nice = frac <= 1.5 ? 1.5 : frac <= 2 ? 2 : frac <= 2.5 ? 2.5 : frac <= 3 ? 3 : frac <= 4 ? 4 : frac <= 5 ? 5 : frac <= 7.5 ? 7.5 : 10;
     return nice * mag;
   }
-  const maxVal = niceMax(rawMax * 1.04); // 4% headroom so top line isn't clipped
+  const maxVal = niceMax(rawMax * 1.04);
   const yTicks = 5;
   const yStep = maxVal / yTicks;
 
@@ -754,8 +892,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
 
   return (
     <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', padding:'20px 20px 14px', overflow:'hidden' }}>
-
-      {/* Header row */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px', flexWrap:'wrap', gap:'8px' }}>
         <div>
           <div style={{ fontSize:'13px', fontWeight:800, color:'#0F172A' }}>Portfolio Growth Trajectory</div>
@@ -779,7 +915,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
         </div>
       </div>
 
-      {/* SVG chart */}
       <div style={{ overflowX:'auto', position:'relative' }}>
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%"
           style={{ display:'block', minWidth:'320px', cursor:'crosshair' }}
@@ -798,7 +933,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             </clipPath>
           </defs>
 
-          {/* Y-grid + labels */}
           {Array.from({ length: yTicks + 1 }, (_, i) => {
             const val = i * yStep;
             const y = yPos(val);
@@ -810,13 +944,11 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             );
           })}
 
-          {/* Phase dividers */}
           {plan.phaseDescriptions.slice(1).map((ph, i) => (
             <line key={i} x1={xPos(ph.fromYear)} y1={PAD.top} x2={xPos(ph.fromYear)} y2={PAD.top + chartH}
               stroke="#E2E8F0" strokeWidth="1" strokeDasharray="4,4"/>
           ))}
 
-          {/* Chart paths — clipped */}
           <g clipPath="url(#ltClip)">
             <path d={makeAreaPath(p => p.portfolioHigh, p => p.portfolioLow)} fill="url(#ltPGrad)"/>
             <path d={makePath(p => p.portfolioHigh)} fill="none" stroke="#10B981" strokeWidth="1" strokeDasharray="5,4" opacity="0.4"/>
@@ -826,7 +958,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             <path d={makePath(p => p.portfolioMid)} fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           </g>
 
-          {/* Goal milestone markers */}
           {achievedGoalYears.map((snap, i) => {
             const x = xPos(snap.year);
             const pt = points.find(p => p.year === snap.year);
@@ -851,7 +982,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             );
           })}
 
-          {/* X-axis */}
           {xTicks.map((yr, i) => (
             <g key={i}>
               <line x1={xPos(yr)} y1={PAD.top + chartH} x2={xPos(yr)} y2={PAD.top + chartH + 4} stroke="#CBD5E1" strokeWidth="1"/>
@@ -859,11 +989,9 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             </g>
           ))}
 
-          {/* Axes */}
           <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1"/>
           <line x1={PAD.left} y1={PAD.top + chartH} x2={PAD.left + chartW} y2={PAD.top + chartH} stroke="#E2E8F0" strokeWidth="1"/>
 
-          {/* Final-year callout — value taken from last point, same as summary cards */}
           {(() => {
             const x = xPos(last.year);
             const y = yPos(last.portfolioMid);
@@ -878,7 +1006,6 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             );
           })()}
 
-          {/* Hover tooltip */}
           {tooltip && (() => {
             const { x, pt } = tooltip;
             const midY = yPos(pt.portfolioMid);
@@ -888,33 +1015,23 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
             const goalLabels = goalsAchieved.map(id => goalMap.get(id)).filter(Boolean);
             return (
               <g>
-                {/* Vertical crosshair */}
                 <line x1={x} y1={PAD.top} x2={x} y2={PAD.top + chartH} stroke="#94A3B8" strokeWidth="1" strokeDasharray="3,3" opacity="0.6"/>
-                {/* Dots on each series */}
                 <circle cx={x} cy={yPos(pt.portfolioMid)} r="4.5" fill="#10B981" stroke="white" strokeWidth="2"/>
                 <circle cx={x} cy={yPos(pt.invested)} r="3.5" fill="#2563EB" stroke="white" strokeWidth="2"/>
-                {/* Card shadow background */}
                 <rect x={ttX + 1} y={ttY + 1} width={TT_W} height={TT_H} rx="9" fill="rgba(0,0,0,0.06)"/>
-                {/* Card */}
                 <rect x={ttX} y={ttY} width={TT_W} height={TT_H} rx="9" fill="white" stroke="#E2E8F0" strokeWidth="1"/>
-                {/* Header bar */}
                 <rect x={ttX} y={ttY} width={TT_W} height="24" rx="9" fill="#0F172A"/>
                 <rect x={ttX} y={ttY + 16} width={TT_W} height="8" fill="#0F172A"/>
                 <text x={ttX + TT_W / 2} y={ttY + 15.5} textAnchor="middle" fontSize="10" fill="white" fontWeight="800" fontFamily="system-ui">
                   {`Year ${pt.year}  ·  SIP ₹${(pt.monthlySIP / 1000).toFixed(0)}K/mo`}
                 </text>
-                {/* Portfolio mid */}
                 <text x={ttX + 11} y={ttY + 37} fontSize="8.5" fill="#94A3B8" fontFamily="system-ui">Portfolio value</text>
                 <text x={ttX + 11} y={ttY + 51} fontSize="14" fill="#10B981" fontWeight="900" fontFamily="system-ui">{fmtY(pt.portfolioMid)}</text>
-                {/* Range */}
                 <text x={ttX + 11} y={ttY + 65} fontSize="8" fill="#CBD5E1" fontFamily="system-ui">{`${fmtY(pt.portfolioLow)} – ${fmtY(pt.portfolioHigh)}`}</text>
-                {/* Invested */}
                 <text x={ttX + 11} y={ttY + 80} fontSize="8.5" fill="#94A3B8" fontFamily="system-ui">Capital invested</text>
                 <text x={ttX + 11} y={ttY + 93} fontSize="13" fill="#2563EB" fontWeight="800" fontFamily="system-ui">{fmtY(pt.invested)}</text>
-                {/* Return rate chip */}
                 <rect x={ttX + TT_W - 48} y={ttY + 77} width="42" height="16" rx="4" fill="#ECFDF5" stroke="#A7F3D0" strokeWidth="0.8"/>
                 <text x={ttX + TT_W - 27} y={ttY + 88} textAnchor="middle" fontSize="8" fill="#059669" fontWeight="700" fontFamily="system-ui">{pt.midRate.toFixed(1)}% p.a.</text>
-                {/* Goal achieved tags */}
                 {goalLabels.map((g, j) => (
                   <g key={j}>
                     <rect x={ttX + TT_W - 44} y={ttY + 27 + j * 18} width="38" height="15" rx="4" fill="#FFFBEB" stroke="#FDE68A" strokeWidth="0.8"/>
@@ -927,13 +1044,12 @@ function GrowthTrajectoryChart({ plan, goals, points }: { plan: LifetimePlan; go
         </svg>
       </div>
 
-      {/* Summary stats — identical values to the hero cards (both use `last` from same points array) */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px, 1fr))', gap:'10px', marginTop:'14px', paddingTop:'12px', borderTop:'1px solid #F1F5F9' }}>
         {[
-          { label:'Total invested',      value: fmtINR(last.invested),                                                sub:`${totalYears}yr · 10% step-up`,   color:'#2563EB' },
-          { label:'Estimated portfolio', value: fmtINR(last.portfolioMid),                                            sub:'mid-case projection',              color:'#10B981' },
-          { label:'Wealth created',      value: fmtINR(last.portfolioMid - last.invested),                            sub:'gains on invested capital',        color:'#059669' },
-          { label:'Money multiplier',    value:`${(last.portfolioMid / Math.max(1, last.invested)).toFixed(1)}×`,     sub:'portfolio ÷ invested',             color:'#D97706' },
+          { label:'Total invested',      value: fmtINR(last.invested),                                            sub:`${totalYears}yr · 10% step-up`,   color:'#2563EB' },
+          { label:'Estimated portfolio', value: fmtINR(last.portfolioMid),                                        sub:'mid-case projection',              color:'#10B981' },
+          { label:'Wealth created',      value: fmtINR(last.portfolioMid - last.invested),                        sub:'gains on invested capital',        color:'#059669' },
+          { label:'Money multiplier',    value:`${(last.portfolioMid / Math.max(1, last.invested)).toFixed(1)}×`, sub:'portfolio ÷ invested',             color:'#D97706' },
         ].map((s, i) => (
           <div key={i} style={{ background:'#F8FAFC', borderRadius:'10px', padding:'10px 12px', border:'1px solid #F1F5F9' }}>
             <div style={{ fontSize:'10px', color:'#94A3B8', fontWeight:600, marginBottom:'2px' }}>{s.label}</div>
@@ -1376,79 +1492,41 @@ export default function LifetimePlanPage() {
   const selectedFunds = selectedPhaseKey ? (lifetimePlan?.resolvedFundsByPhase.get(selectedPhaseKey)??[]) : [];
 
   return (
-    <div style={{ minHeight:'100vh',background:'#F8FAFC',fontFamily:"'DM Sans',system-ui,-apple-system,sans-serif",color:'#1F2937' }}>
+    <div style={{ minHeight:'100vh', background:'#F8FAFC', fontFamily:"'DM Sans',system-ui,-apple-system,sans-serif", color:'#1F2937' }}>
 
-      {/* NAV */}
-      <div style={{ background:'white',borderBottom:'1px solid #E2E8F0',zIndex:30,position:'sticky',top:0 }}>
-        <div style={{ maxWidth:'1152px',margin:'0 auto' }}><AnalysisTabs /></div>
-      </div>
-
-      {/* HERO — redesigned: removed verbose text blocks, made it clean and visual */}
-      <section style={{ background:'linear-gradient(155deg,#FFFBEB 0%,#F0FDF4 50%,#EFF6FF 100%)',borderBottom:'1px solid #E2E8F0',position:'relative',overflow:'hidden' }}>
-        <div style={{ position:'absolute',inset:0,backgroundImage:'radial-gradient(circle at 1px 1px,rgba(217,119,6,0.06) 1px,transparent 0)',backgroundSize:'28px 28px',pointerEvents:'none' }} />
-        <div style={{ position:'absolute',top:-80,right:-60,width:'380px',height:'380px',background:'radial-gradient(circle,rgba(217,119,6,0.08) 0%,transparent 70%)',pointerEvents:'none' }} />
-        <div style={{ position:'relative',maxWidth:'1100px',margin:'0 auto',padding:'clamp(32px,5vw,52px) clamp(16px,4vw,24px) clamp(36px,5vw,56px)' }}>
-          <div style={{ display:'inline-flex',alignItems:'center',gap:'8px',background:'rgba(217,119,6,0.1)',border:'1px solid rgba(217,119,6,0.25)',borderRadius:'100px',padding:'5px 14px',marginBottom:'16px' }}>
-            <span style={{ width:'7px',height:'7px',background:'#D97706',borderRadius:'50%' }} />
-            <span style={{ fontSize:'11px',fontWeight:700,color:'#78350F',letterSpacing:'0.08em',textTransform:'uppercase' }}>Lifetime Wealth Plan · All Goals, One Portfolio</span>
-          </div>
-          <h1 style={{ fontSize:'clamp(1.8rem,5vw,3rem)',fontWeight:800,color:'#0F172A',lineHeight:1.1,letterSpacing:'-0.03em',marginBottom:'14px',maxWidth:'680px' }}>
-            Every goal you have,<br />
-            <span style={{ background:'linear-gradient(90deg,#D97706 0%,#059669 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>
-              one plan that grows with you.
-            </span>
-          </h1>
-          <p style={{ fontSize:'clamp(13px,2vw,15px)',color:'#475569',lineHeight:1.75,maxWidth:'500px',marginBottom:'32px' }}>
-            Car in 3 years. Home in 6. Retirement in 25. One SIP that steps up every year — covering every goal, shifting as each is achieved.
-          </p>
-
-          {/* Clean aesthetic feature pills — no verbose text */}
-          <div style={{ display:'flex',gap:'10px',flexWrap:'wrap' }}>
-            {[
-              { icon:'🔄', label:'Fixed SIP · 10% annual step-up', color:'#059669', bg:'rgba(5,150,105,0.08)', border:'rgba(5,150,105,0.2)' },
-              { icon:'🎯', label:'Nearest goal funded first', color:'#D97706', bg:'rgba(217,119,6,0.08)', border:'rgba(217,119,6,0.2)' },
-              { icon:'📊', label:'Live fund engine · Same as matrix', color:'#2563EB', bg:'rgba(37,99,235,0.08)', border:'rgba(37,99,235,0.2)' },
-              { icon:'⚖️', label:'Blended risk by priority', color:'#7C3AED', bg:'rgba(124,58,237,0.08)', border:'rgba(124,58,237,0.2)' },
-            ].map((f, i) => (
-              <div key={i} style={{ display:'inline-flex',alignItems:'center',gap:'7px',background:f.bg,border:`1px solid ${f.border}`,borderRadius:'100px',padding:'7px 14px' }}>
-                <span style={{ fontSize:'14px' }}>{f.icon}</span>
-                <span style={{ fontSize:'11px',fontWeight:700,color:f.color,whiteSpace:'nowrap' }}>{f.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── HERO WITH INTEGRATED NAV — replaces old sticky white nav + old hero ── */}
+      <HeroSection />
 
       {/* FORM */}
-      <div style={{ maxWidth:'900px',margin:'0 auto',padding:'clamp(24px,4vw,44px) clamp(12px,3vw,24px)' }}>
+      <div style={{ maxWidth:'900px', margin:'0 auto', padding:'clamp(24px,4vw,44px) clamp(12px,3vw,24px)' }}>
 
         {/* Goal templates */}
-        <div style={{ background:'white',borderRadius:'20px',border:'1px solid #E2E8F0',boxShadow:'0 1px 6px rgba(0,0,0,0.04)',padding:'clamp(16px,3vw,22px)',marginBottom:'14px' }}>
-          <div style={{ fontSize:'13px',fontWeight:700,color:'#0F172A',marginBottom:'4px' }}>Add goals to your plan</div>
-          <div style={{ fontSize:'12px',color:'#94A3B8',marginBottom:'14px' }}>Tap any goal below to add it. Then customise the amount, years, and risk tolerance.</div>
-          <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(105px,1fr))',gap:'8px' }}>
+        <div style={{ background:'white', borderRadius:'20px', border:'1px solid #E2E8F0', boxShadow:'0 1px 6px rgba(0,0,0,0.04)', padding:'clamp(16px,3vw,22px)', marginBottom:'14px' }}>
+          <div style={{ fontSize:'13px', fontWeight:700, color:'#0F172A', marginBottom:'4px' }}>Add goals to your plan</div>
+          <div style={{ fontSize:'12px', color:'#94A3B8', marginBottom:'14px' }}>Tap any goal below to add it. Then customise the amount, years, and risk tolerance.</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(105px,1fr))', gap:'8px' }}>
             {GOAL_TEMPLATES.map((t,i)=>{
               const alreadyAdded=goals.some(g=>g.label===t.label);
               return (
                 <button key={i} onClick={()=>addGoalFromTemplate(t)} disabled={alreadyAdded}
-                  style={{ background:alreadyAdded?'#F8FAFC':'white',border:`2px solid ${alreadyAdded?'#E2E8F0':PRIORITY_CONFIG[t.priority].border}`,borderRadius:'14px',padding:'10px 6px',cursor:alreadyAdded?'default':'pointer',textAlign:'center',transition:'all 0.15s',fontFamily:'inherit',opacity:alreadyAdded?0.5:1 }}>
-                  <div style={{ fontSize:'22px',marginBottom:'4px' }}>{t.emoji}</div>
-                  <div style={{ fontSize:'10px',fontWeight:700,color:alreadyAdded?'#94A3B8':PRIORITY_CONFIG[t.priority].color,lineHeight:1.3 }}>{t.label}</div>
-                  {alreadyAdded&&<div style={{ fontSize:'9px',color:'#94A3B8',marginTop:'2px' }}>Added ✓</div>}
+                  style={{ background:alreadyAdded?'#F8FAFC':'white', border:`2px solid ${alreadyAdded?'#E2E8F0':PRIORITY_CONFIG[t.priority].border}`, borderRadius:'14px', padding:'10px 6px', cursor:alreadyAdded?'default':'pointer', textAlign:'center', transition:'all 0.15s', fontFamily:'inherit', opacity:alreadyAdded?0.5:1 }}>
+                  <div style={{ fontSize:'22px', marginBottom:'4px' }}>{t.emoji}</div>
+                  <div style={{ fontSize:'10px', fontWeight:700, color:alreadyAdded?'#94A3B8':PRIORITY_CONFIG[t.priority].color, lineHeight:1.3 }}>{t.label}</div>
+                  {alreadyAdded&&<div style={{ fontSize:'9px', color:'#94A3B8', marginTop:'2px' }}>Added ✓</div>}
                 </button>
               );
             })}
             <button onClick={addBlankGoal}
-              style={{ background:'#F8FAFC',border:'2px dashed #E2E8F0',borderRadius:'14px',padding:'10px 6px',cursor:'pointer',textAlign:'center',fontFamily:'inherit' }}>
-              <div style={{ fontSize:'22px',marginBottom:'4px' }}>➕</div>
-              <div style={{ fontSize:'10px',fontWeight:700,color:'#64748B',lineHeight:1.3 }}>Custom goal</div>
+              style={{ background:'#F8FAFC', border:'2px dashed #E2E8F0', borderRadius:'14px', padding:'10px 6px', cursor:'pointer', textAlign:'center', fontFamily:'inherit' }}>
+              <div style={{ fontSize:'22px', marginBottom:'4px' }}>➕</div>
+              <div style={{ fontSize:'10px', fontWeight:700, color:'#64748B', lineHeight:1.3 }}>Custom goal</div>
             </button>
           </div>
         </div>
 
         {/* Goal cards */}
         {goals.length>0&&(
-          <div style={{ display:'flex',flexDirection:'column',gap:'12px',marginBottom:'14px' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'14px' }}>
             {goals.map(g=>(
               <GoalCard key={g.id} goal={g}
                 onChange={updated=>setGoals(prev=>prev.map(x=>x.id===g.id?updated:x))}
@@ -1459,8 +1537,8 @@ export default function LifetimePlanPage() {
 
         {/* Summary + generate */}
         {goals.length>0&&(
-          <div style={{ background:'white',borderRadius:'16px',border:'1px solid #E2E8F0',padding:'16px 20px',marginBottom:'14px',display:'flex',flexWrap:'wrap',gap:'16px',alignItems:'center',justifyContent:'space-between' }}>
-            <div style={{ display:'flex',flexWrap:'wrap',gap:'16px' }}>
+          <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', padding:'16px 20px', marginBottom:'14px', display:'flex', flexWrap:'wrap', gap:'16px', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:'16px' }}>
               {[
                 { label:'Goals added',      value:`${goals.length}`,     color:'#2563EB' },
                 { label:'Total target',     value:fmtINR(totalTargetLakh*100000), color:'#059669' },
@@ -1468,73 +1546,71 @@ export default function LifetimePlanPage() {
                 { label:'Essential goals',  value:`${goals.filter(g=>g.priority==='essential').length}`, color:'#DC2626' },
               ].map((s,i)=>(
                 <div key={i}>
-                  <div style={{ fontSize:'10px',color:'#94A3B8',fontWeight:600 }}>{s.label}</div>
-                  <div style={{ fontSize:'18px',fontWeight:800,color:s.color,lineHeight:1.1 }}>{s.value}</div>
+                  <div style={{ fontSize:'10px', color:'#94A3B8', fontWeight:600 }}>{s.label}</div>
+                  <div style={{ fontSize:'18px', fontWeight:800, color:s.color, lineHeight:1.1 }}>{s.value}</div>
                 </div>
               ))}
             </div>
             <button onClick={generate} disabled={!canGenerate||generating}
-              style={{ background:canGenerate?'linear-gradient(90deg,#D97706 0%,#059669 100%)':'#E2E8F0',color:canGenerate?'white':'#94A3B8',border:'none',borderRadius:'14px',padding:'14px 24px',fontSize:'14px',fontWeight:800,cursor:canGenerate?'pointer':'not-allowed',boxShadow:canGenerate?'0 4px 20px rgba(217,119,6,0.3)':'none',transition:'all 0.2s',fontFamily:'inherit',whiteSpace:'nowrap' }}>
+              style={{ background:canGenerate?'linear-gradient(90deg,#D97706 0%,#059669 100%)':'#E2E8F0', color:canGenerate?'white':'#94A3B8', border:'none', borderRadius:'14px', padding:'14px 24px', fontSize:'14px', fontWeight:800, cursor:canGenerate?'pointer':'not-allowed', boxShadow:canGenerate?'0 4px 20px rgba(217,119,6,0.3)':'none', transition:'all 0.2s', fontFamily:'inherit', whiteSpace:'nowrap' }}>
               {generating?'⏳  Building your lifetime plan…':'🌱  Build my lifetime plan →'}
             </button>
           </div>
         )}
 
         {goals.length===0&&(
-          <div style={{ background:'white',borderRadius:'16px',border:'2px dashed #E2E8F0',padding:'32px',textAlign:'center',color:'#94A3B8' }}>
-            <div style={{ fontSize:'36px',marginBottom:'12px' }}>🌱</div>
-            <div style={{ fontSize:'14px',fontWeight:700,color:'#374151',marginBottom:'6px' }}>Start adding your goals above</div>
-            <div style={{ fontSize:'12px',lineHeight:1.6 }}>Pick from common goals or create a custom one. Add as many as you like — we'll build one plan that covers them all.</div>
+          <div style={{ background:'white', borderRadius:'16px', border:'2px dashed #E2E8F0', padding:'32px', textAlign:'center', color:'#94A3B8' }}>
+            <div style={{ fontSize:'36px', marginBottom:'12px' }}>🌱</div>
+            <div style={{ fontSize:'14px', fontWeight:700, color:'#374151', marginBottom:'6px' }}>Start adding your goals above</div>
+            <div style={{ fontSize:'12px', lineHeight:1.6 }}>Pick from common goals or create a custom one. Add as many as you like — we'll build one plan that covers them all.</div>
           </div>
         )}
 
         {/* ── RESULTS ── */}
         {lifetimePlan&&(
-          <div ref={resultRef} style={{ marginTop:'32px',display:'flex',flexDirection:'column',gap:'16px' }}>
+          <div ref={resultRef} style={{ marginTop:'32px', display:'flex', flexDirection:'column', gap:'16px' }}>
 
             {/* Plan overview */}
-            <div style={{ background:'linear-gradient(135deg,#FFFBEB,#F0FDF4)',borderRadius:'20px',border:'1px solid #E2E8F0',padding:'clamp(18px,3vw,26px)' }}>
-              <div style={{ fontSize:'11px',fontWeight:700,color:'#94A3B8',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'8px' }}>Your lifetime wealth plan</div>
-              <h2 style={{ fontSize:'clamp(18px,3vw,24px)',fontWeight:800,color:'#0F172A',margin:'0 0 16px' }}>
+            <div style={{ background:'linear-gradient(135deg,#FFFBEB,#F0FDF4)', borderRadius:'20px', border:'1px solid #E2E8F0', padding:'clamp(18px,3vw,26px)' }}>
+              <div style={{ fontSize:'11px', fontWeight:700, color:'#94A3B8', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:'8px' }}>Your lifetime wealth plan</div>
+              <h2 style={{ fontSize:'clamp(18px,3vw,24px)', fontWeight:800, color:'#0F172A', margin:'0 0 16px' }}>
                 {goals.length} goal{goals.length>1?'s':''} · {lifetimePlan.totalYears}-year journey
               </h2>
 
-              {/* Key numbers — all from projectionPoints so they match chart exactly */}
-              <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'10px',marginBottom:'20px' }}>
-                <div style={{ background:'white',borderRadius:'14px',border:'2px solid #BFDBFE',padding:'14px 18px' }}>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Start investing today with</div>
-                  <div style={{ fontSize:'28px',fontWeight:900,color:'#2563EB',lineHeight:1 }}>₹{lifetimePlan.baseMonthlySIP.toLocaleString('en-IN')}</div>
-                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>per month · grows 10% every year</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'10px', marginBottom:'20px' }}>
+                <div style={{ background:'white', borderRadius:'14px', border:'2px solid #BFDBFE', padding:'14px 18px' }}>
+                  <div style={{ fontSize:'11px', color:'#94A3B8', fontWeight:600, marginBottom:'4px' }}>Start investing today with</div>
+                  <div style={{ fontSize:'28px', fontWeight:900, color:'#2563EB', lineHeight:1 }}>₹{lifetimePlan.baseMonthlySIP.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize:'10px', color:'#64748B', marginTop:'4px' }}>per month · grows 10% every year</div>
                 </div>
-                <div style={{ background:'white',borderRadius:'14px',border:'1px solid #E2E8F0',padding:'14px 18px' }}>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>
+                <div style={{ background:'white', borderRadius:'14px', border:'1px solid #E2E8F0', padding:'14px 18px' }}>
+                  <div style={{ fontSize:'11px', color:'#94A3B8', fontWeight:600, marginBottom:'4px' }}>
                     In year {Math.floor(lifetimePlan.totalYears/2)}, your SIP becomes
                   </div>
-                  <div style={{ fontSize:'22px',fontWeight:900,color:'#059669',lineHeight:1 }}>
-                    {/* Use projectionPoints so this matches the chart tooltip exactly */}
+                  <div style={{ fontSize:'22px', fontWeight:900, color:'#059669', lineHeight:1 }}>
                     ₹{(projectionPoints.find(p => p.year === Math.floor(lifetimePlan.totalYears/2))?.monthlySIP ?? 0).toLocaleString('en-IN')}
                   </div>
-                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>after 10% annual step-ups</div>
+                  <div style={{ fontSize:'10px', color:'#64748B', marginTop:'4px' }}>after 10% annual step-ups</div>
                 </div>
-                <div style={{ background:'white',borderRadius:'14px',border:'1px solid #E2E8F0',padding:'14px 18px' }}>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',fontWeight:600,marginBottom:'4px' }}>Estimated final portfolio</div>
-                  <div style={{ fontSize:'22px',fontWeight:900,color:'#10B981',lineHeight:1 }}>
+                <div style={{ background:'white', borderRadius:'14px', border:'1px solid #E2E8F0', padding:'14px 18px' }}>
+                  <div style={{ fontSize:'11px', color:'#94A3B8', fontWeight:600, marginBottom:'4px' }}>Estimated final portfolio</div>
+                  <div style={{ fontSize:'22px', fontWeight:900, color:'#10B981', lineHeight:1 }}>
                     {fmtINR(projectionPoints[projectionPoints.length - 1]?.portfolioMid ?? 0)}
                   </div>
-                  <div style={{ fontSize:'10px',color:'#64748B',marginTop:'4px' }}>mid-case · matches chart below</div>
+                  <div style={{ fontSize:'10px', color:'#64748B', marginTop:'4px' }}>mid-case · matches chart below</div>
                 </div>
               </div>
 
               {/* Goal roadmap */}
-              <div style={{ display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'20px' }}>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'20px' }}>
                 {[...lifetimePlan.goals].sort((a,b)=>parseInt(a.horizonYears)-parseInt(b.horizonYears)).map(g=>{
                   const pc=PRIORITY_CONFIG[g.priority];
                   return (
-                    <div key={g.id} style={{ display:'flex',alignItems:'center',gap:'6px',background:'white',border:`1.5px solid ${pc.border}`,borderRadius:'100px',padding:'5px 12px',boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
+                    <div key={g.id} style={{ display:'flex', alignItems:'center', gap:'6px', background:'white', border:`1.5px solid ${pc.border}`, borderRadius:'100px', padding:'5px 12px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
                       <span style={{ fontSize:'14px' }}>{g.emoji}</span>
                       <div>
-                        <div style={{ fontSize:'11px',fontWeight:800,color:'#1F2937',lineHeight:1.1 }}>{g.label}</div>
-                        <div style={{ fontSize:'9px',color:pc.color,fontWeight:600 }}>Year {g.horizonYears} · {fmtINR(parseFloat(g.targetLakh)*100000)}</div>
+                        <div style={{ fontSize:'11px', fontWeight:800, color:'#1F2937', lineHeight:1.1 }}>{g.label}</div>
+                        <div style={{ fontSize:'9px', color:pc.color, fontWeight:600 }}>Year {g.horizonYears} · {fmtINR(parseFloat(g.targetLakh)*100000)}</div>
                       </div>
                     </div>
                   );
@@ -1545,7 +1621,7 @@ export default function LifetimePlanPage() {
               <TimelineVisual plan={lifetimePlan} goals={goals} selectedPhaseIdx={selectedPhaseIdx} onSelectPhase={setSelectedPhaseIdx} />
             </div>
 
-            {/* ── GROWTH TRAJECTORY CHART — added below plan overview ── */}
+            {/* Growth trajectory chart */}
             <GrowthTrajectoryChart plan={lifetimePlan} goals={goals} points={projectionPoints} />
 
             {/* Phase detail */}
@@ -1554,20 +1630,20 @@ export default function LifetimePlanPage() {
             )}
 
             {/* All phases table */}
-            <div style={{ background:'white',borderRadius:'16px',border:'1px solid #E2E8F0',overflow:'hidden' }}>
-              <div style={{ padding:'16px 18px',borderBottom:'1px solid #F1F5F9',display:'flex',alignItems:'center',gap:'10px' }}>
+            <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', overflow:'hidden' }}>
+              <div style={{ padding:'16px 18px', borderBottom:'1px solid #F1F5F9', display:'flex', alignItems:'center', gap:'10px' }}>
                 <span style={{ fontSize:'16px' }}>🗂️</span>
                 <div>
-                  <div style={{ fontSize:'14px',fontWeight:800,color:'#0F172A' }}>All phases at a glance</div>
-                  <div style={{ fontSize:'11px',color:'#94A3B8',marginTop:'1px' }}>SIP grows 10% each year. Portfolio rebalances when a goal is achieved.</div>
+                  <div style={{ fontSize:'14px', fontWeight:800, color:'#0F172A' }}>All phases at a glance</div>
+                  <div style={{ fontSize:'11px', color:'#94A3B8', marginTop:'1px' }}>SIP grows 10% each year. Portfolio rebalances when a goal is achieved.</div>
                 </div>
               </div>
               <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'560px' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px', minWidth:'560px' }}>
                   <thead>
                     <tr style={{ background:'#F8FAFC' }}>
                       {['Phase','Active goals','Monthly SIP','Exposure blocks','Expected returns'].map((h,i)=>(
-                        <th key={i} style={{ padding:'10px 14px',textAlign:'left',fontWeight:700,color:'#374151',borderBottom:'1px solid #E2E8F0',whiteSpace:'nowrap',fontSize:'11px' }}>{h}</th>
+                        <th key={i} style={{ padding:'10px 14px', textAlign:'left', fontWeight:700, color:'#374151', borderBottom:'1px solid #E2E8F0', whiteSpace:'nowrap', fontSize:'11px' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1576,29 +1652,29 @@ export default function LifetimePlanPage() {
                       const isSelected=selectedPhaseIdx===i;
                       return (
                         <tr key={i} onClick={()=>{ setSelectedPhaseIdx(i); resultRef.current?.scrollIntoView({behavior:'smooth',block:'start'}); }}
-                          style={{ borderBottom:'1px solid #F1F5F9',cursor:'pointer',background:isSelected?'#EFF6FF':'white',transition:'background 0.15s' }}
+                          style={{ borderBottom:'1px solid #F1F5F9', cursor:'pointer', background:isSelected?'#EFF6FF':'white', transition:'background 0.15s' }}
                           onMouseEnter={e=>{ if(!isSelected)(e.currentTarget as HTMLTableRowElement).style.background='#F8FAFC'; }}
                           onMouseLeave={e=>{ if(!isSelected)(e.currentTarget as HTMLTableRowElement).style.background='white'; }}>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#374151',whiteSpace:'nowrap' }}>{phase.label}</td>
+                          <td style={{ padding:'11px 14px', fontWeight:700, color:'#374151', whiteSpace:'nowrap' }}>{phase.label}</td>
                           <td style={{ padding:'11px 14px' }}>
-                            <div style={{ display:'flex',gap:'3px',flexWrap:'wrap' }}>
-                              {phase.activeGoalLabels.map((l,j)=><span key={j} style={{ fontSize:'11px',color:'#6B7280' }}>{l}</span>)}
+                            <div style={{ display:'flex', gap:'3px', flexWrap:'wrap' }}>
+                              {phase.activeGoalLabels.map((l,j)=><span key={j} style={{ fontSize:'11px', color:'#6B7280' }}>{l}</span>)}
                             </div>
                           </td>
-                          <td style={{ padding:'11px 14px',fontWeight:800,color:'#2563EB',whiteSpace:'nowrap' }}>
+                          <td style={{ padding:'11px 14px', fontWeight:800, color:'#2563EB', whiteSpace:'nowrap' }}>
                             ₹{phase.totalSIP.toLocaleString('en-IN')}
-                            {i>0&&<div style={{ fontSize:'9px',color:'#94A3B8',fontWeight:400 }}>+10%/yr step-up</div>}
+                            {i>0&&<div style={{ fontSize:'9px', color:'#94A3B8', fontWeight:400 }}>+10%/yr step-up</div>}
                           </td>
                           <td style={{ padding:'11px 14px' }}>
-                            <div style={{ display:'flex',flexWrap:'wrap',gap:'4px' }}>
+                            <div style={{ display:'flex', flexWrap:'wrap', gap:'4px' }}>
                               {phase.plan.blocks.map((b,j)=>(
-                                <span key={j} style={{ fontSize:'10px',fontWeight:700,color:b.color,background:b.bg,border:`1px solid ${b.border}`,borderRadius:'100px',padding:'2px 7px',whiteSpace:'nowrap' }}>
+                                <span key={j} style={{ fontSize:'10px', fontWeight:700, color:b.color, background:b.bg, border:`1px solid ${b.border}`, borderRadius:'100px', padding:'2px 7px', whiteSpace:'nowrap' }}>
                                   {b.emoji} {b.type} {b.pct}%
                                 </span>
                               ))}
                             </div>
                           </td>
-                          <td style={{ padding:'11px 14px',fontWeight:700,color:'#374151',whiteSpace:'nowrap' }}>{phase.plan.expectedReturnLo}–{phase.plan.expectedReturnHi}%</td>
+                          <td style={{ padding:'11px 14px', fontWeight:700, color:'#374151', whiteSpace:'nowrap' }}>{phase.plan.expectedReturnLo}–{phase.plan.expectedReturnHi}%</td>
                         </tr>
                       );
                     })}
@@ -1608,42 +1684,42 @@ export default function LifetimePlanPage() {
             </div>
 
             {/* How it works */}
-            <div style={{ background:'white',borderRadius:'16px',border:'1px solid #E2E8F0',padding:'18px 20px' }}>
-              <div style={{ fontSize:'14px',fontWeight:800,color:'#0F172A',marginBottom:'12px',display:'flex',alignItems:'center',gap:'8px' }}>
+            <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', padding:'18px 20px' }}>
+              <div style={{ fontSize:'14px', fontWeight:800, color:'#0F172A', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px' }}>
                 <span>🧠</span> How we built this plan — in plain English
               </div>
-              <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'10px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:'10px' }}>
                 {[
-                  { step:'1',icon:'📋',color:'#2563EB',bg:'#EFF6FF',bd:'#BFDBFE', title:'Goals sorted by urgency', body:`We sort your ${goals.length} goal${goals.length>1?'s':''} by time horizon, shortest first. Your nearest goal gets funded first. Essential goals anchor safety; aspirational ones take more risk.` },
-                  { step:'2',icon:'💰',color:'#059669',bg:'#ECFDF5',bd:'#A7F3D0', title:'One fixed SIP, 10% step-up', body:'We calculate the total SIP you need today assuming it grows 10% every year — matching typical salary growth. This single number is your commitment. Nothing changes unless you want it to.' },
-                  { step:'3',icon:'🔀',color:'#D97706',bg:'#FFFBEB',bd:'#FDE68A', title:'SIP directed to nearest goal', body:"At any point, your SIP flows first to the goal that matures soonest. Whatever is surplus after meeting that goal's required share automatically flows to longer-horizon goals." },
-                  { step:'4',icon:'⚖️',color:'#7C3AED',bg:'#F5F3FF',bd:'#DDD6FE', title:'Blended risk for the portfolio', body:'Your risk scores are weighted by priority: essential goals count 1.5×, important goals 1.0×, aspirational 0.6×. The blended risk + shortest active horizon determines the exposure block mix for each phase.' },
-                  { step:'5',icon:'🔬',color:'#0891B2',bg:'#ECFEFF',bd:'#A5F3FC', title:'Horizon-aware fund engine', body:'Each phase uses the same 4-layer engine as our single-goal page. Critically, tactical and momentum exposure is only introduced when the effective horizon supports it (5yr+). Short-horizon phases stay quality-focused.' },
-                  { step:'6',icon:'🔁',color:'#DC2626',bg:'#FEF2F2',bd:'#FECACA', title:'Rebalance when a goal is met', body:'When a goal matures, it exits the portfolio. The SIP (now stepped up further) is redistributed proportionally across remaining goals. The allocation often becomes more growth-oriented as safety obligations are cleared.' },
+                  { step:'1', icon:'📋', color:'#2563EB', bg:'#EFF6FF', bd:'#BFDBFE', title:'Goals sorted by urgency', body:`We sort your ${goals.length} goal${goals.length>1?'s':''} by time horizon, shortest first. Your nearest goal gets funded first. Essential goals anchor safety; aspirational ones take more risk.` },
+                  { step:'2', icon:'💰', color:'#059669', bg:'#ECFDF5', bd:'#A7F3D0', title:'One fixed SIP, 10% step-up', body:'We calculate the total SIP you need today assuming it grows 10% every year — matching typical salary growth. This single number is your commitment. Nothing changes unless you want it to.' },
+                  { step:'3', icon:'🔀', color:'#D97706', bg:'#FFFBEB', bd:'#FDE68A', title:'SIP directed to nearest goal', body:"At any point, your SIP flows first to the goal that matures soonest. Whatever is surplus after meeting that goal's required share automatically flows to longer-horizon goals." },
+                  { step:'4', icon:'⚖️', color:'#7C3AED', bg:'#F5F3FF', bd:'#DDD6FE', title:'Blended risk for the portfolio', body:'Your risk scores are weighted by priority: essential goals count 1.5×, important goals 1.0×, aspirational 0.6×. The blended risk + shortest active horizon determines the exposure block mix for each phase.' },
+                  { step:'5', icon:'🔬', color:'#0891B2', bg:'#ECFEFF', bd:'#A5F3FC', title:'Horizon-aware fund engine', body:'Each phase uses the same 4-layer engine as our single-goal page. Critically, tactical and momentum exposure is only introduced when the effective horizon supports it (5yr+). Short-horizon phases stay quality-focused.' },
+                  { step:'6', icon:'🔁', color:'#DC2626', bg:'#FEF2F2', bd:'#FECACA', title:'Rebalance when a goal is met', body:'When a goal matures, it exits the portfolio. The SIP (now stepped up further) is redistributed proportionally across remaining goals. The allocation often becomes more growth-oriented as safety obligations are cleared.' },
                 ].map((item,i)=>(
-                  <div key={i} style={{ background:item.bg,border:`1px solid ${item.bd}`,borderRadius:'12px',padding:'14px 16px' }}>
-                    <div style={{ display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px' }}>
-                      <span style={{ width:'22px',height:'22px',background:'white',border:`1px solid ${item.bd}`,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:800,color:item.color,flexShrink:0 }}>{item.step}</span>
+                  <div key={i} style={{ background:item.bg, border:`1px solid ${item.bd}`, borderRadius:'12px', padding:'14px 16px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' }}>
+                      <span style={{ width:'22px', height:'22px', background:'white', border:`1px solid ${item.bd}`, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:800, color:item.color, flexShrink:0 }}>{item.step}</span>
                       <span style={{ fontSize:'14px' }}>{item.icon}</span>
-                      <span style={{ fontSize:'12px',fontWeight:800,color:item.color }}>{item.title}</span>
+                      <span style={{ fontSize:'12px', fontWeight:800, color:item.color }}>{item.title}</span>
                     </div>
-                    <p style={{ fontSize:'12px',color:'#475569',lineHeight:1.65,margin:0 }}>{item.body}</p>
+                    <p style={{ fontSize:'12px', color:'#475569', lineHeight:1.65, margin:0 }}>{item.body}</p>
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop:'14px',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:'12px',padding:'12px 16px',fontSize:'12px',color:'#92400E',lineHeight:1.6 }}>
+              <div style={{ marginTop:'14px', background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:'12px', padding:'12px 16px', fontSize:'12px', color:'#92400E', lineHeight:1.6 }}>
                 <strong>Disclaimer:</strong> All projections are based on historical performance and are not a guarantee of future returns. Please consult a SEBI-registered investment advisor before making investment decisions.
               </div>
             </div>
 
-            {/* CTA */}
-            <div style={{ background:'linear-gradient(135deg,#EFF6FF,#F0FDF4)',border:'1px solid #BFDBFE',borderRadius:'16px',padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'16px' }}>
+            {/* CTA to quick picks */}
+            <div style={{ background:'linear-gradient(135deg,#EFF6FF,#F0FDF4)', border:'1px solid #BFDBFE', borderRadius:'16px', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'16px' }}>
               <div>
-                <div style={{ fontSize:'16px',marginBottom:'4px' }}>⚡</div>
-                <div style={{ fontSize:'14px',fontWeight:800,color:'#0F172A',marginBottom:'4px' }}>Only have one goal right now?</div>
-                <p style={{ fontSize:'12px',color:'#64748B',margin:0,maxWidth:'380px',lineHeight:1.6 }}>Use our quick fund picks tool for a single goal. Same live engine, simpler output — funds in seconds.</p>
+                <div style={{ fontSize:'16px', marginBottom:'4px' }}>⚡</div>
+                <div style={{ fontSize:'14px', fontWeight:800, color:'#0F172A', marginBottom:'4px' }}>Only have one goal right now?</div>
+                <p style={{ fontSize:'12px', color:'#64748B', margin:0, maxWidth:'380px', lineHeight:1.6 }}>Use our quick fund picks tool for a single goal. Same live engine, simpler output — funds in seconds.</p>
               </div>
-              <a href="/find-my-fund-quick-picks" style={{ background:'linear-gradient(90deg,#059669,#2563EB)',color:'white',borderRadius:'12px',padding:'12px 20px',fontSize:'13px',fontWeight:800,textDecoration:'none',whiteSpace:'nowrap',boxShadow:'0 4px 16px rgba(5,150,105,0.2)' }}>
+              <a href="/find-my-fund-quick-picks" style={{ background:'linear-gradient(90deg,#059669,#2563EB)', color:'white', borderRadius:'12px', padding:'12px 20px', fontSize:'13px', fontWeight:800, textDecoration:'none', whiteSpace:'nowrap', boxShadow:'0 4px 16px rgba(5,150,105,0.2)' }}>
                 Single goal plan →
               </a>
             </div>
