@@ -1452,6 +1452,7 @@ export default function LifetimePlanPage() {
   const [selectedPhaseIdx, setSelectedPhaseIdx] = useState(0);
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  const phaseDetailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     Promise.all([
@@ -1626,7 +1627,9 @@ export default function LifetimePlanPage() {
 
             {/* Phase detail */}
             {selectedPhase&&(
-              <PhaseDetailPanel phase={selectedPhase} resolvedFunds={selectedFunds} onFundDetail={setSelectedFundSlot} />
+              <div ref={phaseDetailRef}>
+                <PhaseDetailPanel phase={selectedPhase} resolvedFunds={selectedFunds} onFundDetail={setSelectedFundSlot} />
+              </div>
             )}
 
             {/* All phases table */}
@@ -1651,7 +1654,7 @@ export default function LifetimePlanPage() {
                     {lifetimePlan.phaseDescriptions.map((phase,i)=>{
                       const isSelected=selectedPhaseIdx===i;
                       return (
-                        <tr key={i} onClick={()=>{ setSelectedPhaseIdx(i); resultRef.current?.scrollIntoView({behavior:'smooth',block:'start'}); }}
+                        <tr key={i} onClick={()=>{ setSelectedPhaseIdx(i); setTimeout(()=>phaseDetailRef.current?.scrollIntoView({behavior:'smooth',block:'start'}),50); }}
                           style={{ borderBottom:'1px solid #F1F5F9', cursor:'pointer', background:isSelected?'#EFF6FF':'white', transition:'background 0.15s' }}
                           onMouseEnter={e=>{ if(!isSelected)(e.currentTarget as HTMLTableRowElement).style.background='#F8FAFC'; }}
                           onMouseLeave={e=>{ if(!isSelected)(e.currentTarget as HTMLTableRowElement).style.background='white'; }}>
