@@ -21,10 +21,11 @@
 		"paths": {
 			"@/*": ["./src/*"]
 		},
-		"types": [
-			"./cloudflare-env.d.ts",
-			"node"
-		]
+		       "types": [
+			       "./cloudflare-env.d.ts",
+			       "node",
+			       "./src/types/pdfjs-dist-legacy"
+		       ]
 	},
 	"include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
 	"exclude": ["node_modules"]

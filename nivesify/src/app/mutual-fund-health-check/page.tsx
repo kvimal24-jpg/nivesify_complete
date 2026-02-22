@@ -175,8 +175,8 @@ export default function MutualFundHealthCheckPage() {
       const filteredText = getFilteredText(text);
       logDebug("Parsing CAS and fetching scheme list from AMFI NAVAll.txt");
       const json = await getJsonFromTxt(filteredText, text);
-      logDebug(`Parsed transactions: ${json.transactions.length}`);
-      logDebug(`CAS summary invested: ${json.summary.invested}`);
+      logDebug(`Parsed transactions: ${json.transactions?.length ?? 0}`);
+      logDebug(`CAS summary invested: ${json.summary?.invested ?? 0}`);
 
       const payload = json;
       logDebug(`Payload size: ${JSON.stringify(payload).length} chars`);

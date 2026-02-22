@@ -38,6 +38,7 @@
 		"@eslint/eslintrc": "^3",
 		"@tailwindcss/postcss": "^4",
 		"@types/node": "^20.19.33",
+		"@types/pdfjs-dist": "^2.10.377",
 		"@types/react": "^19.2.14",
 		"@types/react-dom": "^19.1.5",
 		"drizzle-kit": "^0.31.8",
