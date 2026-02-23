@@ -505,4 +505,4 @@ Folder: mf-data-bucket/data/latest/
 
 ---
 
-Build this grid following these steps exactly. Use real R2 data. Make every decision auditable. This is people's money - get it right.
+Build this grid following these steps exactly. Use real R2 data. Make every decision auditable. This is people's money - get it right....
