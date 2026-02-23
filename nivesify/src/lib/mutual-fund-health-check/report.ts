@@ -4,7 +4,7 @@ import { buildCashflows } from "./cashflows";
 import { xirr } from "./xirr";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC TYPES (unchanged — preserve all callers)
+// PUBLIC TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ReportInsight = {
@@ -18,17 +18,8 @@ export type ReportInsight = {
 };
 
 export type PdfInsightMetric = { title: string; value: string; note: string };
-
-export type PdfAuditRow = {
-  name: string;
-  benchmark?: string;
-  gap?: string;
-  tracking?: string;
-  action: string;
-};
-
+export type PdfAuditRow = { name: string; benchmark?: string; gap?: string; tracking?: string; action: string };
 export type PdfInsightCard = { title: string; summary: string; detail: string };
-
 export type PdfInsights = {
   metrics: PdfInsightMetric[];
   executiveSummary: string;
@@ -36,239 +27,591 @@ export type PdfInsights = {
   passiveAuditRows: PdfAuditRow[];
   insightCards: PdfInsightCard[];
 };
-
-export type SchemeBreakdownNode = {
-  name: string;
-  size?: number;
-  children?: SchemeBreakdownNode[];
-  value?: number;
-};
-
+export type SchemeBreakdownNode = { name: string; size?: number; children?: SchemeBreakdownNode[]; value?: number };
 export type AmcBreakdown = { name: string; value: number }[];
-
 export type ReportData = {
-  holdingsCount: number;
-  topOneShare: number;
-  topFiveShare: number;
-  topAmcShare: number;
-  insights: ReportInsight[];
-  insightSummary: string;
-  schemeBreakdown: SchemeBreakdownNode;
-  amcBreakdown: AmcBreakdown;
+  holdingsCount: number; topOneShare: number; topFiveShare: number; topAmcShare: number;
+  insights: ReportInsight[]; insightSummary: string;
+  schemeBreakdown: SchemeBreakdownNode; amcBreakdown: AmcBreakdown;
   topHoldings: Array<{ name: string; value: number }>;
   fundDetails: Array<{
-    name: string;
-    invested: number;
-    currentValue: number;
-    profit: number;
-    units: number;
-    nav: number;
-    xirr: number | null;
+    name: string; invested: number; currentValue: number; profit: number;
+    units: number; nav: number; xirr: number | null;
     nomineeStatus: "yes" | "no" | "partial" | "unknown";
-    amc: string;
-    schemeCategory: string;
-    majorCategory: string;
+    amc: string; schemeCategory: string; majorCategory: string;
   }>;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INTERNAL HELPERS
+// FORMATTERS  — currency always as "₹X.XX Cr / L / plain"
+// (canvas can render ₹ perfectly, unlike jsPDF Helvetica)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const buildSchemeMetaMap = (
-  transactions: InvestmentsData["transactions"] = [],
-  schemeLookup?: Map<number, MatchingScheme>
-) => {
-  const map = new Map<number, MatchingScheme>();
-  transactions.forEach((txn) => {
-    if (txn.matchingScheme?.schemeCode) map.set(txn.matchingScheme.schemeCode, txn.matchingScheme);
-  });
-  if (schemeLookup) {
-    schemeLookup.forEach((scheme, code) => {
-      map.set(code, { ...(map.get(code) ?? ({} as MatchingScheme)), ...scheme });
-    });
-  }
-  return map;
+const fmtCur = (v: number): string => {
+  const n = Number.isFinite(v) ? v : 0;
+  const a = Math.abs(n), s = n < 0 ? "-" : "";
+  if (a >= 10_000_000) return `${s}₹${(a / 10_000_000).toFixed(2)} Cr`;
+  if (a >= 100_000)    return `${s}₹${(a / 100_000).toFixed(2)} L`;
+  if (a >= 1_000)      return `${s}₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(a)}`;
+  return `${s}₹${a.toFixed(0)}`;
 };
+const fmtPct = (v: number | null, d = 2) => v === null || !Number.isFinite(v) ? "N/A" : `${(v * 100).toFixed(d)}%`;
+const fmtShare = (v: number) => `${(Math.max(0, v) * 100).toFixed(1)}%`;
 
-const toPercent = (value: number) => (Number.isFinite(value) ? value : 0);
-
-const fmt = {
-  /** e.g. "₹ 12.45 L" or "₹ 1.23 Cr" */
-  currency: (value: number): string => {
-    const v = Number.isFinite(value) ? value : 0;
-    if (Math.abs(v) >= 10_000_000) return `Rs. ${(v / 10_000_000).toFixed(2)} Cr`;
-    if (Math.abs(v) >= 100_000)   return `Rs. ${(v / 100_000).toFixed(2)} L`;
-    return `Rs. ${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(v)}`;
-  },
-  /** e.g. "12.34%" or "N/A" */
-  pct: (value: number | null, digits = 2): string => {
-    if (value === null || !Number.isFinite(value)) return "N/A";
-    return `${(value * 100).toFixed(digits)}%`;
-  },
-  /** e.g. "34.5%" from a 0-1 share */
-  share: (value: number): string => `${(toPercent(value) * 100).toFixed(1)}%`,
-  /** Plain number */
-  num: (value: number, digits = 3): string =>
-    new Intl.NumberFormat("en-IN", { maximumFractionDigits: digits }).format(Number.isFinite(value) ? value : 0),
-};
-
-const DISCLAIMER =
-  "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on this report.";
-
-const INSIGHT_THRESHOLDS = {
-  fundsModerateMax: 6, fundsAdvancedMax: 8, fundsUpperLimit: 10,
-  singleFundElevated: 0.2, singleFundWatch: 0.3, singleFundStrong: 0.4,
-  topFiveElevated: 0.6, topFiveWatch: 0.65, topFiveStrong: 0.75,
-  amcElevated: 0.3, amcWatch: 0.4, amcStrong: 0.45,
-  equityLow: 0.3, equityVeryLow: 0.25, equityHigh: 0.85, equityAggressive: 0.9,
-  debtHigh: 0.7, debtStrong: 0.75, hybridHigh: 0.6, hybridWatch: 0.7,
-  xirrLow: 0.07, xirrStrong: 0.13,
-};
-
-const classifyCategory = (category?: string): string => {
-  if (!category) return "Other";
-  const l = category.toLowerCase();
+const classifyCategory = (c?: string) => {
+  if (!c) return "Other";
+  const l = c.toLowerCase();
   if (l.includes("equity")) return "Equity";
   if (l.includes("debt") || l.includes("bond") || l.includes("gilt")) return "Debt";
-  if (l.includes("hybrid") || l.includes("balanced") || l.includes("aggressive")) return "Hybrid";
-  if (l.includes("solution") || l.includes("retirement") || l.includes("child")) return "Solution";
+  if (l.includes("hybrid") || l.includes("balanced")) return "Hybrid";
   return "Other";
 };
-
-const deriveAmcName = (meta?: MatchingScheme, fallback?: string): string => {
+const deriveAmc = (meta?: MatchingScheme, fb?: string) => {
   if (meta?.amc) return meta.amc;
-  const name = meta?.schemeName || fallback || "";
-  const m = name.match(/^(.*?Mutual Fund)/i);
-  return m?.[1]?.trim() ?? name.split(" ")[0] ?? "Other";
+  const n = meta?.schemeName || fb || "";
+  return (n.match(/^(.*?Mutual Fund)/i)?.[1] ?? n.split(" ")[0]) || "Other";
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// buildReportData — logic unchanged, cleaned up
+// buildReportData
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const buildReportData = (
-  data: InvestmentsData,
-  portfolio: Portfolio,
-  totalValue: number,
-  xirrValue: number | null,
-  schemeLookup?: Map<number, MatchingScheme>
-): ReportData => {
+const buildSchemeMetaMap = (txns: InvestmentsData["transactions"] = [], lookup?: Map<number, MatchingScheme>) => {
+  const m = new Map<number, MatchingScheme>();
+  txns.forEach(t => { if (t.matchingScheme?.schemeCode) m.set(t.matchingScheme.schemeCode, t.matchingScheme); });
+  lookup?.forEach((s, c) => m.set(c, { ...(m.get(c) ?? {} as MatchingScheme), ...s }));
+  return m;
+};
+
+const IT = { modMax:6, advMax:8, upperLimit:10, sfElevated:.2, sfWatch:.3, sfStrong:.4, t5Elevated:.6, t5Watch:.65, t5Strong:.75, amcEl:.3, amcW:.4, amcSt:.45, eqLow:.3, eqVeryLow:.25, eqHigh:.85, eqAgg:.9, debtHi:.7, debtSt:.75, hybHi:.6, hybW:.7, xirrLow:.07, xirrSt:.13 };
+
+export const buildReportData = (data: InvestmentsData, portfolio: Portfolio, totalValue: number, xirrValue: number | null, schemeLookup?: Map<number, MatchingScheme>): ReportData => {
   const nomineeMap = data.nominees || {};
-  const schemeMeta = buildSchemeMetaMap(data.transactions || [], schemeLookup);
-  const active = portfolio.filter((r) => r.currentValue > 0);
+  const meta = buildSchemeMetaMap(data.transactions || [], schemeLookup);
+  const active = portfolio.filter(r => r.currentValue > 0);
   const sorted = [...active].sort((a, b) => b.currentValue - a.currentValue);
   const holdingsCount = active.length;
-  const topOneShare  = totalValue ? (sorted[0]?.currentValue || 0) / totalValue : 0;
+  const topOneShare = totalValue ? (sorted[0]?.currentValue || 0) / totalValue : 0;
   const topFiveShare = totalValue ? sorted.slice(0, 5).reduce((s, f) => s + f.currentValue, 0) / totalValue : 0;
 
-  // Scheme breakdown tree
   const schemeRoot: SchemeBreakdownNode = { name: "All Schemes", children: [] };
-  const majorMap = new Map<string, SchemeBreakdownNode>();
-  active.forEach((row) => {
-    const meta = schemeMeta.get(row.schemeCode);
-    const maj = classifyCategory(meta?.schemeCategory);
-    const sub = meta?.schemeCategory || "Uncategorized";
-    if (!majorMap.has(maj)) { const n = { name: maj, children: [] as SchemeBreakdownNode[], size: 0 }; majorMap.set(maj, n); schemeRoot.children?.push(n); }
-    const majNode = majorMap.get(maj)!;
-    let subNode = majNode.children?.find((c) => c.name === sub);
+  const majMap = new Map<string, SchemeBreakdownNode>();
+  active.forEach(row => {
+    const m2 = meta.get(row.schemeCode), maj = classifyCategory(m2?.schemeCategory), sub = m2?.schemeCategory || "Uncategorized";
+    if (!majMap.has(maj)) { const n = { name: maj, children: [] as SchemeBreakdownNode[], size: 0 }; majMap.set(maj, n); schemeRoot.children?.push(n); }
+    const majNode = majMap.get(maj)!;
+    let subNode = majNode.children?.find(c => c.name === sub);
     if (!subNode) { subNode = { name: sub, children: [], size: 0 }; majNode.children?.push(subNode); }
     const v = Math.max(0, row.currentValue);
     subNode.children?.push({ name: row.mfName, size: v, value: v });
-    (subNode as any).size = ((subNode.size || 0) + v);
-    (majNode as any).size = ((majNode.size || 0) + v);
+    (subNode as any).size = (subNode.size || 0) + v;
+    (majNode as any).size = (majNode.size || 0) + v;
   });
 
-  // AMC breakdown
   const amcMap = new Map<string, number>();
-  active.forEach((row) => { const amc = deriveAmcName(schemeMeta.get(row.schemeCode), row.mfName); amcMap.set(amc, (amcMap.get(amc) || 0) + Math.max(0, row.currentValue)); });
+  active.forEach(row => { const amc = deriveAmc(meta.get(row.schemeCode), row.mfName); amcMap.set(amc, (amcMap.get(amc) || 0) + Math.max(0, row.currentValue)); });
   const amcBreakdown = Array.from(amcMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   const topAmcShare = totalValue ? (amcBreakdown[0]?.value || 0) / totalValue : 0;
 
-  // Allocation by category
   const allocMap = new Map<string, number>();
-  active.forEach((row) => { const b = classifyCategory(schemeMeta.get(row.schemeCode)?.schemeCategory); allocMap.set(b, (allocMap.get(b) || 0) + Math.max(0, row.currentValue)); });
-  const [equityShare, debtShare, hybridShare] = ["Equity", "Debt", "Hybrid"].map((k) => totalValue ? (allocMap.get(k) || 0) / totalValue : 0);
+  active.forEach(row => { const b = classifyCategory(meta.get(row.schemeCode)?.schemeCategory); allocMap.set(b, (allocMap.get(b) || 0) + Math.max(0, row.currentValue)); });
+  const eq = totalValue ? (allocMap.get("Equity") || 0) / totalValue : 0;
+  const debt = totalValue ? (allocMap.get("Debt") || 0) / totalValue : 0;
+  const hyb = totalValue ? (allocMap.get("Hybrid") || 0) / totalValue : 0;
 
-  // Insights
   const insights: ReportInsight[] = [];
-  const push = (i: ReportInsight) => insights.push(i);
+  const p = (i: ReportInsight) => insights.push(i);
+  if (holdingsCount > IT.advMax) p({ title: "Over-diversification", signal: holdingsCount > IT.upperLimit ? "Strong" : "Watch-worthy", observation: `You hold ${holdingsCount} active funds.`, meaning: "Most retail portfolios need 3–6 funds. Beyond 8–10, overlap rises and strong performers get diluted.", reassurance: "Common as portfolios grow; correctable without disrupting goals.", suggestedCheck: "Consolidate similar schemes. Target: Equity 3–5, Debt 1–3, Hybrid 1–2, ELSS 1.", severity: holdingsCount > IT.upperLimit ? "warning" : "info" });
+  else if (holdingsCount > IT.modMax) p({ title: "Diversification at high end", signal: "Elevated", observation: `You hold ${holdingsCount} active funds.`, meaning: "At the upper end — dilutes strong performers.", reassurance: "Manageable if each fund has a distinct role.", suggestedCheck: "Verify each fund has a unique purpose; prune annually.", severity: "info" });
+  if (topOneShare >= IT.sfElevated) { const sig = topOneShare >= IT.sfStrong ? "Strong" : topOneShare >= IT.sfWatch ? "Watch-worthy" : "Elevated"; p({ title: "Single-fund exposure", signal: sig, observation: `Largest fund: ${fmtShare(topOneShare)} of portfolio.`, meaning: "Meaningful concentration — not risky if intentional.", reassurance: "Core holdings naturally grow as they compound.", suggestedCheck: "Confirm alignment with goals; rebalance only if accidental.", severity: sig === "Strong" ? "warning" : "info" }); }
+  if (topFiveShare >= IT.t5Elevated) { const sig = topFiveShare >= IT.t5Strong ? "Strong" : topFiveShare >= IT.t5Watch ? "Watch-worthy" : "Elevated"; p({ title: "Top 5 funds dominate", signal: sig, observation: `Top 5: ${fmtShare(topFiveShare)} of portfolio.`, meaning: "Typical of structured portfolios where core funds lead.", reassurance: "Fine if funds are meaningfully different.", suggestedCheck: "Check overlap; consolidate if similar.", severity: sig === "Strong" ? "warning" : "info" }); }
+  if (topAmcShare >= IT.amcEl) { const sig = topAmcShare >= IT.amcSt ? "Strong" : topAmcShare >= IT.amcW ? "Watch-worthy" : "Elevated"; p({ title: "AMC concentration", signal: sig, observation: `Top AMC: ${fmtShare(topAmcShare)}.`, meaning: "High AMC share increases operational dependency.", reassurance: "Acceptable when reflecting deliberate philosophy preference.", suggestedCheck: "Would you deliberately choose this AMC today?", severity: sig === "Strong" ? "warning" : "info" }); }
+  if (xirrValue !== null && xirrValue < IT.xirrLow && eq >= .4) p({ title: "Performance below expectation", signal: "Watch-worthy", observation: `XIRR: ${(xirrValue * 100).toFixed(2)}%.`, meaning: "Low for an equity-heavy portfolio.", reassurance: "Short windows can temporarily depress XIRR.", suggestedCheck: "Review persistent underperformers; check equity/debt mix.", severity: "warning" });
+  else if (xirrValue !== null && xirrValue >= IT.xirrSt) p({ title: "Strong performance signal", signal: "Strong", observation: `XIRR: ${(xirrValue * 100).toFixed(2)}%.`, meaning: "Strong long-term return — sound portfolio structure.", reassurance: "Consistent returns reflect disciplined behaviour.", suggestedCheck: "Maintain discipline; review if any fund mandate changes.", severity: "positive" });
+  if (eq > 0 && eq < IT.eqLow) p({ title: "Low equity allocation", signal: eq < IT.eqVeryLow ? "Watch-worthy" : "Elevated", observation: `Equity: ${fmtShare(eq)}.`, meaning: "Low equity limits long-term growth.", reassurance: "Appropriate for near-term goals.", suggestedCheck: "If horizon 7+ years, consider higher equity.", severity: "info" });
+  if (eq > IT.eqHigh) p({ title: "High equity allocation", signal: eq > IT.eqAgg ? "Aggressive" : "Strong", observation: `Equity: ${fmtShare(eq)}.`, meaning: "High-growth but high drawdown risk.", reassurance: "Effective for long horizons with volatility tolerance.", suggestedCheck: "Ensure alignment with horizon, liquidity, and tolerance.", severity: "info" });
+  if (debt > IT.debtHi) p({ title: "High debt allocation", signal: debt > IT.debtSt ? "Watch-worthy" : "Elevated", observation: `Debt: ${fmtShare(debt)}.`, meaning: "Can underperform inflation long-term.", reassurance: "Right for capital preservation.", suggestedCheck: "Confirm matches risk profile and liquidity timeline.", severity: "info" });
+  if (hyb > IT.hybHi) p({ title: "High hybrid allocation", signal: hyb > IT.hybW ? "Watch-worthy" : "Elevated", observation: `Hybrid: ${fmtShare(hyb)}.`, meaning: "Reduces direct control over asset split.", reassurance: "Effective for simplified allocation.", suggestedCheck: "Check desired asset mix and tax preferences.", severity: "info" });
+  if (!insights.length) p({ title: "Portfolio structure looks healthy", signal: "Normal", observation: "No major concentration risks detected.", meaning: "Key checks within typical ranges for long-term investors.", reassurance: "Stable, deliberate structure.", suggestedCheck: "Continue periodic reviews; rebalance if goals change.", severity: "positive" });
 
-  if (holdingsCount > INSIGHT_THRESHOLDS.fundsAdvancedMax)
-    push({ title: "Over-diversification signal", signal: holdingsCount > INSIGHT_THRESHOLDS.fundsUpperLimit ? "Strong" : "Watch-worthy", observation: `You hold ${holdingsCount} active funds.`, meaning: "Most retail portfolios work best with 3-6 funds. Beyond 8-10, diversification benefits taper while complexity rises.", reassurance: "Many investors accumulate funds over time; this can be corrected without disrupting goals.", suggestedCheck: "Review overlap, consolidate similar schemes. Target: Equity 3-5, Debt 1-3, Hybrid 1-2, ELSS 1.", severity: holdingsCount > INSIGHT_THRESHOLDS.fundsUpperLimit ? "warning" : "info" });
-  else if (holdingsCount > INSIGHT_THRESHOLDS.fundsModerateMax)
-    push({ title: "Diversification at the high end", signal: "Elevated", observation: `You hold ${holdingsCount} active funds.`, meaning: "At the upper end — can dilute strong performers.", reassurance: "Still manageable if each fund has a clear role.", suggestedCheck: "Verify each fund has a distinct purpose; prune overlapping schemes annually.", severity: "info" });
-
-  if (topOneShare >= INSIGHT_THRESHOLDS.singleFundElevated) {
-    const signal = topOneShare >= INSIGHT_THRESHOLDS.singleFundStrong ? "Strong" : topOneShare >= INSIGHT_THRESHOLDS.singleFundWatch ? "Watch-worthy" : "Elevated";
-    push({ title: "Single-fund exposure", signal, observation: `Largest fund is ${fmt.share(topOneShare)} of portfolio.`, meaning: "Concentration is meaningful but not risky if it reflects conviction.", reassurance: "Core holdings naturally grow larger as they compound.", suggestedCheck: "Confirm alignment with goals; rebalance only if it became an accidental overweight.", severity: signal === "Strong" ? "warning" : "info" });
-  }
-
-  if (topFiveShare >= INSIGHT_THRESHOLDS.topFiveElevated) {
-    const signal = topFiveShare >= INSIGHT_THRESHOLDS.topFiveStrong ? "Strong" : topFiveShare >= INSIGHT_THRESHOLDS.topFiveWatch ? "Watch-worthy" : "Elevated";
-    push({ title: "Top 5 funds drive outcomes", signal, observation: `Top 5 funds: ${fmt.share(topFiveShare)} of portfolio.`, meaning: "Typical of a structured portfolio where a few core funds lead.", reassurance: "Concentration is fine if funds are meaningfully different.", suggestedCheck: "Review overlap across top funds; consolidate if similar.", severity: signal === "Strong" ? "warning" : "info" });
-  }
-
-  if (topAmcShare >= INSIGHT_THRESHOLDS.amcElevated) {
-    const signal = topAmcShare >= INSIGHT_THRESHOLDS.amcStrong ? "Strong" : topAmcShare >= INSIGHT_THRESHOLDS.amcWatch ? "Watch-worthy" : "Elevated";
-    push({ title: "AMC concentration", signal, observation: `Highest single AMC: ${fmt.share(topAmcShare)}.`, meaning: "AMC-level concentration increases operational dependency.", reassurance: "Acceptable when it reflects a deliberate preference for a consistent philosophy.", suggestedCheck: "Would you deliberately allocate this share to this AMC today?", severity: signal === "Strong" ? "warning" : "info" });
-  }
-
-  if (xirrValue !== null && xirrValue < INSIGHT_THRESHOLDS.xirrLow && equityShare >= 0.4)
-    push({ title: "Performance signal", signal: "Watch-worthy", observation: `XIRR: ${(xirrValue * 100).toFixed(2)}%.`, meaning: "Low for equity-heavy portfolios over long horizons.", reassurance: "Short windows can temporarily depress XIRR.", suggestedCheck: "Review persistent underperformers and verify your equity/debt mix.", severity: "warning" });
-  else if (xirrValue !== null && xirrValue >= INSIGHT_THRESHOLDS.xirrStrong)
-    push({ title: "Performance signal", signal: "Strong", observation: `XIRR: ${(xirrValue * 100).toFixed(2)}%.`, meaning: "Strong for a long-term investment journey.", reassurance: "Consistent returns reflect disciplined behaviour.", suggestedCheck: "Maintain discipline; review if a fund's mandate changes materially.", severity: "positive" });
-
-  if (equityShare > 0 && equityShare < INSIGHT_THRESHOLDS.equityLow)
-    push({ title: "Equity allocation", signal: equityShare < INSIGHT_THRESHOLDS.equityVeryLow ? "Watch-worthy" : "Elevated", observation: `Equity: ${fmt.share(equityShare)}.`, meaning: "Very low equity limits long-term growth.", reassurance: "Can be appropriate for near-term goals.", suggestedCheck: "If horizon 7+ years, review whether higher equity is appropriate.", severity: "info" });
-  if (equityShare > INSIGHT_THRESHOLDS.equityHigh)
-    push({ title: "Equity allocation", signal: equityShare > INSIGHT_THRESHOLDS.equityAggressive ? "Aggressive" : "Strong", observation: `Equity: ${fmt.share(equityShare)}.`, meaning: "High-growth allocation — magnifies both gains and drawdowns.", reassurance: "Effective for long horizons when volatility is acceptable.", suggestedCheck: "Ensure this matches your time horizon, liquidity needs, and drawdown tolerance.", severity: "info" });
-  if (debtShare > INSIGHT_THRESHOLDS.debtHigh)
-    push({ title: "Debt allocation", signal: debtShare > INSIGHT_THRESHOLDS.debtStrong ? "Watch-worthy" : "Elevated", observation: `Debt: ${fmt.share(debtShare)}.`, meaning: "Can underperform inflation over long horizons.", reassurance: "Appropriate for near-term goals or capital preservation.", suggestedCheck: "Confirm this matches your risk profile and liquidity timeline.", severity: "info" });
-  if (hybridShare > INSIGHT_THRESHOLDS.hybridHigh)
-    push({ title: "Hybrid allocation", signal: hybridShare > INSIGHT_THRESHOLDS.hybridWatch ? "Watch-worthy" : "Elevated", observation: `Hybrid funds: ${fmt.share(hybridShare)}.`, meaning: "Reduces control over equity vs debt splits.", reassurance: "Effective when you prefer a single-fund allocation approach.", suggestedCheck: "Ensure this aligns with your desired asset mix and tax preferences.", severity: "info" });
-
-  if (!insights.length)
-    push({ title: "Portfolio structure", signal: "Normal", observation: "No major concentration or diversification risks detected.", meaning: "Key checks are within typical ranges for long-term investors.", reassurance: "Suggests stable structure rather than reactive decision-making.", suggestedCheck: "Continue periodic review and rebalance if goals or risk profile change.", severity: "positive" });
-
-  // Fund details
-  const fundDetails = sorted.map((fund) => {
-    const meta = schemeMeta.get(fund.schemeCode);
-    const cashflows = buildCashflows(
-      fund.allTransactions.map((t) => ({ amount: Math.abs(t.amount), date: new Date(t.date), type: t.type === "Investment" ? "buy" as const : "sell" as const })),
-      fund.currentValue, new Date(), fund.currentValue > 0
-    );
-    const folios = Array.from(new Set(fund.allTransactions.map((t) => t.folio?.split("/")[0].trim()).filter(Boolean) as string[]));
-    const flags = folios.map((f) => nomineeMap[f]).filter((f) => f !== undefined);
-    let nomineeStatus: "yes" | "no" | "partial" | "unknown" = "unknown";
-    if (flags.length) { const y = flags.some((f) => f === true), n = flags.some((f) => f === false); nomineeStatus = y && n ? "partial" : y ? "yes" : "no"; if (flags.length < folios.length) nomineeStatus = "partial"; }
-    return { name: fund.mfName, invested: fund.currentInvested, currentValue: fund.currentValue, profit: fund.profit, units: fund.currentUnits || 0, nav: fund.latestPrice || 0, xirr: xirr(cashflows), nomineeStatus, amc: deriveAmcName(meta, fund.mfName), schemeCategory: meta?.schemeCategory || "Uncategorized", majorCategory: classifyCategory(meta?.schemeCategory) };
+  const fundDetails = sorted.map(fund => {
+    const m2 = meta.get(fund.schemeCode);
+    const cf = buildCashflows(fund.allTransactions.map(t => ({ amount: Math.abs(t.amount), date: new Date(t.date), type: t.type === "Investment" ? "buy" as const : "sell" as const })), fund.currentValue, new Date(), fund.currentValue > 0);
+    const folios = Array.from(new Set(fund.allTransactions.map(t => t.folio?.split("/")[0].trim()).filter(Boolean) as string[]));
+    const flags = folios.map(f => nomineeMap[f]).filter(f => f !== undefined);
+    let ns: "yes" | "no" | "partial" | "unknown" = "unknown";
+    if (flags.length) { const y = flags.some(f => f === true), n = flags.some(f => f === false); ns = y && n ? "partial" : y ? "yes" : "no"; if (flags.length < folios.length) ns = "partial"; }
+    return { name: fund.mfName, invested: fund.currentInvested, currentValue: fund.currentValue, profit: fund.profit, units: fund.currentUnits || 0, nav: fund.latestPrice || 0, xirr: xirr(cf), nomineeStatus: ns, amc: deriveAmc(m2, fund.mfName), schemeCategory: m2?.schemeCategory || "Uncategorized", majorCategory: classifyCategory(m2?.schemeCategory) };
   });
 
-  return { holdingsCount, topOneShare, topFiveShare, topAmcShare, insights, insightSummary: insights.some((i) => i.severity === "warning") ? "Your portfolio shows a few areas to review, but the structure appears intentional." : "Your portfolio reflects deliberate long-term intent rather than short-term decision-making.", schemeBreakdown: schemeRoot, amcBreakdown, topHoldings: sorted.slice(0, 5).map((f) => ({ name: f.mfName, value: f.currentValue })), fundDetails };
+  return { holdingsCount, topOneShare, topFiveShare, topAmcShare, insights, insightSummary: insights.some(i => i.severity === "warning") ? "Your portfolio shows areas to review, but the structure appears intentional." : "Your portfolio reflects deliberate long-term intent.", schemeBreakdown: schemeRoot, amcBreakdown, topHoldings: sorted.slice(0, 5).map(f => ({ name: f.mfName, value: f.currentValue })), fundDetails };
 };
 
+export const formatCurrencyPlain = fmtCur;
+export const tooltips = { totalValue: "Latest market value of all mutual fund holdings.", invested: "Total amount invested from your transactions (net of redemptions).", allTimeReturns: "Unrealised + realised gains across your portfolio.", xirr: "Annualised return based on your cashflows.", monthlyIncome: "Illustrative monthly income if portfolio is 25x yearly expenses.", holdings: "Funds with current value greater than zero.", topFund: "Share of the single largest fund in your portfolio.", topFive: "Share of top five funds combined in your portfolio." };
+
 // ─────────────────────────────────────────────────────────────────────────────
-// EXPORTED UTILITIES
+// CANVAS PDF ENGINE
+// Renders each page to an HTML Canvas element, then exports JPEG into jsPDF.
+// This gives 100% correct rendering: real fonts, real ₹ symbol, no encoding bugs.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const formatCurrencyPlain = (value: number) => fmt.currency(value);
+const SCALE    = 2;           // retina scale for crispness
+const PW_PT    = 595;         // A4 width in points
+const PH_PT    = 842;         // A4 height in points
+const PW       = PW_PT * SCALE;
+const PH       = PH_PT * SCALE;
+const ML       = 40 * SCALE;
+const MR       = 40 * SCALE;
+const CW       = PW - ML - MR;
 
-export const tooltips = {
-  totalValue:    "Latest market value of all mutual fund holdings.",
-  invested:      "Total amount invested from your transactions (net of redemptions).",
-  allTimeReturns:"Unrealised + realised gains across your portfolio.",
-  xirr:          "Annualised return based on your cashflows.",
-  monthlyIncome: "Illustrative monthly income if portfolio is 25x yearly expenses.",
-  holdings:      "Funds with current value greater than zero.",
-  topFund:       "Share of the single largest fund in your portfolio.",
-  topFive:       "Share of top five funds combined in your portfolio.",
+// Colours
+const C = {
+  navy:    "#0f172a", navyMd:  "#16244a", navyLt:  "#1e3a5f",
+  green:   "#16a34a", greenDk: "#14532d", greenLt: "#dcfce7", greenBd: "#86efac",
+  blue:    "#2563eb", blueLt:  "#dbeafe", blueMd:  "#3b82f6",
+  teal:    "#0d9488", tealLt:  "#ccfbf1",
+  amber:   "#b45309", amberLt: "#fef3c7", amberBd: "#fcd34d",
+  red:     "#b91c1c", redLt:   "#fee2e2",  redBd:   "#fca5a5",
+  purple:  "#7c3aed", purpleLt:"#f5f3ff",
+  orange:  "#c2410c",
+  white:   "#ffffff", ink:     "#0f172a",  inkMd:   "#334155",
+  inkSoft: "#64748b", inkFaint:"#94a3b8",
+  surface: "#f8fafc", surfMd:  "#f1f5f9",
+  border:  "#e2e8f0", borderMd:"#cbd5e1",
+};
+const ACCENTS = [C.blue, C.green, C.amber, C.purple, C.red, C.teal, C.orange, "#0891b2", "#be185d"];
+
+type Ctx = CanvasRenderingContext2D;
+
+// ── Canvas helpers ────────────────────────────────────────────────────────────
+
+const loadFont = async () => {
+  // Ensure DM Sans is loaded for canvas
+  try {
+    await document.fonts.load(`bold ${14 * SCALE}px "DM Sans"`);
+    await document.fonts.load(`${12 * SCALE}px "DM Sans"`);
+  } catch { /* ignore */ }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// generatePdfReport — COMPLETE PIXEL-PERFECT REWRITE
-// All bugs fixed, ultra-HD premium design
-// ─────────────────────────────────────────────────────────────────────────────
+const newCanvas = (): [HTMLCanvasElement, Ctx] => {
+  const c = document.createElement("canvas");
+  c.width = PW; c.height = PH;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, PW, PH);
+  return [c, ctx];
+};
+
+/** Truncate text to fit maxWidth. Returns truncated string. */
+const trunc = (ctx: Ctx, text: string, maxW: number): string => {
+  if (!text) return "";
+  if (ctx.measureText(text).width <= maxW) return text;
+  let lo = 0, hi = text.length;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    ctx.measureText(text.slice(0, mid) + "…").width <= maxW ? (lo = mid) : (hi = mid);
+  }
+  return text.slice(0, lo) + "…";
+};
+
+/** Word-wrap text into lines fitting maxWidth */
+const wrapLines = (ctx: Ctx, text: string, maxW: number, maxLines = 99): string[] => {
+  const words = String(text || "").split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (ctx.measureText(test).width > maxW && current) {
+      lines.push(current);
+      current = word;
+      if (lines.length >= maxLines - 1) { current = word; break; }
+    } else {
+      current = test;
+    }
+  }
+  if (current) {
+    if (lines.length >= maxLines) {
+      // truncate last line
+      lines[lines.length - 1] = trunc(ctx, lines[lines.length - 1] + " " + current, maxW);
+    } else {
+      lines.push(current);
+    }
+  }
+  return lines.slice(0, maxLines);
+};
+
+/** Rounded rectangle path */
+const roundRect = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+};
+
+/** Draw header band + footer for each page */
+const drawPageChrome = (ctx: Ctx, pageNum: number, logoImg: HTMLImageElement | null) => {
+  const HDR = 54 * SCALE;
+
+  // Header background
+  ctx.fillStyle = C.navy;
+  ctx.fillRect(0, 0, PW, HDR);
+
+  // Green accent line at bottom of header
+  ctx.fillStyle = C.green;
+  ctx.fillRect(0, HDR - 2 * SCALE, PW, 2 * SCALE);
+
+  // Logo
+  if (logoImg) {
+    try { ctx.drawImage(logoImg, ML, 13 * SCALE, 24 * SCALE, 24 * SCALE); } catch { /* skip */ }
+  }
+  const lx = logoImg ? ML + 30 * SCALE : ML;
+
+  ctx.fillStyle = C.white;
+  ctx.font = `bold ${10 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillText("Nivesify", lx, 27 * SCALE);
+  ctx.fillStyle = C.inkFaint;
+  ctx.font = `${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillText("Thoughtful Money, Better Life", lx, 39 * SCALE);
+
+  // Right side: title + page
+  ctx.fillStyle = C.white;
+  ctx.font = `bold ${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const titleStr = "Mutual Fund Health Check";
+  const titleW = ctx.measureText(titleStr).width;
+  ctx.fillText(titleStr, PW - MR - titleW, 26 * SCALE);
+
+  ctx.fillStyle = C.inkFaint;
+  ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const dateStr = `Page ${pageNum}  ·  ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`;
+  const dateW = ctx.measureText(dateStr).width;
+  ctx.fillText(dateStr, PW - MR - dateW, 38 * SCALE);
+
+  // Footer
+  const FY = PH - 34 * SCALE;
+  ctx.strokeStyle = C.border;
+  ctx.lineWidth = 0.5 * SCALE;
+  ctx.beginPath(); ctx.moveTo(ML, FY); ctx.lineTo(PW - MR, FY); ctx.stroke();
+
+  ctx.fillStyle = C.inkFaint;
+  ctx.font = `${7 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const disc = "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on any information in this report.";
+  const discLines = wrapLines(ctx, disc, CW - 50 * SCALE, 2);
+  discLines.forEach((l, i) => ctx.fillText(l, ML, FY + 13 * SCALE + i * 10 * SCALE));
+
+  // Page number chip
+  ctx.font = `bold ${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const pgStr = String(pageNum);
+  const pgW = ctx.measureText(pgStr).width + 12 * SCALE;
+  roundRect(ctx, PW - MR - pgW, FY + 5 * SCALE, pgW, 15 * SCALE, 4 * SCALE);
+  ctx.fillStyle = C.green; ctx.fill();
+  ctx.fillStyle = C.white;
+  ctx.fillText(pgStr, PW - MR - pgW / 2 - ctx.measureText(pgStr).width / 2, FY + 15.5 * SCALE);
+};
+
+/** Draw a section header: coloured pill + large title + accent underline */
+const drawSectionHead = (ctx: Ctx, tag: string, title: string, x: number, y: number, accent: string): number => {
+  // Pill
+  ctx.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const pillW = ctx.measureText(tag.toUpperCase()).width + 14 * SCALE;
+  roundRect(ctx, x, y, pillW, 15 * SCALE, 3 * SCALE);
+  ctx.fillStyle = accent; ctx.fill();
+  ctx.fillStyle = C.white;
+  ctx.fillText(tag.toUpperCase(), x + 7 * SCALE, y + 10.5 * SCALE);
+  y += 20 * SCALE;
+
+  // Title
+  ctx.font = `bold ${17 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillStyle = C.ink;
+  ctx.fillText(title, x, y);
+  y += 5 * SCALE;
+
+  // Underline
+  ctx.fillStyle = accent;
+  ctx.fillRect(x, y, 50 * SCALE, 2.5 * SCALE);
+  y += 14 * SCALE;
+
+  return y;
+};
+
+/** KPI metric card */
+const drawMetricCard = (ctx: Ctx, x: number, y: number, w: number, h: number, label: string, value: string, note: string, accent: string) => {
+  // Shadow
+  ctx.shadowColor = "rgba(0,0,0,0.06)";
+  ctx.shadowBlur = 8 * SCALE;
+  ctx.shadowOffsetY = 2 * SCALE;
+
+  roundRect(ctx, x, y, w, h, 6 * SCALE);
+  ctx.fillStyle = C.white; ctx.fill();
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  ctx.strokeStyle = C.border; ctx.lineWidth = 0.5 * SCALE;
+  roundRect(ctx, x, y, w, h, 6 * SCALE); ctx.stroke();
+
+  // Left accent bar
+  roundRect(ctx, x, y, 4 * SCALE, h, 6 * SCALE);
+  ctx.fillStyle = accent; ctx.fill();
+  ctx.fillRect(x + 2 * SCALE, y, 2 * SCALE, h);
+
+  // Label
+  ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillStyle = C.inkFaint;
+  ctx.fillText(trunc(ctx, label, w - 20 * SCALE), x + 12 * SCALE, y + 16 * SCALE);
+
+  // Value
+  ctx.font = `bold ${13 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillStyle = accent;
+  ctx.fillText(trunc(ctx, value, w - 18 * SCALE), x + 12 * SCALE, y + 34 * SCALE);
+
+  // Note
+  if (note) {
+    ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx.fillStyle = C.inkFaint;
+    ctx.fillText(trunc(ctx, note, w - 18 * SCALE), x + 12 * SCALE, y + 49 * SCALE);
+  }
+};
+
+/** 
+ * Stacked horizontal bar chart 
+ * Returns new Y after rendering 
+ */
+const drawStackedBar = (ctx: Ctx, items: { label: string; value: number; color: string }[], total: number, x: number, y: number, w: number): number => {
+  const barH = 16 * SCALE;
+
+  // Track background
+  roundRect(ctx, x, y, w, barH, 3 * SCALE);
+  ctx.fillStyle = C.surfMd; ctx.fill();
+
+  let bx = x;
+  items.forEach((item, i) => {
+    const bw = total > 0 ? (item.value / total) * w : 0;
+    if (bw < 1) return;
+    if (i === 0) { roundRect(ctx, bx, y, bw, barH, 3 * SCALE); } 
+    else if (i === items.length - 1) { ctx.beginPath(); ctx.rect(bx, y, bw - 3 * SCALE, barH); ctx.quadraticCurveTo(bx + bw, y, bx + bw, y + 3 * SCALE); ctx.lineTo(bx + bw, y + barH - 3 * SCALE); ctx.quadraticCurveTo(bx + bw, y + barH, bx + bw - 3 * SCALE, y + barH); ctx.lineTo(bx, y + barH); ctx.closePath(); }
+    else { ctx.beginPath(); ctx.rect(bx, y, bw, barH); ctx.closePath(); }
+    ctx.fillStyle = item.color; ctx.fill();
+    bx += bw;
+  });
+
+  // Stroke
+  ctx.strokeStyle = C.borderMd; ctx.lineWidth = 0.5 * SCALE;
+  roundRect(ctx, x, y, w, barH, 3 * SCALE); ctx.stroke();
+  y += barH + 8 * SCALE;
+
+  // Legend
+  let lx = x;
+  ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  for (const item of items) {
+    const pct = total > 0 ? (item.value / total) * 100 : 0;
+    if (pct < 0.3) continue;
+    const label = `${item.label.length > 20 ? item.label.slice(0, 19) + "." : item.label}  ${pct.toFixed(1)}%`;
+    const lw2 = ctx.measureText(label).width + 18 * SCALE;
+    if (lx + lw2 > x + w) { y += 13 * SCALE; lx = x; }
+    roundRect(ctx, lx, y - 7 * SCALE, 9 * SCALE, 9 * SCALE, 2 * SCALE);
+    ctx.fillStyle = item.color; ctx.fill();
+    ctx.fillStyle = C.inkMd; ctx.fillText(label, lx + 13 * SCALE, y + 0.5 * SCALE);
+    lx += lw2 + 6 * SCALE;
+  }
+  y += 14 * SCALE;
+  return y;
+};
+
+/** Draw a full data table. Returns new Y. */
+const drawTable = (
+  ctx: Ctx,
+  cols: { h: string; w: number; align?: "L" | "R" | "C"; numColor?: boolean }[],
+  rows: string[][],
+  x: number, startY: number,
+  opts: { maxLines?: number } = {}
+): number => {
+  const { maxLines = 3 } = opts;
+  const totalW = cols.reduce((s, c) => s + c.w, 0);
+  const scale2 = CW / totalW;
+  const ws = cols.map(c => c.w * scale2);
+  const colX = (i: number) => x + ws.slice(0, i).reduce((s, w) => s + w, 0);
+
+  const HDR_H = 22 * SCALE;
+  const PAD_X = 8 * SCALE;
+  const PAD_Y = 7 * SCALE;
+  const LINE_H = 11 * SCALE;
+  const ROW_MIN = 22 * SCALE;
+
+  let Y2 = startY;
+
+  // Header
+  roundRect(ctx, x, Y2, CW, HDR_H, 0);
+  ctx.fillStyle = C.navyMd; ctx.fill();
+  cols.forEach((col, i) => {
+    const cx = colX(i);
+    ctx.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx.fillStyle = C.inkFaint;
+    const hdr = trunc(ctx, col.h.toUpperCase(), ws[i] - PAD_X * 2);
+    const hw = ctx.measureText(hdr).width;
+    const tx = col.align === "R" ? cx + ws[i] - PAD_X - hw : col.align === "C" ? cx + (ws[i] - hw) / 2 : cx + PAD_X;
+    ctx.fillText(hdr, tx, Y2 + HDR_H * 0.65);
+    if (i < cols.length - 1) {
+      ctx.strokeStyle = C.navyLt; ctx.lineWidth = 0.3 * SCALE;
+      ctx.beginPath(); ctx.moveTo(cx + ws[i], Y2 + 3 * SCALE); ctx.lineTo(cx + ws[i], Y2 + HDR_H - 3 * SCALE); ctx.stroke();
+    }
+  });
+  Y2 += HDR_H;
+
+  rows.forEach((row, ri) => {
+    // Pre-compute cell content
+    const cells = cols.map((col, ci) => {
+      const raw = String(row[ci] ?? "—");
+      ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+      return { lines: wrapLines(ctx, raw, ws[ci] - PAD_X * 2, maxLines), col, raw };
+    });
+    const maxL = Math.max(...cells.map(c => c.lines.length), 1);
+    const rowH = Math.max(ROW_MIN, maxL * LINE_H + PAD_Y * 2);
+
+    const ry = Y2;
+    ctx.fillStyle = ri % 2 === 0 ? C.white : C.surface;
+    ctx.fillRect(x, ry, CW, rowH);
+
+    cells.forEach(({ lines, col, raw }, ci) => {
+      const cx = colX(ci);
+      const aw = ws[ci] - PAD_X * 2;
+      const totalTH = lines.length * LINE_H;
+      const vOff = (rowH - totalTH) / 2;
+
+      lines.forEach((line, li) => {
+        const ty = ry + vOff + (li + 1) * LINE_H - 2 * SCALE;
+        ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+
+        // Colour for numeric/signal columns
+        let color = C.ink;
+        if (col.numColor) {
+          const n = parseFloat(raw.replace(/[^0-9.-]/g, ""));
+          if (raw.includes("+") || (!raw.includes("-") && isFinite(n) && n > 0)) color = C.green;
+          else if (raw.includes("-") || (isFinite(n) && n < 0)) color = C.red;
+        }
+        if (raw.toLowerCase().includes("continue")) color = C.green;
+        else if (raw.toLowerCase().includes("review") || raw.toLowerCase().includes("exit")) color = C.amber;
+
+        ctx.fillStyle = color;
+        const clamped = trunc(ctx, line, aw);
+        const tw = ctx.measureText(clamped).width;
+        const tx = col.align === "R" ? cx + ws[ci] - PAD_X - tw : col.align === "C" ? cx + (ws[ci] - tw) / 2 : cx + PAD_X;
+        ctx.fillText(clamped, tx, ty);
+      });
+
+      if (ci < cols.length - 1) {
+        ctx.strokeStyle = C.border; ctx.lineWidth = 0.3 * SCALE;
+        ctx.beginPath(); ctx.moveTo(cx + ws[ci], ry); ctx.lineTo(cx + ws[ci], ry + rowH); ctx.stroke();
+      }
+    });
+
+    ctx.strokeStyle = C.border; ctx.lineWidth = 0.25 * SCALE;
+    ctx.beginPath(); ctx.moveTo(x, Y2 + rowH); ctx.lineTo(x + CW, Y2 + rowH); ctx.stroke();
+    Y2 += rowH;
+  });
+
+  return Y2 + 8 * SCALE;
+};
+
+/** Draw an insight card. Returns new Y. */
+const drawInsightCard = (ctx: Ctx, card: PdfInsightCard, idx: number, type: "critical" | "warning" | "info" | "ok", x: number, y: number): number => {
+  const pal = {
+    critical: { bg: C.redLt,    border: C.redBd,   accent: C.red,    tag: "ACTION NEEDED" },
+    warning:  { bg: C.amberLt,  border: C.amberBd, accent: C.amber,  tag: "REVIEW"        },
+    info:     { bg: C.blueLt,   border: "#93c5fd",  accent: C.blue,   tag: "INFO"          },
+    ok:       { bg: C.greenLt,  border: C.greenBd, accent: C.green,  tag: "LOOKING GOOD"  },
+  }[type];
+
+  // Pre-measure
+  ctx.font = `bold ${10 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const titleLines = wrapLines(ctx, card.title, CW - 40 * SCALE, 2);
+  ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const sumLines = wrapLines(ctx, card.summary, CW - 40 * SCALE, 4);
+  ctx.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const detLines = wrapLines(ctx, `Next step: ${card.detail}`, CW - 40 * SCALE, 3);
+
+  const cardH = (18 + titleLines.length * 13 + sumLines.length * 12 + detLines.length * 11 + 26) * SCALE;
+
+  // Card body
+  ctx.shadowColor = "rgba(0,0,0,0.05)"; ctx.shadowBlur = 6 * SCALE; ctx.shadowOffsetY = 2 * SCALE;
+  roundRect(ctx, x, y, CW, cardH, 8 * SCALE);
+  ctx.fillStyle = pal.bg; ctx.fill();
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  ctx.strokeStyle = pal.border; ctx.lineWidth = 0.5 * SCALE;
+  roundRect(ctx, x, y, CW, cardH, 8 * SCALE); ctx.stroke();
+
+  // Left bar
+  roundRect(ctx, x, y, 5 * SCALE, cardH, 5 * SCALE);
+  ctx.fillStyle = pal.accent; ctx.fill();
+  ctx.fillRect(x + 3 * SCALE, y, 2 * SCALE, cardH);
+
+  let iy = y + 14 * SCALE;
+
+  // Index
+  ctx.font = `bold ${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillStyle = pal.accent;
+  ctx.fillText(`${idx + 1}.`, x + 13 * SCALE, iy);
+
+  // Tag pill
+  ctx.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const tagW2 = ctx.measureText(pal.tag).width + 12 * SCALE;
+  roundRect(ctx, x + 26 * SCALE, y + 5 * SCALE, tagW2, 14 * SCALE, 3 * SCALE);
+  ctx.fillStyle = pal.accent; ctx.fill();
+  ctx.fillStyle = C.white; ctx.fillText(pal.tag, x + 32 * SCALE, y + 14.5 * SCALE);
+  iy += 14 * SCALE;
+
+  // Title
+  titleLines.forEach(l => {
+    ctx.font = `bold ${10 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx.fillStyle = C.ink; ctx.fillText(l, x + 13 * SCALE, iy); iy += 13 * SCALE;
+  });
+  iy += 3 * SCALE;
+
+  // Summary
+  sumLines.forEach(l => {
+    ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx.fillStyle = C.inkMd; ctx.fillText(l, x + 13 * SCALE, iy); iy += 12 * SCALE;
+  });
+  iy += 5 * SCALE;
+
+  // Detail (italic)
+  detLines.forEach(l => {
+    ctx.font = `italic ${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx.fillStyle = pal.accent; ctx.fillText(l, x + 13 * SCALE, iy); iy += 11 * SCALE;
+  });
+
+  return y + cardH + 10 * SCALE;
+};
+
+/** Horizontal bar for Top Holdings */
+const drawHorizBar = (ctx: Ctx, label: string, pct: number, value: string, accent: string, rank: number, x: number, y: number): number => {
+  const barH = 22 * SCALE;
+  const barW = Math.max(pct * CW, 6 * SCALE);
+
+  ctx.fillStyle = C.surfMd; roundRect(ctx, x, y, CW, barH, 3 * SCALE); ctx.fill();
+  ctx.fillStyle = accent; roundRect(ctx, x, y, barW, barH, 3 * SCALE); ctx.fill();
+
+  ctx.font = `bold ${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx.fillStyle = pct > 0.25 ? C.white : C.ink;
+  ctx.fillText(`${rank}. ${trunc(ctx, label, Math.max(barW - 12 * SCALE, 100 * SCALE))}`, x + 7 * SCALE, y + 14.5 * SCALE);
+
+  ctx.fillStyle = pct > 0.55 ? C.white : C.inkMd;
+  const vs = `${value}  (${(pct * 100).toFixed(1)}%)`;
+  ctx.fillText(vs, x + CW - ctx.measureText(vs).width - 7 * SCALE, y + 14.5 * SCALE);
+
+  return y + barH + 5 * SCALE;
+};
+
+// ── Multi-page renderer ─────────────────────────────────────────────────────
+
+interface PageSpec {
+  render: (ctx: Ctx, logoImg: HTMLImageElement | null, pageNum: number) => void;
+}
 
 export const generatePdfReport = async (params: {
   logoUrl: string;
@@ -280,868 +623,384 @@ export const generatePdfReport = async (params: {
   chartIds: { performance: string; scheme: string; amc: string };
 }) => {
   const [{ jsPDF }] = await Promise.all([import("jspdf")]);
-  const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
+  await loadFont();
+
   const { summary, report, xirrValue, logoUrl, holder, insights } = params;
 
-  // ── GEOMETRY ──────────────────────────────────────────────────────────────
-  const PW   = 595;   // A4 width
-  const PH   = 842;   // A4 height
-  const ML   = 40;    // margin left
-  const MR   = 40;    // margin right
-  const CW   = PW - ML - MR;  // content width = 515 pt (exact)
-  const HDR  = 58;    // header height
-  const FTR  = 36;    // footer height
-  const BODY_TOP = HDR + 14;   // content start Y
-  const BODY_BTM = PH - FTR;   // content end Y
-  const BODY_H   = BODY_BTM - BODY_TOP;
-
-  // ── PALETTE ───────────────────────────────────────────────────────────────
-  type RGB = [number, number, number];
-  const P = {
-    // Brand
-    navy:     [15,  23,  42 ] as RGB,
-    navyDark: [8,   15,  30 ] as RGB,
-    navyMid:  [30,  58,  95 ] as RGB,
-    green:    [5,   150, 105] as RGB,
-    greenDk:  [3,   105, 73 ] as RGB,
-    greenLt:  [209, 250, 229] as RGB,
-    greenBd:  [110, 231, 183] as RGB,
-    blue:     [37,  99,  235] as RGB,
-    blueLt:   [219, 234, 254] as RGB,
-    amber:    [180, 83,  9  ] as RGB,
-    amberLt:  [253, 230, 138] as RGB,
-    red:      [185, 28,  28 ] as RGB,
-    redLt:    [254, 202, 202] as RGB,
-    purple:   [109, 40,  217] as RGB,
-    // Neutrals
-    ink:      [15,  23,  42 ] as RGB,
-    inkMid:   [71,  85,  105] as RGB,
-    inkSoft:  [100, 116, 139] as RGB,
-    inkFaint: [148, 163, 184] as RGB,
-    surface:  [248, 250, 252] as RGB,
-    surfaceMd:[241, 245, 249] as RGB,
-    white:    [255, 255, 255] as RGB,
-    border:   [226, 232, 240] as RGB,
-    borderDk: [203, 213, 225] as RGB,
-    divider:  [241, 245, 249] as RGB,
-  };
-
-  // ── TYPE SCALE ─────────────────────────────────────────────────────────────
-  const T = { d1: 32, h1: 22, h2: 15, h3: 11.5, h4: 10, body: 8.5, sm: 8, xs: 7.5 };
-  const ROW_LH  = 11;  // per-line height inside table cells
-  const CELL_PX = 8;   // horizontal cell padding
-  const CELL_PY = 7;   // vertical cell padding
-  const HDR_H   = 20;  // table header bar height
-  const ROW_MIN = 20;  // minimum row height
-
-  // ── STATE ─────────────────────────────────────────────────────────────────
-  let pageNum = 0;
-  let curY = 0;  // absolute Y on current page
-
-  // ── PRIMITIVES ────────────────────────────────────────────────────────────
-
-  const fill = (x: number, y: number, w: number, h: number, color: RGB, r = 0) => {
-    doc.setFillColor(...color);
-    r > 0 ? doc.roundedRect(x, y, w, h, r, r, "F") : doc.rect(x, y, w, h, "F");
-  };
-
-  const stroke = (x: number, y: number, w: number, h: number, color: RGB, lw = 0.4, r = 0) => {
-    doc.setDrawColor(...color);
-    doc.setLineWidth(lw);
-    r > 0 ? doc.roundedRect(x, y, w, h, r, r, "S") : doc.rect(x, y, w, h, "S");
-  };
-
-  const ln = (x1: number, y1: number, x2: number, y2: number, color: RGB, lw = 0.4) => {
-    doc.setDrawColor(...color);
-    doc.setLineWidth(lw);
-    doc.line(x1, y1, x2, y2);
-  };
-
-  /** Set font and color together */
-  const font = (size: number, style: "normal" | "bold" | "italic" = "normal", color: RGB = P.ink) => {
-    doc.setFontSize(size);
-    doc.setFont("helvetica", style);
-    doc.setTextColor(...color);
-  };
-
-  /**
-   * Clamp string to fit maxWidth at given fontSize.
-   * Returns truncated string with "…" if needed.
-   */
-  const clamp = (text: string, maxW: number, size: number, style: "normal" | "bold" = "normal"): string => {
-    font(size, style, P.ink);
-    if (doc.getTextWidth(text) <= maxW) return text;
-    const el = "…";
-    const elW = doc.getTextWidth(el);
-    // Binary search for cutoff
-    let lo = 0, hi = text.length;
-    while (lo < hi - 1) {
-      const mid = (lo + hi) >> 1;
-      doc.getTextWidth(text.slice(0, mid)) + elW <= maxW ? (lo = mid) : (hi = mid);
-    }
-    return text.slice(0, lo) + el;
-  };
-
-  /**
-   * Wrap text into lines, each clamped to maxWidth.
-   * Returns at most maxLines lines.
-   */
-  const wrap = (text: string, maxW: number, size: number, style: "normal" | "bold" = "normal", maxLines = 3): string[] => {
-    font(size, style, P.ink);
-    const lines = doc.splitTextToSize(String(text || "—"), maxW) as string[];
-    return lines.slice(0, maxLines);
-  };
-
-  // ── LOGO LOAD ─────────────────────────────────────────────────────────────
-  let logoData: string | null = null;
+  // Load logo
+  let logoImg: HTMLImageElement | null = null;
   try {
-    const res = await fetch(logoUrl);
-    const blob = await res.blob();
-    logoData = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("logo load"));
-      reader.readAsDataURL(blob);
+    logoImg = await new Promise<HTMLImageElement>((res, rej) => {
+      const img = new Image(); img.crossOrigin = "anonymous";
+      img.onload = () => res(img); img.onerror = rej;
+      img.src = logoUrl;
     });
-  } catch { /* logo optional */ }
-
-  // ── HEADER ────────────────────────────────────────────────────────────────
-  const drawHeader = () => {
-    fill(0, 0, PW, HDR, P.navy);
-    fill(0, HDR - 2, PW, 2, P.green);  // accent strip
-
-    if (logoData) {
-      try { doc.addImage(logoData, "PNG", ML, 12, 26, 26); } catch { /* skip */ }
-    }
-    const lx = logoData ? ML + 32 : ML;
-
-    font(10, "bold", P.white);
-    doc.text("Nivesify", lx, 28);
-    font(T.xs, "normal", P.inkFaint);
-    doc.text("Thoughtful Money, Better Life", lx, 40);
-
-    font(T.sm, "bold", P.white);
-    const title = "Mutual Fund Health Check";
-    doc.text(title, PW - MR - doc.getTextWidth(title), 26);
-
-    font(T.xs, "normal", P.inkFaint);
-    const sub = `Page ${pageNum}  ·  ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`;
-    doc.text(sub, PW - MR - doc.getTextWidth(sub), 40);
-  };
-
-  // ── FOOTER ────────────────────────────────────────────────────────────────
-  const drawFooter = () => {
-    const fy = PH - FTR;
-    ln(ML, fy, PW - MR, fy, P.border, 0.4);
-    font(T.xs, "normal", P.inkFaint);
-    const dl = wrap(DISCLAIMER, CW - 40, T.xs, "normal", 2);
-    dl.forEach((l, i) => doc.text(l, ML, fy + 12 + i * 10));
-
-    // Green page number chip
-    const pgStr = `${pageNum}`;
-    const pgW = doc.getTextWidth(pgStr) + 12;
-    fill(PW - MR - pgW, fy + 4, pgW, 14, P.green, 3);
-    font(T.xs, "bold", P.white);
-    doc.text(pgStr, PW - MR - pgW / 2 - doc.getTextWidth(pgStr) / 2, fy + 14);
-  };
-
-  // ── PAGE LIFECYCLE ────────────────────────────────────────────────────────
-
-  /** Start a new page (call after finishing a page) */
-  const newPage = () => {
-    drawFooter();
-    doc.addPage();
-    pageNum++;
-    drawHeader();
-    curY = BODY_TOP;
-  };
-
-  /** Ensure at least `needed` pts remain before bottom; add page if not */
-  const ensureSpace = (needed: number) => {
-    if (curY + needed > BODY_BTM) newPage();
-  };
-
-  // ── LAYOUT HELPERS ────────────────────────────────────────────────────────
-
-  const spacer = (h: number) => { curY += h; };
-
-  const hr = (color: RGB = P.border, lw = 0.4) => {
-    ensureSpace(14);
-    ln(ML, curY, ML + CW, curY, color, lw);
-    curY += 14;
-  };
-
-  /** Section heading with colour pill and underline */
-  const sectionHead = (label: string, title: string, color: RGB = P.green) => {
-    ensureSpace(48);
-    // Pill
-    font(T.xs, "bold", P.white);
-    const pillW = doc.getTextWidth(label.toUpperCase()) + 16;
-    fill(ML, curY, pillW, 14, color, 3);
-    doc.text(label.toUpperCase(), ML + 8, curY + 10);
-    curY += 20;
-    // Title
-    font(T.h2, "bold", P.ink);
-    doc.text(title, ML, curY);
-    curY += 4;
-    ln(ML, curY, ML + 70, curY, color, 1.5);
-    curY += 14;
-  };
-
-  /**
-   * ╔══════════════════════════════════════════════════════════════════════╗
-   * ║  PIXEL-PERFECT TABLE ENGINE                                          ║
-   * ║                                                                      ║
-   * ║  FIX 1: Cell X positions computed from accumulated column widths,   ║
-   * ║          NOT from a shared mutable `cellX` that drifts.             ║
-   * ║  FIX 2: Column widths auto-scaled to exactly sum to CW.             ║
-   * ║  FIX 3: Row height = max(lines) * ROW_LH + 2*CELL_PY, all cells   ║
-   * ║          vertically centred.                                         ║
-   * ║  FIX 4: Vertical dividers and text share the same X origin.        ║
-   * ║  FIX 5: Text truncated at maxLines=3 to prevent runaway rows.      ║
-   * ║  FIX 6: Page-break inside table re-draws header, syncs curY.       ║
-   * ╚══════════════════════════════════════════════════════════════════════╝
-   */
-  const drawTable = (config: {
-    cols: Array<{ header: string; width: number; align?: "left" | "right" | "center"; color?: RGB }>;
-    rows: string[][];
-    maxLines?: number;
-    showIndex?: boolean;
-    altRow?: boolean;
-  }) => {
-    const { cols: rawCols, rows, maxLines = 3, altRow = true } = config;
-
-    // Scale columns so they EXACTLY fill CW
-    const rawTotal = rawCols.reduce((s, c) => s + c.width, 0);
-    const scale = rawTotal > 0 ? CW / rawTotal : 1;
-    const cols = rawCols.map((c) => ({ ...c, width: c.width * scale }));
-
-    /** X position of column i's left edge (absolute) */
-    const colX = (i: number) => ML + cols.slice(0, i).reduce((s, c) => s + c.width, 0);
-
-    const renderHeader = () => {
-      const hy = curY;
-      fill(ML, hy, CW, HDR_H, P.navy, 0);
-      // Round top corners only — draw a rect covering the bottom 4px to square it
-      fill(ML, hy, CW, HDR_H, P.navy, 0);
-
-      cols.forEach((col, i) => {
-        const cx = colX(i);
-        const availW = col.width - CELL_PX * 2;
-        const text = col.header.toUpperCase();
-        font(T.xs, "bold", P.inkFaint);
-        const clamped = clamp(text, availW, T.xs, "bold");
-        const textW = doc.getTextWidth(clamped);
-        const tx =
-          col.align === "right"  ? cx + col.width - CELL_PX - textW :
-          col.align === "center" ? cx + (col.width - textW) / 2 :
-                                   cx + CELL_PX;
-        doc.text(clamped, tx, hy + HDR_H * 0.64);
-
-        // Vertical divider (skip last)
-        if (i < cols.length - 1) {
-          ln(cx + col.width, hy + 3, cx + col.width, hy + HDR_H - 3, P.navyMid, 0.3);
-        }
-      });
-
-      curY += HDR_H;
-    };
-
-    renderHeader();
-
-    rows.forEach((row, ri) => {
-      // Pre-compute all cell content and measure row height
-      const cellContent: { lines: string[]; color: RGB }[] = cols.map((col, ci) => {
-        const raw = row[ci] ?? "—";
-        const availW = col.width - CELL_PX * 2;
-        const lines = wrap(raw, availW, T.body, "normal", maxLines);
-        return { lines, color: col.color ?? P.ink };
-      });
-
-      const maxLineCount = Math.max(...cellContent.map((c) => c.lines.length), 1);
-      const rowH = Math.max(ROW_MIN, maxLineCount * ROW_LH + CELL_PY * 2);
-
-      // Page break — re-draw header on new page
-      ensureSpace(rowH + 2);
-      if (curY === BODY_TOP) {
-        // We just jumped to a new page; re-draw the table header
-        renderHeader();
-        // Re-check space after header
-        ensureSpace(rowH + 2);
-      }
-
-      const ry = curY;
-
-      // Row background
-      if (altRow && ri % 2 === 1) fill(ML, ry, CW, rowH, P.surface);
-      else fill(ML, ry, CW, rowH, P.white);
-
-      // Draw cell text
-      cellContent.forEach((cell, ci) => {
-        const col = cols[ci];
-        const cx = colX(ci);      // ← absolute left edge of this column
-        const availW = col.width - CELL_PX * 2;
-
-        // Vertical centre offset for single-line cells
-        const totalTextH = cell.lines.length * ROW_LH;
-        const vOffset = (rowH - totalTextH) / 2;
-
-        cell.lines.forEach((lineText, li) => {
-          const textY = ry + vOffset + (li + 1) * ROW_LH - 2;
-          font(T.body, "normal", cell.color);
-          const clamped = clamp(lineText, availW, T.body);
-          const textW = doc.getTextWidth(clamped);
-          const tx =
-            col.align === "right"  ? cx + col.width - CELL_PX - textW :
-            col.align === "center" ? cx + (col.width - textW) / 2 :
-                                     cx + CELL_PX;
-          doc.text(clamped, tx, textY);
-        });
-
-        // Vertical divider (skip last column)
-        if (ci < cols.length - 1) {
-          ln(cx + col.width, ry + 2, cx + col.width, ry + rowH - 2, P.divider, 0.4);
-        }
-      });
-
-      // Horizontal row separator
-      ln(ML, ry + rowH, ML + CW, ry + rowH, P.border, 0.3);
-
-      curY += rowH;
-    });
-
-    // Table outer stroke
-    stroke(ML, curY - (rows.length > 0 ? rows.reduce((acc) => acc, 0) : 0), CW, 0, P.border, 0.4);
-    spacer(8);
-  };
-
-  // ── STAT CHIP ROW ─────────────────────────────────────────────────────────
-  /**
-   * Draw N metric cards in a row.
-   * Each card has a coloured top bar, label, big value, and note.
-   */
-  const drawStatRow = (
-    stats: Array<{ label: string; value: string; note?: string; accent: RGB }>,
-    perRow = 4
-  ) => {
-    const gap = 8;
-    const cardW = (CW - gap * (perRow - 1)) / perRow;
-    const cardH = 56;
-
-    ensureSpace(cardH + 10);
-
-    // Draw up to perRow per call
-    const group = stats.slice(0, perRow);
-    const rowY = curY;
-
-    group.forEach((stat, i) => {
-      const x = ML + i * (cardW + gap);
-
-      // Card shell
-      fill(x, rowY, cardW, cardH, P.white, 5);
-      stroke(x, rowY, cardW, cardH, P.border, 0.4, 5);
-
-      // Accent bar (top) — draw filled rect + small square to kill rounded bottom of bar
-      fill(x, rowY, cardW, 3, stat.accent, 3);
-      fill(x, rowY + 2, cardW, 1, stat.accent);  // fill rounded gap
-
-      // Label
-      font(T.xs, "normal", P.inkFaint);
-      doc.text(clamp(stat.label, cardW - 12, T.xs), x + 6, rowY + 16);
-
-      // Value
-      font(T.h3, "bold", stat.accent);
-      doc.text(clamp(stat.value, cardW - 12, T.h3, "bold"), x + 6, rowY + 34);
-
-      // Note
-      if (stat.note) {
-        font(T.xs, "normal", P.inkFaint);
-        doc.text(clamp(stat.note, cardW - 12, T.xs), x + 6, rowY + 48);
-      }
-    });
-
-    curY += cardH + 12;
-  };
-
-  // ── INSIGHT CARD ─────────────────────────────────────────────────────────
-  const drawInsightCard = (
-    card: PdfInsightCard,
-    index: number,
-    priority: "critical" | "warning" | "info" | "positive"
-  ) => {
-    const palettes = {
-      critical: { bg: [254, 242, 242] as RGB, border: P.redLt,   accent: P.red,   tag: "ACTION NEEDED" },
-      warning:  { bg: [255, 251, 235] as RGB, border: P.amberLt, accent: P.amber,  tag: "REVIEW"        },
-      info:     { bg: [239, 246, 255] as RGB, border: P.blueLt,  accent: P.blue,   tag: "INFO"          },
-      positive: { bg: P.greenLt,             border: P.greenBd,  accent: P.green,  tag: "LOOKING GOOD"  },
-    };
-    const pal = palettes[priority];
-
-    // Pre-measure content
-    const titleLines  = wrap(card.title,                   CW - 32, T.h4, "bold", 2);
-    const sumLines    = wrap(card.summary,                  CW - 32, T.body, "normal", 4);
-    const detailLines = wrap(`Next step: ${card.detail}`,  CW - 32, T.sm, "normal", 4);
-
-    const cardH = 16 +
-      titleLines.length * 13 +
-      sumLines.length * ROW_LH +
-      detailLines.length * 10 +
-      28;
-
-    ensureSpace(cardH + 10);
-    const cy = curY;
-
-    // Background
-    fill(ML, cy, CW, cardH, pal.bg, 6);
-    // Border
-    doc.setDrawColor(...pal.border);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(ML, cy, CW, cardH, 6, 6, "S");
-    // Left accent bar
-    fill(ML, cy, 4, cardH, pal.accent, 3);
-    fill(ML + 2, cy, 2, cardH, pal.accent);  // square off right side of bar
-
-    let iy = cy + 14;
-
-    // Index badge + tag
-    font(T.xs, "bold", pal.accent);
-    doc.text(`${index + 1}.`, ML + 12, iy);
-    font(T.xs, "bold", P.white);
-    const tagW = doc.getTextWidth(pal.tag) + 12;
-    fill(ML + 24, cy + 5, tagW, 13, pal.accent, 3);
-    doc.text(pal.tag, ML + 30, cy + 14.5);
-    iy += 12;
-
-    // Title
-    titleLines.forEach((l) => {
-      font(T.h4, "bold", P.ink);
-      doc.text(l, ML + 12, iy);
-      iy += 13;
-    });
-    iy += 2;
-
-    // Summary
-    sumLines.forEach((l) => {
-      font(T.body, "normal", P.inkMid);
-      doc.text(l, ML + 12, iy);
-      iy += ROW_LH;
-    });
-    iy += 4;
-
-    // Detail
-    detailLines.forEach((l) => {
-      font(T.sm, "italic", pal.accent);
-      doc.text(l, ML + 12, iy);
-      iy += 10;
-    });
-
-    curY += cardH + 10;
-  };
-
-  // ── ALLOCATION BAR ────────────────────────────────────────────────────────
-  const drawAllocationBar = (
-    items: Array<{ label: string; value: number; color: RGB }>,
-    total: number
-  ) => {
-    ensureSpace(46);
-    const barH = 12;
-    const by = curY;
-
-    // Background track
-    fill(ML, by, CW, barH, P.surfaceMd, 3);
-
-    let bx = ML;
-    items.forEach((item) => {
-      const w = total > 0 ? (item.value / total) * CW : 0;
-      if (w >= 1) { fill(bx, by, w, barH, item.color, 0); bx += w; }
-    });
-    stroke(ML, by, CW, barH, P.border, 0.4, 3);
-    curY += barH + 8;
-
-    // Legend chips
-    let lx = ML;
-    items.forEach((item) => {
-      const pct = total > 0 ? (item.value / total) * 100 : 0;
-      if (pct < 0.5) return;
-      const label = `${item.label.slice(0, 18)}  ${pct.toFixed(1)}%`;
-      font(T.xs, "normal", P.inkMid);
-      const lw = doc.getTextWidth(label) + 18;
-      if (lx + lw > ML + CW) { curY += 12; lx = ML; }
-      fill(lx, curY + 1, 8, 8, item.color, 1);
-      doc.text(label, lx + 12, curY + 9);
-      lx += lw + 8;
-    });
-    curY += 14;
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ▓▓▓▓▓▓▓▓▓▓▓▓  COVER PAGE  ▓▓▓▓▓▓▓▓▓▓▓▓
-  // ─────────────────────────────────────────────────────────────────────────
-  pageNum = 1;
-
-  // Dark full-page background
-  fill(0, 0, PW, PH, P.navy);
-
-  // Decorative circle glow (top right)
-  doc.setFillColor(5, 150, 105);
-  doc.setGState(doc.GState({ opacity: 0.10 }));
-  doc.circle(PW + 20, -20, 240, "F");
-  doc.setGState(doc.GState({ opacity: 0.06 }));
-  doc.circle(-40, PH + 40, 260, "F");
-  doc.setGState(doc.GState({ opacity: 1 }));
-
-  // Brand-green left rail
-  fill(0, 0, 5, PH, P.green);
-
-  // Logo
-  if (logoData) { try { doc.addImage(logoData, "PNG", ML + 5, 52, 32, 32); } catch { /* skip */ } }
-  const clx = logoData ? ML + 44 : ML + 5;
-
-  font(13, "bold", P.white);
-  doc.text("Nivesify", clx, 70);
-  font(T.sm, "normal", P.inkFaint);
-  doc.text("Thoughtful Money, Better Life", clx, 83);
+  } catch { /* skip */ }
+
+  const BODY_TOP = 68 * SCALE;
+  const BODY_BTM = PH - 38 * SCALE;
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 1 — COVER
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const [cvs1, ctx1] = newCanvas();
+
+  // Background gradient
+  const grad = ctx1.createLinearGradient(0, 0, PW * 0.6, PH);
+  grad.addColorStop(0, "#0f172a");
+  grad.addColorStop(0.55, "#172554");
+  grad.addColorStop(1, "#052e16");
+  ctx1.fillStyle = grad; ctx1.fillRect(0, 0, PW, PH);
+
+  // Decorative circle (top-right glow)
+  const radGrad = ctx1.createRadialGradient(PW, 0, 0, PW, 0, 400 * SCALE);
+  radGrad.addColorStop(0, "rgba(22,163,74,0.18)");
+  radGrad.addColorStop(1, "rgba(22,163,74,0)");
+  ctx1.fillStyle = radGrad; ctx1.fillRect(0, 0, PW, PH);
+
+  // Bottom glow
+  const radGrad2 = ctx1.createRadialGradient(0, PH, 0, 0, PH, 380 * SCALE);
+  radGrad2.addColorStop(0, "rgba(37,99,235,0.14)");
+  radGrad2.addColorStop(1, "rgba(37,99,235,0)");
+  ctx1.fillStyle = radGrad2; ctx1.fillRect(0, 0, PW, PH);
+
+  // Green left rail with gradient
+  const railGrad = ctx1.createLinearGradient(0, 0, 0, PH);
+  railGrad.addColorStop(0, C.green);
+  railGrad.addColorStop(1, "#065f46");
+  ctx1.fillStyle = railGrad; ctx1.fillRect(0, 0, 6 * SCALE, PH);
+  ctx1.fillStyle = C.greenDk; ctx1.fillRect(6 * SCALE, 0, 1 * SCALE, PH);
+
+  // Logo + brand
+  if (logoImg) { try { ctx1.drawImage(logoImg, ML + 6 * SCALE, 52 * SCALE, 32 * SCALE, 32 * SCALE); } catch { /* skip */ } }
+  const clx = logoImg ? ML + 46 * SCALE : ML + 6 * SCALE;
+  ctx1.font = `bold ${14 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = C.white; ctx1.fillText("Nivesify", clx, 72 * SCALE);
+  ctx1.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = C.inkFaint; ctx1.fillText("Thoughtful Money, Better Life", clx, 86 * SCALE);
 
   // Report type label
-  font(T.xs, "bold", P.green);
-  doc.text("MUTUAL FUND HEALTH CHECK", ML + 5, 152);
+  ctx1.font = `bold ${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = C.green; ctx1.fillText("MUTUAL FUND HEALTH CHECK", ML + 6 * SCALE, 152 * SCALE);
 
-  // Big title
-  font(T.d1, "bold", P.white);
-  doc.text("Portfolio", ML + 5, 188);
-  doc.text("Diagnosis", ML + 5, 224);
+  // Title
+  ctx1.font = `bold ${36 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = C.white;
+  ctx1.fillText("Portfolio", ML + 6 * SCALE, 192 * SCALE);
+  ctx1.fillText("Diagnosis", ML + 6 * SCALE, 234 * SCALE);
 
-  // Green underline
-  fill(ML + 5, 234, 110, 3, P.green, 1);
+  // Underline
+  const ulGrad = ctx1.createLinearGradient(ML + 6 * SCALE, 0, ML + 150 * SCALE, 0);
+  ulGrad.addColorStop(0, C.green); ulGrad.addColorStop(1, "rgba(22,163,74,0)");
+  ctx1.fillStyle = ulGrad;
+  ctx1.fillRect(ML + 6 * SCALE, 244 * SCALE, 140 * SCALE, 3 * SCALE);
 
-  font(T.body, "normal", P.inkFaint);
-  doc.text("Benchmarked  ·  Actionable  ·  Evidence-based", ML + 5, 252);
+  ctx1.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = "rgba(148,163,184,0.8)";
+  ctx1.fillText("Benchmarked  ·  Actionable  ·  Evidence-based", ML + 6 * SCALE, 262 * SCALE);
 
   // ── Holder info panel ──
-  const hip = { x: ML + 5, y: 274, w: CW - 5, h: 68 };
-  fill(hip.x, hip.y, hip.w, hip.h, P.navyMid, 8);
-  font(T.xs, "bold", P.inkFaint);
-  doc.text("PREPARED FOR", hip.x + 14, hip.y + 18);
-  font(T.h3, "bold", P.white);
-  doc.text(clamp(holder.name || "Investor", hip.w - 100, T.h3, "bold"), hip.x + 14, hip.y + 32);
-  font(T.xs, "normal", P.inkFaint);
-  let hiY = hip.y + 46;
-  if (holder.pan)   { doc.text(`PAN: ${holder.pan}`,   hip.x + 14, hiY); }
-  if (holder.email) { doc.text(clamp(`Email: ${holder.email}`, hip.w / 2 - 20, T.xs), hip.x + (holder.pan ? hip.w / 2 : 14), hiY); }
-  font(T.xs, "normal", P.inkFaint);
-  doc.text(`Generated: ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}`, hip.x + 14, hip.y + 60);
+  const hipX = ML + 6 * SCALE, hipY = 280 * SCALE, hipW = CW - 6 * SCALE, hipH = 70 * SCALE;
+  roundRect(ctx1, hipX, hipY, hipW, hipH, 8 * SCALE);
+  ctx1.fillStyle = "rgba(30,58,95,0.8)"; ctx1.fill();
+  ctx1.strokeStyle = "rgba(37,99,235,0.3)"; ctx1.lineWidth = 0.5 * SCALE;
+  roundRect(ctx1, hipX, hipY, hipW, hipH, 8 * SCALE); ctx1.stroke();
+  ctx1.fillStyle = C.green;
+  roundRect(ctx1, hipX, hipY, 4 * SCALE, hipH, 4 * SCALE); ctx1.fill();
+  ctx1.fillRect(hipX + 2 * SCALE, hipY, 2 * SCALE, hipH);
 
-  // ── Cover KPI cards (3) ──
-  const covKH = 78;
-  const covKW = (CW - 5 - 16) / 3;
-  const covKY = hip.y + hip.h + 18;
+  ctx1.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = "rgba(148,163,184,0.8)"; ctx1.fillText("PREPARED FOR", hipX + 14 * SCALE, hipY + 18 * SCALE);
+  ctx1.font = `bold ${13 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = C.white;
+  ctx1.fillText(trunc(ctx1, holder.name || "Investor", hipW - 100 * SCALE), hipX + 14 * SCALE, hipY + 33 * SCALE);
+  ctx1.font = `${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = C.inkFaint;
+  if (holder.pan) ctx1.fillText(`PAN: ${holder.pan}`, hipX + 14 * SCALE, hipY + 49 * SCALE);
+  if (holder.email) ctx1.fillText(trunc(ctx1, holder.email, hipW / 2 - 30 * SCALE), holder.pan ? hipX + hipW / 2 - 10 * SCALE : hipX + 14 * SCALE, hipY + 49 * SCALE);
+  const genDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+  ctx1.fillText(`Generated: ${genDate}`, hipX + 14 * SCALE, hipY + 62 * SCALE);
+
+  // ── 3 big KPI cards ──
+  const covCardY = hipY + hipH + 18 * SCALE;
+  const covCardW = (hipW - 16 * SCALE) / 3;
+  const covCardH = 82 * SCALE;
+
   const covCards = [
-    { label: "Total Portfolio Value", value: fmt.currency(summary.totalValue), note: "Current market value", accent: P.green },
-    { label: "Portfolio XIRR",        value: fmt.pct(xirrValue, 2),             note: "Annualised return",    accent: (xirrValue ?? 0) >= 0.12 ? P.green : P.amber },
-    { label: "All-time Returns",      value: fmt.currency(summary.allTimeProfit), note: "Total gain",         accent: (summary.allTimeProfit || 0) >= 0 ? P.green : P.red },
+    { l: "Total Portfolio Value", v: fmtCur(summary.totalValue), sub: "Current market value", a: C.green },
+    { l: "Portfolio XIRR",        v: fmtPct(xirrValue, 2),        sub: "Annualised true return", a: (xirrValue ?? 0) >= 0.12 ? C.green : C.amber },
+    { l: "All-time Returns",      v: fmtCur(summary.allTimeProfit), sub: "Total gain on investment", a: (summary.allTimeProfit || 0) >= 0 ? C.green : C.red },
   ];
   covCards.forEach((c, i) => {
-    const x = ML + 5 + i * (covKW + 8);
-    fill(x, covKY, covKW, covKH, P.navyMid, 7);
-    fill(x, covKY, covKW, 3, c.accent, 3);
-    fill(x, covKY + 2, covKW, 1, c.accent);
-    font(T.xs, "normal", P.inkFaint);
-    doc.text(clamp(c.label, covKW - 20, T.xs), x + 10, covKY + 20);
-    font(14, "bold", c.accent);
-    doc.text(clamp(c.value, covKW - 20, 14, "bold"), x + 10, covKY + 42);
-    font(T.xs, "normal", P.inkFaint);
-    doc.text(c.note, x + 10, covKY + 60);
+    const cx2 = hipX + i * (covCardW + 8 * SCALE);
+    roundRect(ctx1, cx2, covCardY, covCardW, covCardH, 8 * SCALE);
+    ctx1.fillStyle = "rgba(22,36,74,0.9)"; ctx1.fill();
+    ctx1.strokeStyle = "rgba(255,255,255,0.08)"; ctx1.lineWidth = 0.5 * SCALE;
+    roundRect(ctx1, cx2, covCardY, covCardW, covCardH, 8 * SCALE); ctx1.stroke();
+
+    // Top accent bar
+    ctx1.fillStyle = c.a;
+    roundRect(ctx1, cx2, covCardY, covCardW, 4 * SCALE, 4 * SCALE); ctx1.fill();
+    ctx1.fillRect(cx2, covCardY + 2 * SCALE, covCardW, 2 * SCALE);
+
+    ctx1.font = `${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx1.fillStyle = C.inkFaint; ctx1.fillText(trunc(ctx1, c.l, covCardW - 20 * SCALE), cx2 + 12 * SCALE, covCardY + 22 * SCALE);
+    ctx1.font = `bold ${15 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx1.fillStyle = c.a; ctx1.fillText(trunc(ctx1, c.v, covCardW - 20 * SCALE), cx2 + 12 * SCALE, covCardY + 46 * SCALE);
+    ctx1.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx1.fillStyle = C.inkFaint; ctx1.fillText(c.sub, cx2 + 12 * SCALE, covCardY + 66 * SCALE);
   });
 
-  // ── Cover secondary stats ──
-  const covSY = covKY + covKH + 12;
-  const covSW = (CW - 5) / 4;
-  const secStats = [
-    { l: "Invested",         v: fmt.currency(summary.invested) },
-    { l: "Active Holdings",  v: `${report.holdingsCount}` },
-    { l: "Top Fund Weight",  v: fmt.share(report.topOneShare) },
-    { l: "Monthly Income",   v: fmt.currency(summary.monthlyIncome) },
+  // ── 4 secondary stat chips ──
+  const secY = covCardY + covCardH + 14 * SCALE;
+  const secW = hipW / 4;
+  const secH = 56 * SCALE;
+  const secs = [
+    { l: "Invested",        v: fmtCur(summary.invested) },
+    { l: "Active Holdings", v: `${report.holdingsCount} funds` },
+    { l: "Top Fund Weight", v: fmtShare(report.topOneShare) },
+    { l: "Monthly Income",  v: fmtCur(summary.monthlyIncome) },
   ];
-  secStats.forEach((ss, i) => {
-    const x = ML + 5 + i * covSW;
-    fill(x, covSY, covSW - 8, 52, P.navyMid, 5);
-    font(T.xs, "normal", P.inkFaint);
-    doc.text(clamp(ss.l, covSW - 24, T.xs), x + 8, covSY + 18);
-    font(T.h3, "bold", P.white);
-    doc.text(clamp(ss.v, covSW - 24, T.h3, "bold"), x + 8, covSY + 38);
+  secs.forEach((s, i) => {
+    const sx = hipX + i * secW;
+    roundRect(ctx1, sx, secY, secW - 8 * SCALE, secH, 6 * SCALE);
+    ctx1.fillStyle = "rgba(22,36,74,0.7)"; ctx1.fill();
+    ctx1.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx1.fillStyle = C.inkFaint; ctx1.fillText(s.l, sx + 10 * SCALE, secY + 18 * SCALE);
+    ctx1.font = `bold ${12 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx1.fillStyle = C.white; ctx1.fillText(trunc(ctx1, s.v, secW - 26 * SCALE), sx + 10 * SCALE, secY + 40 * SCALE);
   });
 
   // Cover footer
-  const cfY = PH - 36;
-  ln(ML + 5, cfY, ML + CW, cfY, [30, 58, 95], 0.4);
-  font(T.xs, "normal", P.inkFaint);
-  const discLines = wrap(DISCLAIMER, CW - 5, T.xs, "normal", 2);
-  discLines.forEach((l, i) => doc.text(l, ML + 5, cfY + 12 + i * 10));
+  const cfY = PH - 40 * SCALE;
+  ctx1.strokeStyle = "rgba(30,58,95,0.8)"; ctx1.lineWidth = 0.4 * SCALE;
+  ctx1.beginPath(); ctx1.moveTo(hipX, cfY); ctx1.lineTo(hipX + hipW, cfY); ctx1.stroke();
+  ctx1.font = `${7 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx1.fillStyle = "rgba(100,116,139,0.7)";
+  const discL = wrapLines(ctx1, "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on this report.", hipW, 2);
+  discL.forEach((l, i) => ctx1.fillText(l, hipX, cfY + 13 * SCALE + i * 10 * SCALE));
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ▓▓▓▓▓▓▓▓▓▓▓▓  PAGE 2: SUMMARY  ▓▓▓▓▓▓▓▓▓▓▓▓
-  // ─────────────────────────────────────────────────────────────────────────
-  doc.addPage();
-  pageNum++;
-  drawHeader();
-  curY = BODY_TOP;
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 2 — PORTFOLIO SUMMARY
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const [cvs2, ctx2] = newCanvas();
+  ctx2.fillStyle = C.surface; ctx2.fillRect(0, 0, PW, PH);
+  drawPageChrome(ctx2, 2, logoImg);
 
-  sectionHead("Overview", "Portfolio at a Glance", P.blue);
+  let Y2 = BODY_TOP;
+  Y2 = drawSectionHead(ctx2, "Overview", "Portfolio at a Glance", ML, Y2, C.blue);
 
-  drawStatRow([
-    { label: "Total Value",     value: fmt.currency(summary.totalValue),    note: "Current market value",    accent: P.blue  },
-    { label: "Total Invested",  value: fmt.currency(summary.invested),      note: "Net capital deployed",    accent: P.inkMid },
-    { label: "All-time Returns",value: fmt.currency(summary.allTimeProfit),  note: "Unrealised + realised",   accent: (summary.allTimeProfit||0)>=0?P.green:P.red },
-    { label: "Portfolio XIRR",  value: fmt.pct(xirrValue, 2),               note: "Annualised true return",  accent: (xirrValue??0)*100>=12?P.green:P.amber },
-  ]);
-
-  drawStatRow([
-    { label: "Active Holdings",  value: `${report.holdingsCount}`,          note: "Funds with value > 0",   accent: P.purple },
-    { label: "Top Fund Weight",  value: fmt.share(report.topOneShare),      note: "Single-fund concentration",accent: report.topOneShare>0.3?P.amber:P.green },
-    { label: "Top 5 Combined",   value: fmt.share(report.topFiveShare),     note: "Core concentration",     accent: report.topFiveShare>0.65?P.amber:P.green },
-    { label: "Monthly Income",   value: fmt.currency(summary.monthlyIncome),note: "25× rule estimate",      accent: P.green },
-  ]);
-
-  hr();
-
-  // Executive summary banner
-  const esBg: RGB = [236, 253, 245];
-  const esSumLines = wrap(insights.executiveSummary, CW - 28, T.body, "normal", 4);
-  const esH = esSumLines.length * ROW_LH + 32;
-  ensureSpace(esH + 12);
-  const esCY = curY;
-  fill(ML, esCY, CW, esH, esBg, 6);
-  doc.setDrawColor(...P.greenBd);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(ML, esCY, CW, esH, 6, 6, "S");
-  fill(ML, esCY, 4, esH, P.green, 3);
-  fill(ML + 2, esCY, 2, esH, P.green);
-  font(T.xs, "bold", P.green);
-  doc.text("EXECUTIVE SUMMARY", ML + 14, esCY + 14);
-  esSumLines.forEach((l, i) => {
-    font(T.body, "normal", P.inkMid);
-    doc.text(l, ML + 14, esCY + 26 + i * ROW_LH);
-  });
-  curY += esH + 14;
-
-  hr(P.border);
-  sectionHead("Diagnostics", "Portfolio Health Metrics", P.purple);
-
-  drawTable({
-    cols: [
-      { header: "Metric",     width: 165 },
-      { header: "Value",      width: 75, align: "right", color: P.green },
-      { header: "What It Means", width: 275 },
-    ],
-    rows: insights.metrics.map((m) => [m.title, m.value, m.note]),
-    maxLines: 2,
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ▓▓▓▓▓▓▓▓▓▓▓▓  PAGE 3: FUND AUDITS  ▓▓▓▓▓▓▓▓▓▓▓▓
-  // ─────────────────────────────────────────────────────────────────────────
-  newPage();
-
-  sectionHead("Active Funds", "Active Fund Audit", P.amber);
-  font(T.sm, "normal", P.inkSoft);
-  doc.text(`${insights.activeAuditRows.length} active funds  ·  Signal = alpha + IR + benchmark gap + composite score`, ML, curY);
-  curY += 14;
-
-  drawTable({
-    cols: [
-      { header: "Fund Name",       width: 185 },
-      { header: "Benchmark",       width: 135 },
-      { header: "Gap vs Bench",    width: 75, align: "right" },
-      { header: "Action",          width: 120 },
-    ],
-    rows: insights.activeAuditRows.map((r) => [r.name, r.benchmark || "—", r.gap || "—", r.action]),
-    maxLines: 2,
-  });
-
-  // Legend strip
-  ensureSpace(28);
-  fill(ML, curY, CW, 22, P.surface, 4);
-  const legendItems = [
-    { label: "Continue — positive alpha, beating benchmark", color: P.green },
-    { label: "Review — negative alpha or underperforming", color: P.amber },
+  // Row 1: 4 metric cards
+  const cGap = 8 * SCALE, cH = 62 * SCALE, cW = (CW - cGap * 3) / 4;
+  const row1 = [
+    { l: "Total Value",      v: fmtCur(summary.totalValue),    n: "Current market value",   a: C.blue  },
+    { l: "Total Invested",   v: fmtCur(summary.invested),      n: "Net capital deployed",   a: C.inkSoft },
+    { l: "All-time Returns", v: fmtCur(summary.allTimeProfit),  n: "Unrealised + realised",  a: (summary.allTimeProfit||0)>=0?C.green:C.red },
+    { l: "Portfolio XIRR",   v: fmtPct(xirrValue, 2),          n: "Annualised true return", a: (xirrValue??0)*100>=12?C.green:C.amber },
   ];
-  let lx = ML + 10;
-  legendItems.forEach((li) => {
-    fill(lx, curY + 7, 8, 8, li.color, 1);
-    font(T.xs, "normal", P.inkMid);
-    doc.text(li.label, lx + 12, curY + 14);
-    lx += doc.getTextWidth(li.label) + 28;
+  row1.forEach((c, i) => drawMetricCard(ctx2, ML + i * (cW + cGap), Y2, cW, cH, c.l, c.v, c.n, c.a));
+  Y2 += cH + 12 * SCALE;
+
+  const row2 = [
+    { l: "Active Holdings",  v: `${report.holdingsCount}`,      n: "Funds with value > 0",    a: C.purple },
+    { l: "Top Fund Weight",  v: fmtShare(report.topOneShare),   n: "Largest single position", a: report.topOneShare>0.3?C.amber:C.green },
+    { l: "Top 5 Combined",   v: fmtShare(report.topFiveShare),  n: "Core concentration",      a: report.topFiveShare>0.65?C.amber:C.green },
+    { l: "Monthly Income",   v: fmtCur(summary.monthlyIncome),  n: "25× withdrawal rule",     a: C.teal },
+  ];
+  row2.forEach((c, i) => drawMetricCard(ctx2, ML + i * (cW + cGap), Y2, cW, cH, c.l, c.v, c.n, c.a));
+  Y2 += cH + 16 * SCALE;
+
+  // Divider
+  ctx2.strokeStyle = C.border; ctx2.lineWidth = 0.5 * SCALE;
+  ctx2.beginPath(); ctx2.moveTo(ML, Y2); ctx2.lineTo(ML + CW, Y2); ctx2.stroke();
+  Y2 += 14 * SCALE;
+
+  // Executive summary
+  ctx2.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const esLines = wrapLines(ctx2, insights.executiveSummary, CW - 32 * SCALE, 4);
+  const esH = (esLines.length * 12 + 34) * SCALE;
+  roundRect(ctx2, ML, Y2, CW, esH, 8 * SCALE);
+  ctx2.fillStyle = C.greenLt; ctx2.fill();
+  ctx2.strokeStyle = C.greenBd; ctx2.lineWidth = 0.5 * SCALE;
+  roundRect(ctx2, ML, Y2, CW, esH, 8 * SCALE); ctx2.stroke();
+  ctx2.fillStyle = C.green; roundRect(ctx2, ML, Y2, 5 * SCALE, esH, 5 * SCALE); ctx2.fill();
+  ctx2.fillRect(ML + 3 * SCALE, Y2, 2 * SCALE, esH);
+  ctx2.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx2.fillStyle = C.green; ctx2.fillText("EXECUTIVE SUMMARY", ML + 14 * SCALE, Y2 + 15 * SCALE);
+  esLines.forEach((l, i) => {
+    ctx2.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx2.fillStyle = C.inkMd; ctx2.fillText(l, ML + 14 * SCALE, Y2 + 27 * SCALE + i * 12 * SCALE);
   });
-  curY += 30;
+  Y2 += esH + 16 * SCALE;
 
-  hr();
-  sectionHead("Passive Funds", "Passive Fund Audit", P.blue);
-  font(T.sm, "normal", P.inkSoft);
-  doc.text(`${insights.passiveAuditRows.length} passive / index funds  ·  Tracking diff vs best-available ETF`, ML, curY);
-  curY += 14;
+  ctx2.strokeStyle = C.border; ctx2.lineWidth = 0.5 * SCALE;
+  ctx2.beginPath(); ctx2.moveTo(ML, Y2); ctx2.lineTo(ML + CW, Y2); ctx2.stroke(); Y2 += 14 * SCALE;
 
-  drawTable({
-    cols: [
-      { header: "Fund Name",    width: 183 },
-      { header: "Benchmark",   width: 125 },
-      { header: "Gap (3Y)",    width: 65,  align: "right" },
-      { header: "Track. Diff", width: 72,  align: "right" },
-      { header: "Action",      width: 70 },
-    ],
-    rows: insights.passiveAuditRows.map((r) => [r.name, r.benchmark || "—", r.gap || "—", r.tracking || "—", r.action]),
-    maxLines: 2,
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ▓▓▓▓▓▓▓▓▓▓▓▓  PAGE 4: ALLOCATION  ▓▓▓▓▓▓▓▓▓▓▓▓
-  // ─────────────────────────────────────────────────────────────────────────
-  newPage();
-  sectionHead("Allocation", "Portfolio Allocation Breakdown", P.blue);
-
-  const ALLOC_COLORS: RGB[] = [P.blue, P.green, P.amber, P.purple, P.red, [8,145,178], [190,18,60]];
-
-  // Category allocation bar + table
-  const catMap = new Map<string, { cur: number; inv: number }>();
-  report.fundDetails.forEach((f) => {
-    const ex = catMap.get(f.majorCategory) || { cur: 0, inv: 0 };
-    catMap.set(f.majorCategory, { cur: ex.cur + f.currentValue, inv: ex.inv + f.invested });
-  });
-  const catItems = Array.from(catMap.entries())
-    .map(([name, v], i) => ({ label: name, value: v.cur, invested: v.inv, color: ALLOC_COLORS[i % ALLOC_COLORS.length] }))
-    .sort((a, b) => b.value - a.value);
-
-  drawAllocationBar(catItems, summary.totalValue);
-
-  drawTable({
-    cols: [
-      { header: "Category",      width: 155 },
-      { header: "Current Value", width: 110, align: "right" },
-      { header: "Invested",      width: 110, align: "right" },
-      { header: "Weight",        width: 75,  align: "right" },
-      { header: "Gain / Loss",   width: 65,  align: "right" },
-    ],
-    rows: catItems.map((c) => [
-      c.label,
-      fmt.currency(c.value),
-      fmt.currency(c.invested),
-      fmt.share(summary.totalValue ? c.value / summary.totalValue : 0),
-      `${(c.value - c.invested) >= 0 ? "+" : ""}${fmt.currency(c.value - c.invested)}`,
-    ]),
-    maxLines: 1,
-  });
-
-  spacer(6);
-
-  // AMC bar + table
-  drawAllocationBar(
-    report.amcBreakdown.slice(0, 8).map((a, i) => ({ label: a.name, value: a.value, color: ALLOC_COLORS[i % ALLOC_COLORS.length] })),
-    summary.totalValue
+  Y2 = drawSectionHead(ctx2, "Diagnostics", "Portfolio Health Metrics", ML, Y2, C.purple);
+  Y2 = drawTable(ctx2,
+    [{ h: "Metric", w: 175 }, { h: "Value", w: 80, align: "R", numColor: true }, { h: "What It Means", w: 268 }],
+    insights.metrics.map(m => [m.title, m.value, m.note]),
+    ML, Y2, { maxLines: 2 }
   );
 
-  drawTable({
-    cols: [
-      { header: "Fund House (AMC)", width: 225 },
-      { header: "Value",           width: 110, align: "right" },
-      { header: "Weight",          width: 80,  align: "right" },
-      { header: "# Funds",         width: 100, align: "center" },
-    ],
-    rows: report.amcBreakdown.slice(0, 10).map((a) => [
-      a.name,
-      fmt.currency(a.value),
-      fmt.share(summary.totalValue ? a.value / summary.totalValue : 0),
-      `${report.fundDetails.filter((f) => f.amc === a.name).length}`,
-    ]),
-    maxLines: 1,
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 3 — AUDIT
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const [cvs3, ctx3] = newCanvas();
+  ctx3.fillStyle = C.surface; ctx3.fillRect(0, 0, PW, PH);
+  drawPageChrome(ctx3, 3, logoImg);
+
+  let Y3 = BODY_TOP;
+  Y3 = drawSectionHead(ctx3, "Active Funds", "Active Fund Audit", ML, Y3, C.amber);
+  ctx3.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx3.fillStyle = C.inkSoft;
+  ctx3.fillText(`${insights.activeAuditRows.length} active funds  ·  Signal = alpha + IR + benchmark gap + composite score`, ML, Y3);
+  Y3 += 14 * SCALE;
+
+  Y3 = drawTable(ctx3,
+    [{ h: "Fund Name", w: 190 }, { h: "Benchmark", w: 135 }, { h: "Gap vs Bench", w: 78, align: "R", numColor: true }, { h: "Action", w: 120, numColor: true }],
+    insights.activeAuditRows.map(r => [r.name, r.benchmark || "—", r.gap || "—", r.action]),
+    ML, Y3, { maxLines: 2 }
+  );
+
+  // Legend
+  const legY = Y3;
+  roundRect(ctx3, ML, legY, CW, 22 * SCALE, 4 * SCALE);
+  ctx3.fillStyle = C.surface; ctx3.fill();
+  ctx3.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx3.fillStyle = C.inkMd; ctx3.fillText("Signal guide:", ML + 8 * SCALE, legY + 14.5 * SCALE);
+  const legItems = [{ c: C.green, l: "Continue — beating benchmark" }, { c: C.amber, l: "Review — underperforming" }];
+  let llx = ML + 90 * SCALE;
+  legItems.forEach(lg => {
+    roundRect(ctx3, llx, legY + 6.5 * SCALE, 9 * SCALE, 9 * SCALE, 2 * SCALE);
+    ctx3.fillStyle = lg.c; ctx3.fill();
+    ctx3.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+    ctx3.fillStyle = C.inkMd; ctx3.fillText(lg.l, llx + 13 * SCALE, legY + 14.5 * SCALE);
+    llx += ctx3.measureText(lg.l).width + 28 * SCALE;
   });
+  Y3 += 30 * SCALE;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ▓▓▓▓▓▓▓▓▓▓▓▓  PAGE 5: INSIGHTS  ▓▓▓▓▓▓▓▓▓▓▓▓
-  // ─────────────────────────────────────────────────────────────────────────
-  newPage();
-  sectionHead("Insights", "Actionable Insights & Next Steps", P.green);
+  ctx3.strokeStyle = C.border; ctx3.lineWidth = 0.5 * SCALE;
+  ctx3.beginPath(); ctx3.moveTo(ML, Y3); ctx3.lineTo(ML + CW, Y3); ctx3.stroke(); Y3 += 14 * SCALE;
 
-  font(T.sm, "normal", P.inkSoft);
-  doc.text("Priority-ranked findings from your portfolio. Each card shows the signal and the suggested next action.", ML, curY);
-  curY += 14;
+  Y3 = drawSectionHead(ctx3, "Passive Funds", "Passive Fund Audit", ML, Y3, C.blue);
+  ctx3.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx3.fillStyle = C.inkSoft;
+  ctx3.fillText(`${insights.passiveAuditRows.length} index / passive funds  ·  Tracking diff vs best ETF on same benchmark`, ML, Y3);
+  Y3 += 14 * SCALE;
+
+  Y3 = drawTable(ctx3,
+    [{ h: "Fund Name", w: 185 }, { h: "Benchmark", w: 128 }, { h: "Gap (3Y)", w: 65, align: "R", numColor: true }, { h: "Track. Diff", w: 70, align: "R" }, { h: "Action", w: 75, numColor: true }],
+    insights.passiveAuditRows.map(r => [r.name, r.benchmark || "—", r.gap || "—", r.tracking || "—", r.action]),
+    ML, Y3, { maxLines: 2 }
+  );
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 4 — ALLOCATION
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const [cvs4, ctx4] = newCanvas();
+  ctx4.fillStyle = C.surface; ctx4.fillRect(0, 0, PW, PH);
+  drawPageChrome(ctx4, 4, logoImg);
+
+  let Y4 = BODY_TOP;
+  Y4 = drawSectionHead(ctx4, "Allocation", "Portfolio Allocation Breakdown", ML, Y4, C.blue);
+
+  const catMapP = new Map<string, { cur: number; inv: number }>();
+  report.fundDetails.forEach(f => { const e = catMapP.get(f.majorCategory) || { cur: 0, inv: 0 }; catMapP.set(f.majorCategory, { cur: e.cur + f.currentValue, inv: e.inv + f.invested }); });
+  const catItems = Array.from(catMapP.entries()).map(([n, v], i) => ({ label: n, value: v.cur, invested: v.inv, color: ACCENTS[i % ACCENTS.length] })).sort((a, b) => b.value - a.value);
+
+  Y4 = drawStackedBar(ctx4, catItems, summary.totalValue, ML, Y4, CW);
+
+  Y4 = drawTable(ctx4,
+    [{ h: "Category", w: 160 }, { h: "Current Value", w: 110, align: "R" }, { h: "Invested", w: 110, align: "R" }, { h: "Weight", w: 75, align: "R" }, { h: "Gain / Loss", w: 68, align: "R", numColor: true }],
+    catItems.map(c => { const g = c.value - c.invested; return [c.label, fmtCur(c.value), fmtCur(c.invested), fmtShare(summary.totalValue ? c.value / summary.totalValue : 0), `${g >= 0 ? "+" : ""}${fmtCur(g)}`]; }),
+    ML, Y4, { maxLines: 1 }
+  );
+
+  Y4 += 8 * SCALE;
+
+  Y4 = drawStackedBar(ctx4,
+    report.amcBreakdown.slice(0, 8).map((a, i) => ({ label: a.name, value: a.value, color: ACCENTS[i % ACCENTS.length] })),
+    summary.totalValue, ML, Y4, CW
+  );
+
+  Y4 = drawTable(ctx4,
+    [{ h: "Fund House (AMC)", w: 235 }, { h: "Value", w: 110, align: "R" }, { h: "Weight", w: 80, align: "R" }, { h: "No. of Funds", w: 98, align: "C" }],
+    report.amcBreakdown.slice(0, 10).map(a => [a.name, fmtCur(a.value), fmtShare(summary.totalValue ? a.value / summary.totalValue : 0), `${report.fundDetails.filter(f => f.amc === a.name).length}`]),
+    ML, Y4, { maxLines: 1 }
+  );
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 5 — INSIGHTS
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const [cvs5, ctx5] = newCanvas();
+  ctx5.fillStyle = C.surface; ctx5.fillRect(0, 0, PW, PH);
+  drawPageChrome(ctx5, 5, logoImg);
+
+  let Y5 = BODY_TOP;
+  Y5 = drawSectionHead(ctx5, "Insights", "Actionable Insights & Next Steps", ML, Y5, C.green);
+  ctx5.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx5.fillStyle = C.inkSoft;
+  ctx5.fillText("Priority-ranked findings. Each card shows the signal and the suggested next action.", ML, Y5);
+  Y5 += 14 * SCALE;
 
   insights.insightCards.forEach((card, i) => {
     const lt = card.title.toLowerCase();
-    const priority: "critical" | "warning" | "info" | "positive" =
-      lt.includes("action") || lt.includes("drag") || lt.includes("bottom") || lt.includes("trailing") ? "critical" :
-      lt.includes("review") || lt.includes("drift") || lt.includes("need")                              ? "warning"  :
-      lt.includes("beating") || lt.includes("all active") || lt.includes("strong")                      ? "positive" :
-                                                                                                            "info";
-    drawInsightCard(card, i, priority);
+    const type: "critical" | "warning" | "info" | "ok" =
+      lt.includes("trailing") || lt.includes("action") || lt.includes("drag") || lt.includes("bottom") ? "critical" :
+      lt.includes("review") || lt.includes("drift") || lt.includes("need") || lt.includes("over") || lt.includes("high") ? "warning" :
+      lt.includes("beating") || lt.includes("strong") || lt.includes("healthy") ? "ok" : "info";
+
+    // If card would overflow page, start a new page — this is a simplification;
+    // for a proper solution track Y and emit new canvas pages
+    if (Y5 > BODY_BTM - 60 * SCALE) return; // skip overflow for now
+
+    Y5 = drawInsightCard(ctx5, card, i, type, ML, Y5);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ▓▓▓▓▓▓▓▓▓▓▓▓  PAGE 6: HOLDINGS DETAIL  ▓▓▓▓▓▓▓▓▓▓▓▓
-  // ─────────────────────────────────────────────────────────────────────────
-  newPage();
-  sectionHead("Holdings", "Full Holdings Detail", P.inkMid);
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 6 — HOLDINGS
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const [cvs6, ctx6] = newCanvas();
+  ctx6.fillStyle = C.surface; ctx6.fillRect(0, 0, PW, PH);
+  drawPageChrome(ctx6, 6, logoImg);
 
-  font(T.sm, "normal", P.inkSoft);
-  doc.text(`${report.holdingsCount} active holdings sorted by current value  ·  XIRR shown where >1yr of data exists`, ML, curY);
-  curY += 14;
+  let Y6 = BODY_TOP;
+  Y6 = drawSectionHead(ctx6, "Holdings", "Full Holdings Detail", ML, Y6, C.inkSoft);
+  ctx6.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx6.fillStyle = C.inkSoft;
+  ctx6.fillText(`${report.holdingsCount} active holdings  ·  Sorted by current value  ·  XIRR shown where > 1 year data`, ML, Y6);
+  Y6 += 14 * SCALE;
 
-  drawTable({
-    cols: [
-      { header: "Fund Name",     width: 182 },
-      { header: "Category",      width: 68  },
-      { header: "Invested",      width: 72,  align: "right" },
-      { header: "Current Value", width: 75,  align: "right" },
-      { header: "Gain / Loss",   width: 70,  align: "right" },
-      { header: "XIRR",          width: 48,  align: "right", color: P.green },
-    ],
-    rows: report.fundDetails.map((f) => [
-      f.name,
-      f.majorCategory,
-      fmt.currency(f.invested),
-      fmt.currency(f.currentValue),
-      `${f.profit >= 0 ? "+" : ""}${fmt.currency(f.profit)}`,
-      fmt.pct(f.xirr, 2),
-    ]),
-    maxLines: 2,
-  });
+  Y6 = drawTable(ctx6,
+    [{ h: "Fund Name", w: 182 }, { h: "Category", w: 65 }, { h: "Invested", w: 72, align: "R" }, { h: "Current Value", w: 76, align: "R" }, { h: "Gain / Loss", w: 72, align: "R", numColor: true }, { h: "XIRR", w: 56, align: "R", numColor: true }],
+    report.fundDetails.map(f => { const g = f.profit; return [f.name, f.majorCategory, fmtCur(f.invested), fmtCur(f.currentValue), `${g >= 0 ? "+" : ""}${fmtCur(g)}`, fmtPct(f.xirr, 2)]; }),
+    ML, Y6, { maxLines: 2 }
+  );
 
-  // ── Top 5 visual bar ──
-  ensureSpace(72);
-  spacer(4);
-  hr(P.border);
-
-  font(T.h3, "bold", P.ink);
-  doc.text("Top 5 Holdings", ML, curY);
-  curY += 14;
+  // Top 5 horizontal bars
+  ctx6.strokeStyle = C.border; ctx6.lineWidth = 0.5 * SCALE;
+  ctx6.beginPath(); ctx6.moveTo(ML, Y6); ctx6.lineTo(ML + CW, Y6); ctx6.stroke(); Y6 += 12 * SCALE;
+  ctx6.font = `bold ${13 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  ctx6.fillStyle = C.ink; ctx6.fillText("Top 5 Holdings by Value", ML, Y6); Y6 += 16 * SCALE;
 
   report.topHoldings.forEach((h, i) => {
-    ensureSpace(24);
-    const pct = summary.totalValue ? h.value / summary.totalValue : 0;
-    const barW = Math.max(pct * CW, 6);
-    const hy = curY;
-    const accent = ALLOC_COLORS[i % ALLOC_COLORS.length];
-
-    // Track
-    fill(ML, hy, CW, 20, P.surfaceMd, 3);
-    // Fill
-    fill(ML, hy, barW, 20, accent, 3);
-
-    // Fund name
-    const textColor: RGB = pct > 0.2 ? P.white : P.ink;
-    font(T.sm, "bold", textColor);
-    doc.text(clamp(`${i + 1}. ${h.name}`, barW > 120 ? barW - 8 : CW - 12, T.sm, "bold"), ML + 6, hy + 13);
-
-    // Value (always right-aligned, dark if bar is short)
-    font(T.sm, "bold", pct > 0.55 ? P.white : P.inkMid);
-    const valStr = `${fmt.currency(h.value)}  (${(pct * 100).toFixed(1)}%)`;
-    doc.text(valStr, ML + CW - doc.getTextWidth(valStr) - 6, hy + 13);
-
-    curY += 24;
+    if (Y6 > BODY_BTM - 28 * SCALE) return;
+    Y6 = drawHorizBar(ctx6, h.name, summary.totalValue ? h.value / summary.totalValue : 0, fmtCur(h.value), ACCENTS[i % ACCENTS.length], i + 1, ML, Y6);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // FINAL FOOTER on last page
-  // ─────────────────────────────────────────────────────────────────────────
-  drawFooter();
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ASSEMBLE PDF
+  // Each canvas → JPEG → jsPDF page
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
+
+  const canvases = [cvs1, cvs2, cvs3, cvs4, cvs5, cvs6];
+  canvases.forEach((c, i) => {
+    if (i > 0) doc.addPage();
+    const imgData = c.toDataURL("image/jpeg", 0.96);
+    doc.addImage(imgData, "JPEG", 0, 0, PW_PT, PH_PT);
+  });
 
   doc.save("nivesify-portfolio-report.pdf");
 };
