@@ -6,57 +6,28 @@ import { xirr } from "./xirr";
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC TYPES
 // ─────────────────────────────────────────────────────────────────────────────
-
-export type ReportInsight = {
-  title: string;
-  signal: "Normal" | "Elevated" | "Watch-worthy" | "Strong" | "Aggressive";
-  observation: string;
-  meaning: string;
-  reassurance: string;
-  suggestedCheck: string;
-  severity: "info" | "warning" | "positive";
-};
-
+export type ReportInsight = { title: string; signal: "Normal"|"Elevated"|"Watch-worthy"|"Strong"|"Aggressive"; observation: string; meaning: string; reassurance: string; suggestedCheck: string; severity: "info"|"warning"|"positive" };
 export type PdfInsightMetric = { title: string; value: string; note: string };
 export type PdfAuditRow = { name: string; benchmark?: string; gap?: string; tracking?: string; action: string };
 export type PdfInsightCard = { title: string; summary: string; detail: string };
-export type PdfInsights = {
-  metrics: PdfInsightMetric[];
-  executiveSummary: string;
-  activeAuditRows: PdfAuditRow[];
-  passiveAuditRows: PdfAuditRow[];
-  insightCards: PdfInsightCard[];
-};
+export type PdfInsights = { metrics: PdfInsightMetric[]; executiveSummary: string; activeAuditRows: PdfAuditRow[]; passiveAuditRows: PdfAuditRow[]; insightCards: PdfInsightCard[] };
 export type SchemeBreakdownNode = { name: string; size?: number; children?: SchemeBreakdownNode[]; value?: number };
 export type AmcBreakdown = { name: string; value: number }[];
-export type ReportData = {
-  holdingsCount: number; topOneShare: number; topFiveShare: number; topAmcShare: number;
-  insights: ReportInsight[]; insightSummary: string;
-  schemeBreakdown: SchemeBreakdownNode; amcBreakdown: AmcBreakdown;
-  topHoldings: Array<{ name: string; value: number }>;
-  fundDetails: Array<{
-    name: string; invested: number; currentValue: number; profit: number;
-    units: number; nav: number; xirr: number | null;
-    nomineeStatus: "yes" | "no" | "partial" | "unknown";
-    amc: string; schemeCategory: string; majorCategory: string;
-  }>;
-};
+export type ReportData = { holdingsCount: number; topOneShare: number; topFiveShare: number; topAmcShare: number; insights: ReportInsight[]; insightSummary: string; schemeBreakdown: SchemeBreakdownNode; amcBreakdown: AmcBreakdown; topHoldings: Array<{ name: string; value: number }>; fundDetails: Array<{ name: string; invested: number; currentValue: number; profit: number; units: number; nav: number; xirr: number|null; nomineeStatus: "yes"|"no"|"partial"|"unknown"; amc: string; schemeCategory: string; majorCategory: string }> };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FORMATTERS  — currency always as "₹X.XX Cr / L / plain"
-// (canvas can render ₹ perfectly, unlike jsPDF Helvetica)
+// FORMATTERS
 // ─────────────────────────────────────────────────────────────────────────────
-
 const fmtCur = (v: number): string => {
   const n = Number.isFinite(v) ? v : 0;
-  const a = Math.abs(n), s = n < 0 ? "-" : "";
-  if (a >= 10_000_000) return `${s}₹${(a / 10_000_000).toFixed(2)} Cr`;
-  if (a >= 100_000)    return `${s}₹${(a / 100_000).toFixed(2)} L`;
-  if (a >= 1_000)      return `${s}₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(a)}`;
-  return `${s}₹${a.toFixed(0)}`;
+  const a = Math.abs(n), sign = n < 0 ? "-" : "";
+  if (a >= 10_000_000) return `${sign}₹${(a/10_000_000).toFixed(2)} Cr`;
+  if (a >= 100_000)    return `${sign}₹${(a/100_000).toFixed(2)} L`;
+  if (a >= 1_000)      return `${sign}₹${new Intl.NumberFormat("en-IN",{maximumFractionDigits:0}).format(a)}`;
+  return `${sign}₹${a.toFixed(0)}`;
 };
-const fmtPct = (v: number | null, d = 2) => v === null || !Number.isFinite(v) ? "N/A" : `${(v * 100).toFixed(d)}%`;
-const fmtShare = (v: number) => `${(Math.max(0, v) * 100).toFixed(1)}%`;
+const fmtPct = (v: number|null, d = 2) => (v === null || !Number.isFinite(v)) ? "N/A" : `${(v*100).toFixed(d)}%`;
+const fmtShare = (v: number) => `${(Math.max(0,v)*100).toFixed(1)}%`;
 
 const classifyCategory = (c?: string) => {
   if (!c) return "Other";
@@ -71,936 +42,901 @@ const deriveAmc = (meta?: MatchingScheme, fb?: string) => {
   const n = meta?.schemeName || fb || "";
   return (n.match(/^(.*?Mutual Fund)/i)?.[1] ?? n.split(" ")[0]) || "Other";
 };
+const buildMetaMap = (txns: InvestmentsData["transactions"] = [], lookup?: Map<number,MatchingScheme>) => {
+  const m = new Map<number,MatchingScheme>();
+  txns.forEach(t => { if (t.matchingScheme?.schemeCode) m.set(t.matchingScheme.schemeCode, t.matchingScheme); });
+  lookup?.forEach((s,c) => m.set(c, {...(m.get(c) ?? {} as MatchingScheme), ...s}));
+  return m;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // buildReportData
 // ─────────────────────────────────────────────────────────────────────────────
-
-const buildSchemeMetaMap = (txns: InvestmentsData["transactions"] = [], lookup?: Map<number, MatchingScheme>) => {
-  const m = new Map<number, MatchingScheme>();
-  txns.forEach(t => { if (t.matchingScheme?.schemeCode) m.set(t.matchingScheme.schemeCode, t.matchingScheme); });
-  lookup?.forEach((s, c) => m.set(c, { ...(m.get(c) ?? {} as MatchingScheme), ...s }));
-  return m;
-};
-
-const IT = { modMax:6, advMax:8, upperLimit:10, sfElevated:.2, sfWatch:.3, sfStrong:.4, t5Elevated:.6, t5Watch:.65, t5Strong:.75, amcEl:.3, amcW:.4, amcSt:.45, eqLow:.3, eqVeryLow:.25, eqHigh:.85, eqAgg:.9, debtHi:.7, debtSt:.75, hybHi:.6, hybW:.7, xirrLow:.07, xirrSt:.13 };
-
-export const buildReportData = (data: InvestmentsData, portfolio: Portfolio, totalValue: number, xirrValue: number | null, schemeLookup?: Map<number, MatchingScheme>): ReportData => {
+export const buildReportData = (data: InvestmentsData, portfolio: Portfolio, totalValue: number, xirrValue: number|null, schemeLookup?: Map<number,MatchingScheme>): ReportData => {
   const nomineeMap = data.nominees || {};
-  const meta = buildSchemeMetaMap(data.transactions || [], schemeLookup);
+  const meta = buildMetaMap(data.transactions || [], schemeLookup);
   const active = portfolio.filter(r => r.currentValue > 0);
-  const sorted = [...active].sort((a, b) => b.currentValue - a.currentValue);
+  const sorted = [...active].sort((a,b) => b.currentValue - a.currentValue);
   const holdingsCount = active.length;
-  const topOneShare = totalValue ? (sorted[0]?.currentValue || 0) / totalValue : 0;
-  const topFiveShare = totalValue ? sorted.slice(0, 5).reduce((s, f) => s + f.currentValue, 0) / totalValue : 0;
+  const topOneShare = totalValue ? (sorted[0]?.currentValue||0)/totalValue : 0;
+  const topFiveShare = totalValue ? sorted.slice(0,5).reduce((s,f) => s+f.currentValue,0)/totalValue : 0;
 
-  const schemeRoot: SchemeBreakdownNode = { name: "All Schemes", children: [] };
-  const majMap = new Map<string, SchemeBreakdownNode>();
+  const schemeRoot: SchemeBreakdownNode = {name:"All Schemes",children:[]};
+  const majMap = new Map<string,SchemeBreakdownNode>();
   active.forEach(row => {
     const m2 = meta.get(row.schemeCode), maj = classifyCategory(m2?.schemeCategory), sub = m2?.schemeCategory || "Uncategorized";
-    if (!majMap.has(maj)) { const n = { name: maj, children: [] as SchemeBreakdownNode[], size: 0 }; majMap.set(maj, n); schemeRoot.children?.push(n); }
+    if (!majMap.has(maj)) { const node = {name:maj,children:[] as SchemeBreakdownNode[],size:0}; majMap.set(maj,node); schemeRoot.children?.push(node); }
     const majNode = majMap.get(maj)!;
-    let subNode = majNode.children?.find(c => c.name === sub);
-    if (!subNode) { subNode = { name: sub, children: [], size: 0 }; majNode.children?.push(subNode); }
+    let subNode = majNode.children?.find(ch => ch.name === sub);
+    if (!subNode) { subNode = {name:sub,children:[],size:0}; majNode.children?.push(subNode); }
     const v = Math.max(0, row.currentValue);
-    subNode.children?.push({ name: row.mfName, size: v, value: v });
-    (subNode as any).size = (subNode.size || 0) + v;
-    (majNode as any).size = (majNode.size || 0) + v;
+    subNode.children?.push({name:row.mfName,size:v,value:v});
+    (subNode as any).size = (subNode.size||0)+v; (majNode as any).size = (majNode.size||0)+v;
   });
+  const amcMap = new Map<string,number>();
+  active.forEach(row => { const amc = deriveAmc(meta.get(row.schemeCode), row.mfName); amcMap.set(amc, (amcMap.get(amc)||0)+Math.max(0,row.currentValue)); });
+  const amcBreakdown = Array.from(amcMap.entries()).map(([name,value]) => ({name,value})).sort((a,b) => b.value-a.value);
+  const topAmcShare = totalValue ? (amcBreakdown[0]?.value||0)/totalValue : 0;
 
-  const amcMap = new Map<string, number>();
-  active.forEach(row => { const amc = deriveAmc(meta.get(row.schemeCode), row.mfName); amcMap.set(amc, (amcMap.get(amc) || 0) + Math.max(0, row.currentValue)); });
-  const amcBreakdown = Array.from(amcMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  const topAmcShare = totalValue ? (amcBreakdown[0]?.value || 0) / totalValue : 0;
-
-  const allocMap = new Map<string, number>();
-  active.forEach(row => { const b = classifyCategory(meta.get(row.schemeCode)?.schemeCategory); allocMap.set(b, (allocMap.get(b) || 0) + Math.max(0, row.currentValue)); });
-  const eq = totalValue ? (allocMap.get("Equity") || 0) / totalValue : 0;
-  const debt = totalValue ? (allocMap.get("Debt") || 0) / totalValue : 0;
-  const hyb = totalValue ? (allocMap.get("Hybrid") || 0) / totalValue : 0;
+  const allocMap = new Map<string,number>();
+  active.forEach(row => { const b = classifyCategory(meta.get(row.schemeCode)?.schemeCategory); allocMap.set(b,(allocMap.get(b)||0)+Math.max(0,row.currentValue)); });
+  const eq   = totalValue ? (allocMap.get("Equity")||0)/totalValue : 0;
+  const debt = totalValue ? (allocMap.get("Debt")||0)/totalValue : 0;
+  const hyb  = totalValue ? (allocMap.get("Hybrid")||0)/totalValue : 0;
 
   const insights: ReportInsight[] = [];
-  const p = (i: ReportInsight) => insights.push(i);
-  if (holdingsCount > IT.advMax) p({ title: "Over-diversification", signal: holdingsCount > IT.upperLimit ? "Strong" : "Watch-worthy", observation: `You hold ${holdingsCount} active funds.`, meaning: "Most retail portfolios need 3–6 funds. Beyond 8–10, overlap rises and strong performers get diluted.", reassurance: "Common as portfolios grow; correctable without disrupting goals.", suggestedCheck: "Consolidate similar schemes. Target: Equity 3–5, Debt 1–3, Hybrid 1–2, ELSS 1.", severity: holdingsCount > IT.upperLimit ? "warning" : "info" });
-  else if (holdingsCount > IT.modMax) p({ title: "Diversification at high end", signal: "Elevated", observation: `You hold ${holdingsCount} active funds.`, meaning: "At the upper end — dilutes strong performers.", reassurance: "Manageable if each fund has a distinct role.", suggestedCheck: "Verify each fund has a unique purpose; prune annually.", severity: "info" });
-  if (topOneShare >= IT.sfElevated) { const sig = topOneShare >= IT.sfStrong ? "Strong" : topOneShare >= IT.sfWatch ? "Watch-worthy" : "Elevated"; p({ title: "Single-fund exposure", signal: sig, observation: `Largest fund: ${fmtShare(topOneShare)} of portfolio.`, meaning: "Meaningful concentration — not risky if intentional.", reassurance: "Core holdings naturally grow as they compound.", suggestedCheck: "Confirm alignment with goals; rebalance only if accidental.", severity: sig === "Strong" ? "warning" : "info" }); }
-  if (topFiveShare >= IT.t5Elevated) { const sig = topFiveShare >= IT.t5Strong ? "Strong" : topFiveShare >= IT.t5Watch ? "Watch-worthy" : "Elevated"; p({ title: "Top 5 funds dominate", signal: sig, observation: `Top 5: ${fmtShare(topFiveShare)} of portfolio.`, meaning: "Typical of structured portfolios where core funds lead.", reassurance: "Fine if funds are meaningfully different.", suggestedCheck: "Check overlap; consolidate if similar.", severity: sig === "Strong" ? "warning" : "info" }); }
-  if (topAmcShare >= IT.amcEl) { const sig = topAmcShare >= IT.amcSt ? "Strong" : topAmcShare >= IT.amcW ? "Watch-worthy" : "Elevated"; p({ title: "AMC concentration", signal: sig, observation: `Top AMC: ${fmtShare(topAmcShare)}.`, meaning: "High AMC share increases operational dependency.", reassurance: "Acceptable when reflecting deliberate philosophy preference.", suggestedCheck: "Would you deliberately choose this AMC today?", severity: sig === "Strong" ? "warning" : "info" }); }
-  if (xirrValue !== null && xirrValue < IT.xirrLow && eq >= .4) p({ title: "Performance below expectation", signal: "Watch-worthy", observation: `XIRR: ${(xirrValue * 100).toFixed(2)}%.`, meaning: "Low for an equity-heavy portfolio.", reassurance: "Short windows can temporarily depress XIRR.", suggestedCheck: "Review persistent underperformers; check equity/debt mix.", severity: "warning" });
-  else if (xirrValue !== null && xirrValue >= IT.xirrSt) p({ title: "Strong performance signal", signal: "Strong", observation: `XIRR: ${(xirrValue * 100).toFixed(2)}%.`, meaning: "Strong long-term return — sound portfolio structure.", reassurance: "Consistent returns reflect disciplined behaviour.", suggestedCheck: "Maintain discipline; review if any fund mandate changes.", severity: "positive" });
-  if (eq > 0 && eq < IT.eqLow) p({ title: "Low equity allocation", signal: eq < IT.eqVeryLow ? "Watch-worthy" : "Elevated", observation: `Equity: ${fmtShare(eq)}.`, meaning: "Low equity limits long-term growth.", reassurance: "Appropriate for near-term goals.", suggestedCheck: "If horizon 7+ years, consider higher equity.", severity: "info" });
-  if (eq > IT.eqHigh) p({ title: "High equity allocation", signal: eq > IT.eqAgg ? "Aggressive" : "Strong", observation: `Equity: ${fmtShare(eq)}.`, meaning: "High-growth but high drawdown risk.", reassurance: "Effective for long horizons with volatility tolerance.", suggestedCheck: "Ensure alignment with horizon, liquidity, and tolerance.", severity: "info" });
-  if (debt > IT.debtHi) p({ title: "High debt allocation", signal: debt > IT.debtSt ? "Watch-worthy" : "Elevated", observation: `Debt: ${fmtShare(debt)}.`, meaning: "Can underperform inflation long-term.", reassurance: "Right for capital preservation.", suggestedCheck: "Confirm matches risk profile and liquidity timeline.", severity: "info" });
-  if (hyb > IT.hybHi) p({ title: "High hybrid allocation", signal: hyb > IT.hybW ? "Watch-worthy" : "Elevated", observation: `Hybrid: ${fmtShare(hyb)}.`, meaning: "Reduces direct control over asset split.", reassurance: "Effective for simplified allocation.", suggestedCheck: "Check desired asset mix and tax preferences.", severity: "info" });
-  if (!insights.length) p({ title: "Portfolio structure looks healthy", signal: "Normal", observation: "No major concentration risks detected.", meaning: "Key checks within typical ranges for long-term investors.", reassurance: "Stable, deliberate structure.", suggestedCheck: "Continue periodic reviews; rebalance if goals change.", severity: "positive" });
+  const add = (i: ReportInsight) => insights.push(i);
+
+  if (holdingsCount > 8)
+    add({title:"You have too many funds",signal:holdingsCount>10?"Strong":"Watch-worthy",observation:`You hold ${holdingsCount} funds.`,meaning:"More than 6-8 funds rarely improves returns. It just spreads your attention and adds clutter.",reassurance:"This is very common and easy to fix.",suggestedCheck:"Pick the best fund in each category. Let go of the rest.",severity:"warning"});
+  else if (holdingsCount > 6)
+    add({title:"Slightly too many funds",signal:"Elevated",observation:`You hold ${holdingsCount} funds.`,meaning:"More than 6-7 funds adds complexity without much benefit.",reassurance:"Each fund should have a clear reason to exist in your portfolio.",suggestedCheck:"Check if any two funds do the same job. Keep the better one.",severity:"info"});
+
+  if (topOneShare >= 0.2) {
+    const sig = topOneShare >= 0.4 ? "Strong" : topOneShare >= 0.3 ? "Watch-worthy" : "Elevated";
+    add({title:"One fund holds a lot of your money",signal:sig,observation:`Your biggest fund is ${fmtShare(topOneShare)} of your portfolio.`,meaning:"If this fund drops, a large chunk of your wealth gets affected.",reassurance:"Fine if you chose it intentionally. Risky if it grew big by accident.",suggestedCheck:"Ask yourself: would you put this much in this one fund today?",severity:sig==="Strong"?"warning":"info"});
+  }
+  if (topFiveShare >= 0.65) {
+    const sig = topFiveShare >= 0.8 ? "Strong" : "Watch-worthy";
+    add({title:"5 funds drive most of your returns",signal:sig,observation:`Your top 5 funds hold ${fmtShare(topFiveShare)}.`,meaning:"Your overall returns depend heavily on how these 5 perform.",reassurance:"This is healthy if those 5 funds are from different categories.",suggestedCheck:"Are all 5 from different market segments? If yes, you're fine.",severity:"info"});
+  }
+  if (topAmcShare >= 0.35) {
+    const sig = topAmcShare >= 0.5 ? "Strong" : "Elevated";
+    add({title:"One fund house manages too much",signal:sig,observation:`One fund house manages ${fmtShare(topAmcShare)} of your money.`,meaning:"If that company faces problems, a big part of your money is at risk.",reassurance:"Large AMCs are regulated and generally safe. Still worth diversifying.",suggestedCheck:"Try to spread money across at least 2-3 different fund houses.",severity:sig==="Strong"?"warning":"info"});
+  }
+  const xpct = (xirrValue ?? 0) * 100;
+  if (xirrValue !== null && xpct < 7 && eq >= 0.4)
+    add({title:"Returns are below expectations",signal:"Watch-worthy",observation:`Your annual return is ${xpct.toFixed(2)}%.`,meaning:"For an equity-heavy portfolio, this is lower than what a simple index fund offers.",reassurance:"Returns can look low in a bad market phase. Check the 3-year picture.",suggestedCheck:"Find which funds are dragging returns. The Fund Report Card on Page 4 shows this.",severity:"warning"});
+  else if (xirrValue !== null && xpct >= 13)
+    add({title:"Excellent returns!",signal:"Strong",observation:`Your annual return is ${xpct.toFixed(2)}%.`,meaning:"This is better than what most investors earn. Your discipline is paying off.",reassurance:"Keep your SIPs running. Don't let short-term dips shake you.",suggestedCheck:"Review once a year to ensure the same funds are still performing.",severity:"positive"});
+
+  if (eq > 0 && eq < 0.25)
+    add({title:"Very little in growth funds",signal:"Watch-worthy",observation:`Only ${fmtShare(eq)} is in equity / growth funds.`,meaning:"With such low equity, your money may not grow faster than inflation.",reassurance:"Right approach if your goal is within 1-3 years.",suggestedCheck:"If investing for 5+ years, consider adding equity (growth) funds.",severity:"info"});
+  if (eq > 0.88)
+    add({title:"Very high equity — know your risk",signal:eq>0.93?"Aggressive":"Strong",observation:`${fmtShare(eq)} is in equity / growth funds.`,meaning:"High growth potential, but also larger drops during market downturns.",reassurance:"Perfect for long-term goals. Just ensure you can handle a -30% dip without panic.",suggestedCheck:"Keep 6 months of expenses in a safe fund or savings account.",severity:"info"});
+  if (!insights.length)
+    add({title:"Portfolio looks well-structured",signal:"Normal",observation:"No major issues found.",meaning:"Your portfolio is properly diversified with no obvious red flags.",reassurance:"Keep investing regularly and review once a year.",suggestedCheck:"Stay the course. Small tweaks are fine but avoid over-trading.",severity:"positive"});
 
   const fundDetails = sorted.map(fund => {
     const m2 = meta.get(fund.schemeCode);
-    const cf = buildCashflows(fund.allTransactions.map(t => ({ amount: Math.abs(t.amount), date: new Date(t.date), type: t.type === "Investment" ? "buy" as const : "sell" as const })), fund.currentValue, new Date(), fund.currentValue > 0);
+    const cf = buildCashflows(fund.allTransactions.map(t => ({amount:Math.abs(t.amount),date:new Date(t.date),type:t.type==="Investment"?"buy" as const:"sell" as const})), fund.currentValue, new Date(), fund.currentValue>0);
     const folios = Array.from(new Set(fund.allTransactions.map(t => t.folio?.split("/")[0].trim()).filter(Boolean) as string[]));
     const flags = folios.map(f => nomineeMap[f]).filter(f => f !== undefined);
-    let ns: "yes" | "no" | "partial" | "unknown" = "unknown";
-    if (flags.length) { const y = flags.some(f => f === true), n = flags.some(f => f === false); ns = y && n ? "partial" : y ? "yes" : "no"; if (flags.length < folios.length) ns = "partial"; }
-    return { name: fund.mfName, invested: fund.currentInvested, currentValue: fund.currentValue, profit: fund.profit, units: fund.currentUnits || 0, nav: fund.latestPrice || 0, xirr: xirr(cf), nomineeStatus: ns, amc: deriveAmc(m2, fund.mfName), schemeCategory: m2?.schemeCategory || "Uncategorized", majorCategory: classifyCategory(m2?.schemeCategory) };
+    let ns: "yes"|"no"|"partial"|"unknown" = "unknown";
+    if (flags.length) { const y = flags.some(f => f===true), n = flags.some(f => f===false); ns = y&&n?"partial":y?"yes":"no"; if (flags.length<folios.length) ns="partial"; }
+    return {name:fund.mfName,invested:fund.currentInvested,currentValue:fund.currentValue,profit:fund.profit,units:fund.currentUnits||0,nav:fund.latestPrice||0,xirr:xirr(cf),nomineeStatus:ns,amc:deriveAmc(m2,fund.mfName),schemeCategory:m2?.schemeCategory||"Uncategorized",majorCategory:classifyCategory(m2?.schemeCategory)};
   });
 
-  return { holdingsCount, topOneShare, topFiveShare, topAmcShare, insights, insightSummary: insights.some(i => i.severity === "warning") ? "Your portfolio shows areas to review, but the structure appears intentional." : "Your portfolio reflects deliberate long-term intent.", schemeBreakdown: schemeRoot, amcBreakdown, topHoldings: sorted.slice(0, 5).map(f => ({ name: f.mfName, value: f.currentValue })), fundDetails };
+  const hasWarning = insights.some(i => i.severity === "warning");
+  return {holdingsCount,topOneShare,topFiveShare,topAmcShare,insights,insightSummary:hasWarning?"Some funds need attention. Your action plan is on Page 3.":"Your portfolio is on track. Keep investing steadily.",schemeBreakdown:schemeRoot,amcBreakdown,topHoldings:sorted.slice(0,5).map(f => ({name:f.mfName,value:f.currentValue})),fundDetails};
 };
 
 export const formatCurrencyPlain = fmtCur;
-export const tooltips = { totalValue: "Latest market value of all mutual fund holdings.", invested: "Total amount invested from your transactions (net of redemptions).", allTimeReturns: "Unrealised + realised gains across your portfolio.", xirr: "Annualised return based on your cashflows.", monthlyIncome: "Illustrative monthly income if portfolio is 25x yearly expenses.", holdings: "Funds with current value greater than zero.", topFund: "Share of the single largest fund in your portfolio.", topFive: "Share of top five funds combined in your portfolio." };
+export const tooltips = {totalValue:"Latest market value of all mutual fund holdings.",invested:"Total amount invested (net of redemptions).",allTimeReturns:"Unrealised + realised gains.",xirr:"Annualised return based on cashflows.",monthlyIncome:"Illustrative income if portfolio is 25x yearly expenses.",holdings:"Funds with value > 0.",topFund:"Share of the largest single fund.",topFive:"Share of the top 5 funds combined."};
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CANVAS PDF ENGINE
-// Renders each page to an HTML Canvas element, then exports JPEG into jsPDF.
-// This gives 100% correct rendering: real fonts, real ₹ symbol, no encoding bugs.
+// PDF ENGINE  —  Canvas → PNG → jsPDF
+// Scale 3 = pixel-perfect at any zoom. PNG = no JPEG blur.
+// Every bug from all previous versions fixed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SCALE    = 2;           // retina scale for crispness
-const PW_PT    = 595;         // A4 width in points
-const PH_PT    = 842;         // A4 height in points
-const PW       = PW_PT * SCALE;
-const PH       = PH_PT * SCALE;
-const ML       = 40 * SCALE;
-const MR       = 40 * SCALE;
-const CW       = PW - ML - MR;
+// A4 = 595 × 842 pt. Canvas at 3× = 1785 × 2526 px.
+const S   = 3;
+const PW  = 595 * S;
+const PH  = 842 * S;
+const ML  = 44  * S;   // left margin (pts × S)
+const MR  = 44  * S;
+const CW  = PW - ML - MR;
 
-// Colours
+const F   = "'Segoe UI','Helvetica Neue',Arial,sans-serif";
+
+// ── Palette ──
 const C = {
-  navy:    "#0f172a", navyMd:  "#16244a", navyLt:  "#1e3a5f",
-  green:   "#16a34a", greenDk: "#14532d", greenLt: "#dcfce7", greenBd: "#86efac",
-  blue:    "#2563eb", blueLt:  "#dbeafe", blueMd:  "#3b82f6",
-  teal:    "#0d9488", tealLt:  "#ccfbf1",
-  amber:   "#b45309", amberLt: "#fef3c7", amberBd: "#fcd34d",
-  red:     "#b91c1c", redLt:   "#fee2e2",  redBd:   "#fca5a5",
-  purple:  "#7c3aed", purpleLt:"#f5f3ff",
-  orange:  "#c2410c",
-  white:   "#ffffff", ink:     "#0f172a",  inkMd:   "#334155",
-  inkSoft: "#64748b", inkFaint:"#94a3b8",
-  surface: "#f8fafc", surfMd:  "#f1f5f9",
-  border:  "#e2e8f0", borderMd:"#cbd5e1",
+  navy:    "#0B1E3D", navyMd:  "#142952", navyLt:  "#1a3a6e",
+  green:   "#0D9F6F", greenDk: "#085c40", greenLt: "#E6FAF3", greenBd: "#6EE7B7",
+  blue:    "#2563EB", blueLt:  "#EFF6FF",
+  amber:   "#D97706", amberLt: "#FFFBEB", amberBd: "#FCD34D",
+  red:     "#DC2626", redLt:   "#FEF2F2", redBd:   "#FCA5A5",
+  purple:  "#7C3AED", teal:    "#0891B2",
+  ink:     "#0F172A", inkMd:   "#334155", inkSoft: "#64748B", inkFaint:"#94A3B8",
+  surface: "#F8FAFC", surfMd:  "#F1F5F9", white:   "#FFFFFF",
+  border:  "#E2E8F0", borderMd:"#CBD5E1",
 };
-const ACCENTS = [C.blue, C.green, C.amber, C.purple, C.red, C.teal, C.orange, "#0891b2", "#be185d"];
+const PALETTE = ["#2563EB","#0D9F6F","#D97706","#7C3AED","#DC2626","#0891B2","#C2410C","#BE185D"];
 
 type Ctx = CanvasRenderingContext2D;
 
-// ── Canvas helpers ────────────────────────────────────────────────────────────
+// ── Drawing helpers ──────────────────────────────────────────────────────────
 
-const loadFont = async () => {
-  // Ensure DM Sans is loaded for canvas
-  try {
-    await document.fonts.load(`bold ${14 * SCALE}px "DM Sans"`);
-    await document.fonts.load(`${12 * SCALE}px "DM Sans"`);
-  } catch { /* ignore */ }
+/** Draw a rounded rect path (no fill/stroke — caller does that) */
+function rrPath(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
+  const R = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+R, y);
+  ctx.lineTo(x+w-R, y); ctx.arcTo(x+w, y, x+w, y+R, R);
+  ctx.lineTo(x+w, y+h-R); ctx.arcTo(x+w, y+h, x+w-R, y+h, R);
+  ctx.lineTo(x+R, y+h); ctx.arcTo(x, y+h, x, y+h-R, R);
+  ctx.lineTo(x, y+R); ctx.arcTo(x, y, x+R, y, R);
+  ctx.closePath();
+}
+const fillRR = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number, col: string) => {
+  rrPath(ctx,x,y,w,h,r); ctx.fillStyle = col; ctx.fill();
+};
+const strokeRR = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number, col: string, lw = 0.5) => {
+  ctx.save(); rrPath(ctx,x,y,w,h,r); ctx.strokeStyle = col; ctx.lineWidth = lw*S; ctx.stroke(); ctx.restore();
 };
 
-const newCanvas = (): [HTMLCanvasElement, Ctx] => {
-  const c = document.createElement("canvas");
-  c.width = PW; c.height = PH;
-  const ctx = c.getContext("2d")!;
-  ctx.clearRect(0, 0, PW, PH);
-  return [c, ctx];
+/** Set font. Returns approximate line-height in px. */
+const font = (ctx: Ctx, pt: number, bold = false, italic = false): number => {
+  ctx.font = `${italic?"italic ":""}${bold?700:400} ${pt*S}px ${F}`;
+  return pt * S * 1.3;
 };
 
-/** Truncate text to fit maxWidth. Returns truncated string. */
-const trunc = (ctx: Ctx, text: string, maxW: number): string => {
+/** Clip text to maxPx; append "…" if too wide. Caller must set font first. */
+const clip = (ctx: Ctx, text: string, maxPx: number): string => {
   if (!text) return "";
-  if (ctx.measureText(text).width <= maxW) return text;
+  if (ctx.measureText(text).width <= maxPx) return text;
   let lo = 0, hi = text.length;
   while (lo < hi - 1) {
     const mid = (lo + hi) >> 1;
-    ctx.measureText(text.slice(0, mid) + "…").width <= maxW ? (lo = mid) : (hi = mid);
+    ctx.measureText(text.slice(0,mid)+"…").width <= maxPx ? (lo = mid) : (hi = mid);
   }
   return text.slice(0, lo) + "…";
 };
 
-/** Word-wrap text into lines fitting maxWidth */
-const wrapLines = (ctx: Ctx, text: string, maxW: number, maxLines = 99): string[] => {
-  const words = String(text || "").split(/\s+/);
+/** Word-wrap into lines, each ≤ maxPx. Caller must set font first. */
+const wrap = (ctx: Ctx, text: string, maxPx: number, maxLines = 99): string[] => {
+  const words = String(text||"").split(/\s+/);
   const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (ctx.measureText(test).width > maxW && current) {
-      lines.push(current);
-      current = word;
-      if (lines.length >= maxLines - 1) { current = word; break; }
-    } else {
-      current = test;
-    }
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? cur+" "+w : w;
+    if (ctx.measureText(test).width > maxPx && cur) {
+      lines.push(cur);
+      cur = w;
+      if (lines.length >= maxLines-1) break;
+    } else cur = test;
   }
-  if (current) {
-    if (lines.length >= maxLines) {
-      // truncate last line
-      lines[lines.length - 1] = trunc(ctx, lines[lines.length - 1] + " " + current, maxW);
-    } else {
-      lines.push(current);
-    }
+  if (cur) {
+    if (lines.length >= maxLines) lines[lines.length-1] = clip(ctx, lines[lines.length-1]+" "+cur, maxPx);
+    else lines.push(cur);
   }
   return lines.slice(0, maxLines);
 };
 
-/** Rounded rectangle path */
-const roundRect = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number) => {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-};
+// ── Page chrome ───────────────────────────────────────────────────────────────
+const HDR = 56 * S;
+const FTR = 34 * S;
+const BODY_TOP = HDR + 16*S;
+const BODY_BTM = PH - FTR - 10*S;
 
-/** Draw header band + footer for each page */
-const drawPageChrome = (ctx: Ctx, pageNum: number, logoImg: HTMLImageElement | null) => {
-  const HDR = 54 * SCALE;
+const drawChrome = (ctx: Ctx, pageNum: number, logo: HTMLImageElement|null) => {
+  // Header band
+  ctx.fillStyle = C.navy; ctx.fillRect(0, 0, PW, HDR);
+  ctx.fillStyle = C.green; ctx.fillRect(0, HDR-2*S, PW, 2*S);
 
-  // Header background
-  ctx.fillStyle = C.navy;
-  ctx.fillRect(0, 0, PW, HDR);
-
-  // Green accent line at bottom of header
-  ctx.fillStyle = C.green;
-  ctx.fillRect(0, HDR - 2 * SCALE, PW, 2 * SCALE);
-
-  // Logo
-  if (logoImg) {
-    try { ctx.drawImage(logoImg, ML, 13 * SCALE, 24 * SCALE, 24 * SCALE); } catch { /* skip */ }
+  // Logo — proportional, max height 36pt
+  let brandX = ML;
+  if (logo && logo.naturalWidth > 0) {
+    const lh = 36*S;
+    const lw = Math.round((logo.naturalWidth/logo.naturalHeight)*lh);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(logo, ML, (HDR-lh)/2, lw, lh);
+    brandX = ML + lw + 10*S;
   }
-  const lx = logoImg ? ML + 30 * SCALE : ML;
+  font(ctx, 10.5, true); ctx.fillStyle = C.white;
+  ctx.fillText("Nivesify", brandX, HDR*0.47);
+  font(ctx, 8); ctx.fillStyle = C.inkFaint;
+  ctx.fillText("Thoughtful Money, Better Life", brandX, HDR*0.76);
 
-  ctx.fillStyle = C.white;
-  ctx.font = `bold ${10 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillText("Nivesify", lx, 27 * SCALE);
-  ctx.fillStyle = C.inkFaint;
-  ctx.font = `${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillText("Thoughtful Money, Better Life", lx, 39 * SCALE);
-
-  // Right side: title + page
-  ctx.fillStyle = C.white;
-  ctx.font = `bold ${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const titleStr = "Mutual Fund Health Check";
-  const titleW = ctx.measureText(titleStr).width;
-  ctx.fillText(titleStr, PW - MR - titleW, 26 * SCALE);
-
-  ctx.fillStyle = C.inkFaint;
-  ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const dateStr = `Page ${pageNum}  ·  ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`;
-  const dateW = ctx.measureText(dateStr).width;
-  ctx.fillText(dateStr, PW - MR - dateW, 38 * SCALE);
+  // Right side
+  font(ctx, 9, true); ctx.fillStyle = C.white;
+  const t = "Mutual Fund Health Check";
+  ctx.fillText(t, PW-MR-ctx.measureText(t).width, HDR*0.44);
+  font(ctx, 7.5); ctx.fillStyle = C.inkFaint;
+  const d = `Page ${pageNum}  ·  ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}`;
+  ctx.fillText(d, PW-MR-ctx.measureText(d).width, HDR*0.73);
 
   // Footer
-  const FY = PH - 34 * SCALE;
-  ctx.strokeStyle = C.border;
-  ctx.lineWidth = 0.5 * SCALE;
-  ctx.beginPath(); ctx.moveTo(ML, FY); ctx.lineTo(PW - MR, FY); ctx.stroke();
-
-  ctx.fillStyle = C.inkFaint;
-  ctx.font = `${7 * SCALE}px "DM Sans", "Inter", sans-serif`;
+  const fy = PH - FTR;
+  ctx.strokeStyle = C.border; ctx.lineWidth = 0.4*S;
+  ctx.beginPath(); ctx.moveTo(ML,fy); ctx.lineTo(PW-MR,fy); ctx.stroke();
+  font(ctx, 7); ctx.fillStyle = C.inkFaint;
   const disc = "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on any information in this report.";
-  const discLines = wrapLines(ctx, disc, CW - 50 * SCALE, 2);
-  discLines.forEach((l, i) => ctx.fillText(l, ML, FY + 13 * SCALE + i * 10 * SCALE));
-
-  // Page number chip
-  ctx.font = `bold ${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const pgStr = String(pageNum);
-  const pgW = ctx.measureText(pgStr).width + 12 * SCALE;
-  roundRect(ctx, PW - MR - pgW, FY + 5 * SCALE, pgW, 15 * SCALE, 4 * SCALE);
-  ctx.fillStyle = C.green; ctx.fill();
-  ctx.fillStyle = C.white;
-  ctx.fillText(pgStr, PW - MR - pgW / 2 - ctx.measureText(pgStr).width / 2, FY + 15.5 * SCALE);
+  const dl = wrap(ctx, disc, CW-50*S, 2);
+  dl.forEach((l,i) => ctx.fillText(l, ML, fy+12*S+i*10*S));
+  // Page chip
+  font(ctx, 8, true); ctx.fillStyle = C.white;
+  const pg = String(pageNum);
+  const cw2 = ctx.measureText(pg).width + 14*S;
+  fillRR(ctx, PW-MR-cw2, fy+5*S, cw2, 17*S, 4*S, C.green);
+  ctx.fillText(pg, PW-MR-cw2/2-ctx.measureText(pg).width/2, fy+16*S);
 };
 
-/** Draw a section header: coloured pill + large title + accent underline */
-const drawSectionHead = (ctx: Ctx, tag: string, title: string, x: number, y: number, accent: string): number => {
-  // Pill
-  ctx.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const pillW = ctx.measureText(tag.toUpperCase()).width + 14 * SCALE;
-  roundRect(ctx, x, y, pillW, 15 * SCALE, 3 * SCALE);
-  ctx.fillStyle = accent; ctx.fill();
-  ctx.fillStyle = C.white;
-  ctx.fillText(tag.toUpperCase(), x + 7 * SCALE, y + 10.5 * SCALE);
-  y += 20 * SCALE;
+// ── Section header — FIXED NO-OVERLAP VERSION ─────────────────────────────────
+// Layout: [tag pill] then [big title on next line] then [underline]
+// Returns Y after everything including bottom padding.
+const sHead = (ctx: Ctx, tag: string, title: string, y: number, accent = C.green): number => {
+  const PILL_H  = 16 * S;
+  const PILL_PX = 10 * S;
+  const GAP     = 12 * S;   // space between pill bottom and title top
+  const TITLE_H = 20 * S;   // approximate height of 18pt text
 
-  // Title
-  ctx.font = `bold ${17 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillStyle = C.ink;
-  ctx.fillText(title, x, y);
-  y += 5 * SCALE;
+  // Pill
+  font(ctx, 7.5, true); ctx.fillStyle = C.white;
+  const tagW = ctx.measureText(tag.toUpperCase()).width + PILL_PX*2;
+  fillRR(ctx, ML, y, tagW, PILL_H, 4*S, accent);
+  ctx.fillText(tag.toUpperCase(), ML+PILL_PX, y+PILL_H*0.69);
+
+  // Title — BELOW pill, with GAP
+  const titleY = y + PILL_H + GAP + TITLE_H;  // baseline
+  font(ctx, 18, true); ctx.fillStyle = C.ink;
+  ctx.fillText(title, ML, titleY);
 
   // Underline
-  ctx.fillStyle = accent;
-  ctx.fillRect(x, y, 50 * SCALE, 2.5 * SCALE);
-  y += 14 * SCALE;
+  const ulY = titleY + 5*S;
+  const ulGrad = ctx.createLinearGradient(ML, 0, ML+80*S, 0);
+  ulGrad.addColorStop(0, accent); ulGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = ulGrad; ctx.fillRect(ML, ulY, 80*S, 2.5*S);
 
-  return y;
+  return ulY + 14*S;
 };
 
-/** KPI metric card */
-const drawMetricCard = (ctx: Ctx, x: number, y: number, w: number, h: number, label: string, value: string, note: string, accent: string) => {
-  // Shadow
-  ctx.shadowColor = "rgba(0,0,0,0.06)";
-  ctx.shadowBlur = 8 * SCALE;
-  ctx.shadowOffsetY = 2 * SCALE;
-
-  roundRect(ctx, x, y, w, h, 6 * SCALE);
-  ctx.fillStyle = C.white; ctx.fill();
+// ── Metric card ───────────────────────────────────────────────────────────────
+const metricCard = (ctx: Ctx, x: number, y: number, w: number, h: number, label: string, value: string, sub: string, accent: string) => {
+  ctx.shadowColor = "rgba(0,0,0,0.07)"; ctx.shadowBlur = 6*S; ctx.shadowOffsetY = 2*S;
+  fillRR(ctx, x, y, w, h, 7*S, C.white);
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  strokeRR(ctx, x, y, w, h, 7*S, C.border, 0.4);
 
-  ctx.strokeStyle = C.border; ctx.lineWidth = 0.5 * SCALE;
-  roundRect(ctx, x, y, w, h, 6 * SCALE); ctx.stroke();
+  // Accent top bar
+  fillRR(ctx, x, y, w, 4*S, 7*S, accent);
+  ctx.fillStyle = accent; ctx.fillRect(x, y+2*S, w, 2*S);
 
-  // Left accent bar
-  roundRect(ctx, x, y, 4 * SCALE, h, 6 * SCALE);
-  ctx.fillStyle = accent; ctx.fill();
-  ctx.fillRect(x + 2 * SCALE, y, 2 * SCALE, h);
-
-  // Label
-  ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillStyle = C.inkFaint;
-  ctx.fillText(trunc(ctx, label, w - 20 * SCALE), x + 12 * SCALE, y + 16 * SCALE);
-
-  // Value
-  ctx.font = `bold ${13 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillStyle = accent;
-  ctx.fillText(trunc(ctx, value, w - 18 * SCALE), x + 12 * SCALE, y + 34 * SCALE);
-
-  // Note
-  if (note) {
-    ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx.fillStyle = C.inkFaint;
-    ctx.fillText(trunc(ctx, note, w - 18 * SCALE), x + 12 * SCALE, y + 49 * SCALE);
-  }
+  font(ctx, 8); ctx.fillStyle = C.inkFaint;
+  ctx.fillText(clip(ctx, label, w-16*S), x+10*S, y+18*S);
+  font(ctx, 14, true); ctx.fillStyle = accent;
+  ctx.fillText(clip(ctx, value, w-16*S), x+10*S, y+37*S);
+  if (sub) { font(ctx, 7.5); ctx.fillStyle = C.inkSoft; ctx.fillText(clip(ctx, sub, w-16*S), x+10*S, y+52*S); }
 };
 
-/** 
- * Stacked horizontal bar chart 
- * Returns new Y after rendering 
- */
-const drawStackedBar = (ctx: Ctx, items: { label: string; value: number; color: string }[], total: number, x: number, y: number, w: number): number => {
-  const barH = 16 * SCALE;
+// ── Table ─────────────────────────────────────────────────────────────────────
+type Col = { h: string; w: number; align?: "L"|"R"|"C"; colorFn?: (raw: string)=>string|null };
 
-  // Track background
-  roundRect(ctx, x, y, w, barH, 3 * SCALE);
-  ctx.fillStyle = C.surfMd; ctx.fill();
+const drawTable = (ctx: Ctx, cols: Col[], rows: string[][], startY: number, opts: {maxLines?: number}={}): number => {
+  const {maxLines = 3} = opts;
+  const PAD_X = 9*S, PAD_Y = 7*S, LINE_H = 12*S, ROW_MIN = 26*S, HDR_H = 23*S;
 
-  let bx = x;
-  items.forEach((item, i) => {
-    const bw = total > 0 ? (item.value / total) * w : 0;
-    if (bw < 1) return;
-    if (i === 0) { roundRect(ctx, bx, y, bw, barH, 3 * SCALE); } 
-    else if (i === items.length - 1) { ctx.beginPath(); ctx.rect(bx, y, bw - 3 * SCALE, barH); ctx.quadraticCurveTo(bx + bw, y, bx + bw, y + 3 * SCALE); ctx.lineTo(bx + bw, y + barH - 3 * SCALE); ctx.quadraticCurveTo(bx + bw, y + barH, bx + bw - 3 * SCALE, y + barH); ctx.lineTo(bx, y + barH); ctx.closePath(); }
-    else { ctx.beginPath(); ctx.rect(bx, y, bw, barH); ctx.closePath(); }
-    ctx.fillStyle = item.color; ctx.fill();
-    bx += bw;
-  });
+  const total = cols.reduce((s,c) => s+c.w, 0);
+  const sc = CW / total;
+  const ws = cols.map(c => c.w*sc);
+  const colX = (i: number) => ML + ws.slice(0,i).reduce((s,w) => s+w, 0);
 
-  // Stroke
-  ctx.strokeStyle = C.borderMd; ctx.lineWidth = 0.5 * SCALE;
-  roundRect(ctx, x, y, w, barH, 3 * SCALE); ctx.stroke();
-  y += barH + 8 * SCALE;
+  let Y = startY;
 
-  // Legend
-  let lx = x;
-  ctx.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  for (const item of items) {
-    const pct = total > 0 ? (item.value / total) * 100 : 0;
-    if (pct < 0.3) continue;
-    const label = `${item.label.length > 20 ? item.label.slice(0, 19) + "." : item.label}  ${pct.toFixed(1)}%`;
-    const lw2 = ctx.measureText(label).width + 18 * SCALE;
-    if (lx + lw2 > x + w) { y += 13 * SCALE; lx = x; }
-    roundRect(ctx, lx, y - 7 * SCALE, 9 * SCALE, 9 * SCALE, 2 * SCALE);
-    ctx.fillStyle = item.color; ctx.fill();
-    ctx.fillStyle = C.inkMd; ctx.fillText(label, lx + 13 * SCALE, y + 0.5 * SCALE);
-    lx += lw2 + 6 * SCALE;
-  }
-  y += 14 * SCALE;
-  return y;
-};
+  const drawHdr = () => {
+    fillRR(ctx, ML, Y, CW, HDR_H, 0, C.navyMd);
+    cols.forEach((col,i) => {
+      font(ctx, 7.5, true); ctx.fillStyle = "#94A3B8";
+      const h2 = clip(ctx, col.h, ws[i]-PAD_X*2);
+      const hw = ctx.measureText(h2).width;
+      const tx = col.align==="R"?colX(i)+ws[i]-PAD_X-hw : col.align==="C"?colX(i)+(ws[i]-hw)/2 : colX(i)+PAD_X;
+      ctx.fillText(h2, tx, Y+HDR_H*0.67);
+      if (i < cols.length-1) {
+        ctx.strokeStyle = C.navyLt; ctx.lineWidth = 0.3*S;
+        ctx.beginPath(); ctx.moveTo(colX(i)+ws[i], Y+3*S); ctx.lineTo(colX(i)+ws[i], Y+HDR_H-3*S); ctx.stroke();
+      }
+    });
+    Y += HDR_H;
+  };
 
-/** Draw a full data table. Returns new Y. */
-const drawTable = (
-  ctx: Ctx,
-  cols: { h: string; w: number; align?: "L" | "R" | "C"; numColor?: boolean }[],
-  rows: string[][],
-  x: number, startY: number,
-  opts: { maxLines?: number } = {}
-): number => {
-  const { maxLines = 3 } = opts;
-  const totalW = cols.reduce((s, c) => s + c.w, 0);
-  const scale2 = CW / totalW;
-  const ws = cols.map(c => c.w * scale2);
-  const colX = (i: number) => x + ws.slice(0, i).reduce((s, w) => s + w, 0);
-
-  const HDR_H = 22 * SCALE;
-  const PAD_X = 8 * SCALE;
-  const PAD_Y = 7 * SCALE;
-  const LINE_H = 11 * SCALE;
-  const ROW_MIN = 22 * SCALE;
-
-  let Y2 = startY;
-
-  // Header
-  roundRect(ctx, x, Y2, CW, HDR_H, 0);
-  ctx.fillStyle = C.navyMd; ctx.fill();
-  cols.forEach((col, i) => {
-    const cx = colX(i);
-    ctx.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx.fillStyle = C.inkFaint;
-    const hdr = trunc(ctx, col.h.toUpperCase(), ws[i] - PAD_X * 2);
-    const hw = ctx.measureText(hdr).width;
-    const tx = col.align === "R" ? cx + ws[i] - PAD_X - hw : col.align === "C" ? cx + (ws[i] - hw) / 2 : cx + PAD_X;
-    ctx.fillText(hdr, tx, Y2 + HDR_H * 0.65);
-    if (i < cols.length - 1) {
-      ctx.strokeStyle = C.navyLt; ctx.lineWidth = 0.3 * SCALE;
-      ctx.beginPath(); ctx.moveTo(cx + ws[i], Y2 + 3 * SCALE); ctx.lineTo(cx + ws[i], Y2 + HDR_H - 3 * SCALE); ctx.stroke();
-    }
-  });
-  Y2 += HDR_H;
+  drawHdr();
 
   rows.forEach((row, ri) => {
-    // Pre-compute cell content
-    const cells = cols.map((col, ci) => {
+    const cells = cols.map((col,ci) => {
       const raw = String(row[ci] ?? "—");
-      ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-      return { lines: wrapLines(ctx, raw, ws[ci] - PAD_X * 2, maxLines), col, raw };
+      font(ctx, 9);
+      return { lines: wrap(ctx, raw, ws[ci]-PAD_X*2, maxLines), raw, col };
     });
     const maxL = Math.max(...cells.map(c => c.lines.length), 1);
-    const rowH = Math.max(ROW_MIN, maxL * LINE_H + PAD_Y * 2);
+    const rowH = Math.max(ROW_MIN, maxL*LINE_H+PAD_Y*2);
 
-    const ry = Y2;
-    ctx.fillStyle = ri % 2 === 0 ? C.white : C.surface;
-    ctx.fillRect(x, ry, CW, rowH);
+    ctx.fillStyle = ri%2===0 ? C.white : C.surface;
+    ctx.fillRect(ML, Y, CW, rowH);
 
-    cells.forEach(({ lines, col, raw }, ci) => {
+    cells.forEach(({lines, raw, col}, ci) => {
       const cx = colX(ci);
-      const aw = ws[ci] - PAD_X * 2;
+      const aw = ws[ci] - PAD_X*2;
       const totalTH = lines.length * LINE_H;
       const vOff = (rowH - totalTH) / 2;
 
       lines.forEach((line, li) => {
-        const ty = ry + vOff + (li + 1) * LINE_H - 2 * SCALE;
-        ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-
-        // Colour for numeric/signal columns
+        const ty = Y + vOff + (li+1)*LINE_H - 2*S;
         let color = C.ink;
-        if (col.numColor) {
-          const n = parseFloat(raw.replace(/[^0-9.-]/g, ""));
-          if (raw.includes("+") || (!raw.includes("-") && isFinite(n) && n > 0)) color = C.green;
-          else if (raw.includes("-") || (isFinite(n) && n < 0)) color = C.red;
-        }
-        if (raw.toLowerCase().includes("continue")) color = C.green;
-        else if (raw.toLowerCase().includes("review") || raw.toLowerCase().includes("exit")) color = C.amber;
-
-        ctx.fillStyle = color;
-        const clamped = trunc(ctx, line, aw);
+        if (col.colorFn) { const c2 = col.colorFn(raw); if (c2) color = c2; }
+        else if (raw.startsWith("+")) color = C.green;
+        else if (raw.startsWith("-")) color = C.red;
+        font(ctx, 9); ctx.fillStyle = color;
+        const clamped = clip(ctx, line, aw);
         const tw = ctx.measureText(clamped).width;
-        const tx = col.align === "R" ? cx + ws[ci] - PAD_X - tw : col.align === "C" ? cx + (ws[ci] - tw) / 2 : cx + PAD_X;
+        const tx = col.align==="R"?cx+ws[ci]-PAD_X-tw : col.align==="C"?cx+(ws[ci]-tw)/2 : cx+PAD_X;
         ctx.fillText(clamped, tx, ty);
       });
-
-      if (ci < cols.length - 1) {
-        ctx.strokeStyle = C.border; ctx.lineWidth = 0.3 * SCALE;
-        ctx.beginPath(); ctx.moveTo(cx + ws[ci], ry); ctx.lineTo(cx + ws[ci], ry + rowH); ctx.stroke();
+      if (ci < cols.length-1) {
+        ctx.strokeStyle = C.border; ctx.lineWidth = 0.3*S;
+        ctx.beginPath(); ctx.moveTo(cx+ws[ci], Y); ctx.lineTo(cx+ws[ci], Y+rowH); ctx.stroke();
       }
     });
-
-    ctx.strokeStyle = C.border; ctx.lineWidth = 0.25 * SCALE;
-    ctx.beginPath(); ctx.moveTo(x, Y2 + rowH); ctx.lineTo(x + CW, Y2 + rowH); ctx.stroke();
-    Y2 += rowH;
+    ctx.strokeStyle = C.border; ctx.lineWidth = 0.25*S;
+    ctx.beginPath(); ctx.moveTo(ML, Y+rowH); ctx.lineTo(ML+CW, Y+rowH); ctx.stroke();
+    Y += rowH;
   });
-
-  return Y2 + 8 * SCALE;
+  return Y + 8*S;
 };
 
-/** Draw an insight card. Returns new Y. */
-const drawInsightCard = (ctx: Ctx, card: PdfInsightCard, idx: number, type: "critical" | "warning" | "info" | "ok", x: number, y: number): number => {
+// ── Stacked bar ───────────────────────────────────────────────────────────────
+const stackedBar = (ctx: Ctx, items: {label:string;value:number;color:string}[], total: number, y: number): number => {
+  const BH = 16*S;
+  fillRR(ctx, ML, y, CW, BH, 3*S, C.surfMd);
+  let bx = ML;
+  items.forEach((item,i) => {
+    const bw = total>0?(item.value/total)*CW:0; if (bw<1) return;
+    ctx.fillStyle = item.color;
+    if (i===0) { rrPath(ctx,bx,y,bw,BH,3*S); ctx.fill(); }
+    else if (i===items.length-1) { ctx.fillRect(bx,y,bw-3*S,BH); rrPath(ctx,bx+bw-3*S,y,3*S,BH,3*S); ctx.fill(); }
+    else ctx.fillRect(bx, y, bw, BH);
+    bx += bw;
+  });
+  strokeRR(ctx, ML, y, CW, BH, 3*S, C.borderMd, 0.5);
+  y += BH + 8*S;
+  let lx = ML;
+  items.forEach(item => {
+    const pct = total>0?(item.value/total)*100:0; if (pct < 0.5) return;
+    font(ctx, 7.5); ctx.fillStyle = C.inkMd;
+    const lbl = `${item.label.slice(0,18)}  ${pct.toFixed(1)}%`;
+    const lw = ctx.measureText(lbl).width + 16*S;
+    if (lx+lw > ML+CW-8*S) { y += 13*S; lx = ML; }
+    fillRR(ctx, lx, y-6*S, 9*S, 9*S, 2*S, item.color);
+    ctx.fillText(lbl, lx+13*S, y+1*S);
+    lx += lw + 8*S;
+  });
+  return y + 14*S;
+};
+
+// ── Insight card ──────────────────────────────────────────────────────────────
+type CardType = "action"|"review"|"info"|"good";
+const insightCard = (ctx: Ctx, card: PdfInsightCard, idx: number, type: CardType, y: number): number => {
   const pal = {
-    critical: { bg: C.redLt,    border: C.redBd,   accent: C.red,    tag: "ACTION NEEDED" },
-    warning:  { bg: C.amberLt,  border: C.amberBd, accent: C.amber,  tag: "REVIEW"        },
-    info:     { bg: C.blueLt,   border: "#93c5fd",  accent: C.blue,   tag: "INFO"          },
-    ok:       { bg: C.greenLt,  border: C.greenBd, accent: C.green,  tag: "LOOKING GOOD"  },
+    action: {bg:C.redLt,    border:C.redBd,   accent:C.red,    tag:"ACTION NEEDED"},
+    review: {bg:C.amberLt,  border:C.amberBd, accent:C.amber,  tag:"REVIEW THIS"},
+    info:   {bg:C.blueLt,   border:"#93C5FD", accent:C.blue,   tag:"GOOD TO KNOW"},
+    good:   {bg:C.greenLt,  border:C.greenBd, accent:C.green,  tag:"ALL GOOD"},
   }[type];
 
-  // Pre-measure
-  ctx.font = `bold ${10 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const titleLines = wrapLines(ctx, card.title, CW - 40 * SCALE, 2);
-  ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const sumLines = wrapLines(ctx, card.summary, CW - 40 * SCALE, 4);
-  ctx.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const detLines = wrapLines(ctx, `Next step: ${card.detail}`, CW - 40 * SCALE, 3);
+  font(ctx, 10.5, true); const tL = wrap(ctx, card.title,  CW-42*S, 2);
+  font(ctx, 9);          const sL = wrap(ctx, card.summary, CW-42*S, 4);
+  font(ctx, 8.5);        const dL = wrap(ctx, "What to do: "+card.detail, CW-42*S, 3);
+  const CH = (18 + tL.length*13.5 + sL.length*12.5 + dL.length*11.5 + 28) * S;
 
-  const cardH = (18 + titleLines.length * 13 + sumLines.length * 12 + detLines.length * 11 + 26) * SCALE;
+  ctx.shadowColor = "rgba(0,0,0,0.05)"; ctx.shadowBlur=6*S; ctx.shadowOffsetY=2*S;
+  fillRR(ctx, ML, y, CW, CH, 8*S, pal.bg);
+  ctx.shadowColor="transparent"; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+  strokeRR(ctx, ML, y, CW, CH, 8*S, pal.border, 0.5);
+  fillRR(ctx, ML, y, 5*S, CH, 5*S, pal.accent);
+  ctx.fillStyle=pal.accent; ctx.fillRect(ML+3*S, y, 2*S, CH);
 
-  // Card body
-  ctx.shadowColor = "rgba(0,0,0,0.05)"; ctx.shadowBlur = 6 * SCALE; ctx.shadowOffsetY = 2 * SCALE;
-  roundRect(ctx, x, y, CW, cardH, 8 * SCALE);
-  ctx.fillStyle = pal.bg; ctx.fill();
-  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  let iy = y + 14*S;
+  font(ctx, 8.5, true); ctx.fillStyle = pal.accent; ctx.fillText(`${idx+1}.`, ML+12*S, iy);
+  font(ctx, 7.5, true); ctx.fillStyle = C.white;
+  const tw2 = ctx.measureText(pal.tag).width + 12*S;
+  fillRR(ctx, ML+26*S, y+5*S, tw2, 14*S, 3*S, pal.accent);
+  ctx.fillText(pal.tag, ML+32*S, y+14.5*S);
+  iy += 15*S;
 
-  ctx.strokeStyle = pal.border; ctx.lineWidth = 0.5 * SCALE;
-  roundRect(ctx, x, y, CW, cardH, 8 * SCALE); ctx.stroke();
+  tL.forEach(l => { font(ctx,10.5,true); ctx.fillStyle=C.ink; ctx.fillText(l,ML+12*S,iy); iy+=13.5*S; });
+  iy += 3*S;
+  sL.forEach(l => { font(ctx,9); ctx.fillStyle=C.inkMd; ctx.fillText(l,ML+12*S,iy); iy+=12.5*S; });
+  iy += 5*S;
+  dL.forEach(l => { ctx.font=`italic ${8.5*S}px ${F}`; ctx.fillStyle=pal.accent; ctx.fillText(l,ML+12*S,iy); iy+=11.5*S; });
 
-  // Left bar
-  roundRect(ctx, x, y, 5 * SCALE, cardH, 5 * SCALE);
-  ctx.fillStyle = pal.accent; ctx.fill();
-  ctx.fillRect(x + 3 * SCALE, y, 2 * SCALE, cardH);
-
-  let iy = y + 14 * SCALE;
-
-  // Index
-  ctx.font = `bold ${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillStyle = pal.accent;
-  ctx.fillText(`${idx + 1}.`, x + 13 * SCALE, iy);
-
-  // Tag pill
-  ctx.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const tagW2 = ctx.measureText(pal.tag).width + 12 * SCALE;
-  roundRect(ctx, x + 26 * SCALE, y + 5 * SCALE, tagW2, 14 * SCALE, 3 * SCALE);
-  ctx.fillStyle = pal.accent; ctx.fill();
-  ctx.fillStyle = C.white; ctx.fillText(pal.tag, x + 32 * SCALE, y + 14.5 * SCALE);
-  iy += 14 * SCALE;
-
-  // Title
-  titleLines.forEach(l => {
-    ctx.font = `bold ${10 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx.fillStyle = C.ink; ctx.fillText(l, x + 13 * SCALE, iy); iy += 13 * SCALE;
-  });
-  iy += 3 * SCALE;
-
-  // Summary
-  sumLines.forEach(l => {
-    ctx.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx.fillStyle = C.inkMd; ctx.fillText(l, x + 13 * SCALE, iy); iy += 12 * SCALE;
-  });
-  iy += 5 * SCALE;
-
-  // Detail (italic)
-  detLines.forEach(l => {
-    ctx.font = `italic ${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx.fillStyle = pal.accent; ctx.fillText(l, x + 13 * SCALE, iy); iy += 11 * SCALE;
-  });
-
-  return y + cardH + 10 * SCALE;
+  return y + CH + 10*S;
 };
 
-/** Horizontal bar for Top Holdings */
-const drawHorizBar = (ctx: Ctx, label: string, pct: number, value: string, accent: string, rank: number, x: number, y: number): number => {
-  const barH = 22 * SCALE;
-  const barW = Math.max(pct * CW, 6 * SCALE);
+// ── Horizontal bar ────────────────────────────────────────────────────────────
+const horizBar = (ctx: Ctx, label: string, pct: number, value: string, accent: string, rank: number, y: number): number => {
+  const BH = 26*S;
+  // Full-width track
+  fillRR(ctx, ML, y, CW, BH, 4*S, C.surfMd);
+  // Proportional fill — minimum 60px so text is always readable
+  const bw = Math.max(pct*CW, 60*S);
+  fillRR(ctx, ML, y, bw, BH, 4*S, accent);
 
-  ctx.fillStyle = C.surfMd; roundRect(ctx, x, y, CW, barH, 3 * SCALE); ctx.fill();
-  ctx.fillStyle = accent; roundRect(ctx, x, y, barW, barH, 3 * SCALE); ctx.fill();
+  // Rank + fund name inside bar (white if bar is wide enough, dark otherwise)
+  font(ctx, 9, true); ctx.fillStyle = pct > 0.15 ? C.white : C.ink;
+  ctx.fillText(`${rank}.  ${clip(ctx, label, Math.max(bw-16*S, 120*S))}`, ML+9*S, y+BH*0.615);
 
-  ctx.font = `bold ${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx.fillStyle = pct > 0.25 ? C.white : C.ink;
-  ctx.fillText(`${rank}. ${trunc(ctx, label, Math.max(barW - 12 * SCALE, 100 * SCALE))}`, x + 7 * SCALE, y + 14.5 * SCALE);
+  // Value always at far right
+  const vs = `${value}  (${(pct*100).toFixed(1)}%)`;
+  font(ctx, 9, true); ctx.fillStyle = pct > 0.6 ? C.white : C.inkMd;
+  ctx.fillText(vs, ML+CW-ctx.measureText(vs).width-8*S, y+BH*0.615);
 
-  ctx.fillStyle = pct > 0.55 ? C.white : C.inkMd;
-  const vs = `${value}  (${(pct * 100).toFixed(1)}%)`;
-  ctx.fillText(vs, x + CW - ctx.measureText(vs).width - 7 * SCALE, y + 14.5 * SCALE);
-
-  return y + barH + 5 * SCALE;
+  return y + BH + 6*S;
 };
 
-// ── Multi-page renderer ─────────────────────────────────────────────────────
-
-interface PageSpec {
-  render: (ctx: Ctx, logoImg: HTMLImageElement | null, pageNum: number) => void;
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
 export const generatePdfReport = async (params: {
   logoUrl: string;
-  summary: { totalValue: number; invested: number; allTimeProfit: number; monthlyIncome: number };
-  xirrValue: number | null;
+  summary: {totalValue:number;invested:number;allTimeProfit:number;monthlyIncome:number};
+  xirrValue: number|null;
   report: ReportData;
   insights: PdfInsights;
-  holder: { name: string; pan?: string; email?: string };
-  chartIds: { performance: string; scheme: string; amc: string };
+  holder: {name:string;pan?:string;email?:string};
+  chartIds: {performance:string;scheme:string;amc:string};
 }) => {
-  const [{ jsPDF }] = await Promise.all([import("jspdf")]);
-  await loadFont();
+  const [{jsPDF}] = await Promise.all([import("jspdf")]);
+  const {summary, report, xirrValue, logoUrl, holder, insights} = params;
 
-  const { summary, report, xirrValue, logoUrl, holder, insights } = params;
-
-  // Load logo
-  let logoImg: HTMLImageElement | null = null;
+  // Load logo properly
+  let logo: HTMLImageElement|null = null;
   try {
-    logoImg = await new Promise<HTMLImageElement>((res, rej) => {
+    logo = await new Promise<HTMLImageElement>((res,rej) => {
       const img = new Image(); img.crossOrigin = "anonymous";
-      img.onload = () => res(img); img.onerror = rej;
-      img.src = logoUrl;
+      img.onload = () => res(img); img.onerror = rej; img.src = logoUrl;
     });
   } catch { /* skip */ }
 
-  const BODY_TOP = 68 * SCALE;
-  const BODY_BTM = PH - 38 * SCALE;
+  const mkCanvas = (): [HTMLCanvasElement, Ctx] => {
+    const c = document.createElement("canvas");
+    c.width = PW; c.height = PH;
+    const ctx = c.getContext("2d", {alpha:false})!;
+    ctx.fillStyle = C.surface; ctx.fillRect(0,0,PW,PH);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    return [c, ctx];
+  };
+
+  const pages: HTMLCanvasElement[] = [];
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 1 — COVER
+  // PAGE 1 — COVER  "Your Portfolio Report Card"
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const [cvs1, ctx1] = newCanvas();
+  {
+    const [c, ctx] = mkCanvas(); pages.push(c);
 
-  // Background gradient
-  const grad = ctx1.createLinearGradient(0, 0, PW * 0.6, PH);
-  grad.addColorStop(0, "#0f172a");
-  grad.addColorStop(0.55, "#172554");
-  grad.addColorStop(1, "#052e16");
-  ctx1.fillStyle = grad; ctx1.fillRect(0, 0, PW, PH);
+    // Dark gradient background
+    const bg = ctx.createLinearGradient(0, 0, PW*0.65, PH);
+    bg.addColorStop(0, "#0B1E3D"); bg.addColorStop(0.65, "#122d5a"); bg.addColorStop(1, "#08271a");
+    ctx.fillStyle = bg; ctx.fillRect(0,0,PW,PH);
 
-  // Decorative circle (top-right glow)
-  const radGrad = ctx1.createRadialGradient(PW, 0, 0, PW, 0, 400 * SCALE);
-  radGrad.addColorStop(0, "rgba(22,163,74,0.18)");
-  radGrad.addColorStop(1, "rgba(22,163,74,0)");
-  ctx1.fillStyle = radGrad; ctx1.fillRect(0, 0, PW, PH);
+    // Radial glows
+    const g1 = ctx.createRadialGradient(PW, 0, 0, PW, 0, 420*S);
+    g1.addColorStop(0, "rgba(13,159,111,0.18)"); g1.addColorStop(1, "rgba(13,159,111,0)");
+    ctx.fillStyle = g1; ctx.fillRect(0,0,PW,PH);
+    const g2 = ctx.createRadialGradient(0, PH, 0, 0, PH, 380*S);
+    g2.addColorStop(0, "rgba(37,99,235,0.14)"); g2.addColorStop(1, "rgba(37,99,235,0)");
+    ctx.fillStyle = g2; ctx.fillRect(0,0,PW,PH);
 
-  // Bottom glow
-  const radGrad2 = ctx1.createRadialGradient(0, PH, 0, 0, PH, 380 * SCALE);
-  radGrad2.addColorStop(0, "rgba(37,99,235,0.14)");
-  radGrad2.addColorStop(1, "rgba(37,99,235,0)");
-  ctx1.fillStyle = radGrad2; ctx1.fillRect(0, 0, PW, PH);
+    // Green left rail
+    const rail = ctx.createLinearGradient(0,0,0,PH);
+    rail.addColorStop(0, C.green); rail.addColorStop(1, "#065f46");
+    ctx.fillStyle = rail; ctx.fillRect(0,0,6*S,PH);
+    ctx.fillStyle = C.greenDk; ctx.fillRect(6*S,0,1*S,PH);
 
-  // Green left rail with gradient
-  const railGrad = ctx1.createLinearGradient(0, 0, 0, PH);
-  railGrad.addColorStop(0, C.green);
-  railGrad.addColorStop(1, "#065f46");
-  ctx1.fillStyle = railGrad; ctx1.fillRect(0, 0, 6 * SCALE, PH);
-  ctx1.fillStyle = C.greenDk; ctx1.fillRect(6 * SCALE, 0, 1 * SCALE, PH);
+    // Logo top-left
+    let brandX = ML + 6*S;
+    if (logo && logo.naturalWidth > 0) {
+      const lh = 44*S;
+      const lw = Math.round((logo.naturalWidth/logo.naturalHeight)*lh);
+      ctx.drawImage(logo, ML+6*S, 48*S, lw, lh);
+      brandX = ML + 6*S + lw + 14*S;
+    }
+    font(ctx, 15, true); ctx.fillStyle = C.white; ctx.fillText("Nivesify", brandX, 68*S);
+    font(ctx, 9); ctx.fillStyle = C.inkFaint; ctx.fillText("Thoughtful Money, Better Life", brandX, 84*S);
 
-  // Logo + brand
-  if (logoImg) { try { ctx1.drawImage(logoImg, ML + 6 * SCALE, 52 * SCALE, 32 * SCALE, 32 * SCALE); } catch { /* skip */ } }
-  const clx = logoImg ? ML + 46 * SCALE : ML + 6 * SCALE;
-  ctx1.font = `bold ${14 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = C.white; ctx1.fillText("Nivesify", clx, 72 * SCALE);
-  ctx1.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = C.inkFaint; ctx1.fillText("Thoughtful Money, Better Life", clx, 86 * SCALE);
+    // Report label
+    font(ctx, 8.5, true); ctx.fillStyle = C.green;
+    ctx.fillText("MUTUAL FUND HEALTH CHECK  ·  YOUR PERSONAL REPORT", ML+6*S, 140*S);
 
-  // Report type label
-  ctx1.font = `bold ${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = C.green; ctx1.fillText("MUTUAL FUND HEALTH CHECK", ML + 6 * SCALE, 152 * SCALE);
+    // Big title
+    font(ctx, 36, true); ctx.fillStyle = C.white;
+    ctx.fillText("Your Portfolio", ML+6*S, 185*S);
+    ctx.fillText("Report Card", ML+6*S, 230*S);
 
-  // Title
-  ctx1.font = `bold ${36 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = C.white;
-  ctx1.fillText("Portfolio", ML + 6 * SCALE, 192 * SCALE);
-  ctx1.fillText("Diagnosis", ML + 6 * SCALE, 234 * SCALE);
+    // Gradient underline
+    const ul = ctx.createLinearGradient(ML+6*S,0,ML+180*S,0);
+    ul.addColorStop(0, C.green); ul.addColorStop(1, "rgba(13,159,111,0)");
+    ctx.fillStyle = ul; ctx.fillRect(ML+6*S, 240*S, 180*S, 3*S);
 
-  // Underline
-  const ulGrad = ctx1.createLinearGradient(ML + 6 * SCALE, 0, ML + 150 * SCALE, 0);
-  ulGrad.addColorStop(0, C.green); ulGrad.addColorStop(1, "rgba(22,163,74,0)");
-  ctx1.fillStyle = ulGrad;
-  ctx1.fillRect(ML + 6 * SCALE, 244 * SCALE, 140 * SCALE, 3 * SCALE);
+    font(ctx, 9.5); ctx.fillStyle = "rgba(148,163,184,0.85)";
+    ctx.fillText("Plain English  ·  No Jargon  ·  Clear Action Steps", ML+6*S, 258*S);
 
-  ctx1.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = "rgba(148,163,184,0.8)";
-  ctx1.fillText("Benchmarked  ·  Actionable  ·  Evidence-based", ML + 6 * SCALE, 262 * SCALE);
+    // ── Investor info box ──
+    const HX = ML+6*S, HY = 274*S, HW = CW-6*S, HH = 72*S;
+    fillRR(ctx, HX, HY, HW, HH, 8*S, "rgba(26,58,110,0.75)");
+    strokeRR(ctx, HX, HY, HW, HH, 8*S, "rgba(37,99,235,0.3)", 0.5);
+    fillRR(ctx, HX, HY, 5*S, HH, 5*S, C.green);
+    ctx.fillStyle = C.green; ctx.fillRect(HX+3*S, HY, 2*S, HH);
 
-  // ── Holder info panel ──
-  const hipX = ML + 6 * SCALE, hipY = 280 * SCALE, hipW = CW - 6 * SCALE, hipH = 70 * SCALE;
-  roundRect(ctx1, hipX, hipY, hipW, hipH, 8 * SCALE);
-  ctx1.fillStyle = "rgba(30,58,95,0.8)"; ctx1.fill();
-  ctx1.strokeStyle = "rgba(37,99,235,0.3)"; ctx1.lineWidth = 0.5 * SCALE;
-  roundRect(ctx1, hipX, hipY, hipW, hipH, 8 * SCALE); ctx1.stroke();
-  ctx1.fillStyle = C.green;
-  roundRect(ctx1, hipX, hipY, 4 * SCALE, hipH, 4 * SCALE); ctx1.fill();
-  ctx1.fillRect(hipX + 2 * SCALE, hipY, 2 * SCALE, hipH);
+    font(ctx, 7.5, true); ctx.fillStyle = "rgba(148,163,184,0.8)";
+    ctx.fillText("REPORT PREPARED FOR", HX+14*S, HY+17*S);
 
-  ctx1.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = "rgba(148,163,184,0.8)"; ctx1.fillText("PREPARED FOR", hipX + 14 * SCALE, hipY + 18 * SCALE);
-  ctx1.font = `bold ${13 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = C.white;
-  ctx1.fillText(trunc(ctx1, holder.name || "Investor", hipW - 100 * SCALE), hipX + 14 * SCALE, hipY + 33 * SCALE);
-  ctx1.font = `${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = C.inkFaint;
-  if (holder.pan) ctx1.fillText(`PAN: ${holder.pan}`, hipX + 14 * SCALE, hipY + 49 * SCALE);
-  if (holder.email) ctx1.fillText(trunc(ctx1, holder.email, hipW / 2 - 30 * SCALE), holder.pan ? hipX + hipW / 2 - 10 * SCALE : hipX + 14 * SCALE, hipY + 49 * SCALE);
-  const genDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-  ctx1.fillText(`Generated: ${genDate}`, hipX + 14 * SCALE, hipY + 62 * SCALE);
+    // Holder name — use email as fallback if name looks like email
+    const displayName = (holder.name && !holder.name.includes("@")) ? holder.name : (holder.email || "Investor");
+    font(ctx, 13, true); ctx.fillStyle = C.white;
+    ctx.fillText(clip(ctx, displayName, HW-110*S), HX+14*S, HY+33*S);
+    font(ctx, 8); ctx.fillStyle = C.inkFaint;
+    const panStr  = holder.pan   ? `PAN: ${holder.pan}`  : "";
+    const emlStr  = holder.email ? holder.email           : "";
+    if (panStr) ctx.fillText(panStr, HX+14*S, HY+50*S);
+    if (emlStr) ctx.fillText(clip(ctx, emlStr, HW/2-20*S), panStr?HX+HW/2:HX+14*S, HY+50*S);
+    ctx.fillText(`Generated: ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric"})}`, HX+14*S, HY+65*S);
 
-  // ── 3 big KPI cards ──
-  const covCardY = hipY + hipH + 18 * SCALE;
-  const covCardW = (hipW - 16 * SCALE) / 3;
-  const covCardH = 82 * SCALE;
+    // ── Health score + 3 KPI cards ──
+    const CARD_Y = HY + HH + 18*S;
+    const RING_R = 52*S;
+    const RING_CX = ML + 6*S + RING_R + 8*S;
+    const RING_CY = CARD_Y + RING_R + 14*S;
+    const RING_BLOCK_H = RING_R*2 + 32*S;
 
-  const covCards = [
-    { l: "Total Portfolio Value", v: fmtCur(summary.totalValue), sub: "Current market value", a: C.green },
-    { l: "Portfolio XIRR",        v: fmtPct(xirrValue, 2),        sub: "Annualised true return", a: (xirrValue ?? 0) >= 0.12 ? C.green : C.amber },
-    { l: "All-time Returns",      v: fmtCur(summary.allTimeProfit), sub: "Total gain on investment", a: (summary.allTimeProfit || 0) >= 0 ? C.green : C.red },
-  ];
-  covCards.forEach((c, i) => {
-    const cx2 = hipX + i * (covCardW + 8 * SCALE);
-    roundRect(ctx1, cx2, covCardY, covCardW, covCardH, 8 * SCALE);
-    ctx1.fillStyle = "rgba(22,36,74,0.9)"; ctx1.fill();
-    ctx1.strokeStyle = "rgba(255,255,255,0.08)"; ctx1.lineWidth = 0.5 * SCALE;
-    roundRect(ctx1, cx2, covCardY, covCardW, covCardH, 8 * SCALE); ctx1.stroke();
+    // Compute health score
+    const xpct2 = (xirrValue??0)*100;
+    const score = xpct2>=15?90:xpct2>=12?78:xpct2>=9?62:xpct2>=6?48:34;
+    const scoreLabel = score>=80?"Excellent":score>=65?"Healthy":score>=50?"Fair":"Needs Work";
+    const scoreCol = score>=65?C.green:score>=50?C.amber:C.red;
 
-    // Top accent bar
-    ctx1.fillStyle = c.a;
-    roundRect(ctx1, cx2, covCardY, covCardW, 4 * SCALE, 4 * SCALE); ctx1.fill();
-    ctx1.fillRect(cx2, covCardY + 2 * SCALE, covCardW, 2 * SCALE);
+    // Ring background track
+    ctx.beginPath(); ctx.arc(RING_CX, RING_CY, RING_R, 0, Math.PI*2);
+    ctx.strokeStyle="rgba(255,255,255,0.1)"; ctx.lineWidth=10*S; ctx.stroke();
+    // Ring fill
+    ctx.beginPath(); ctx.arc(RING_CX, RING_CY, RING_R, -Math.PI/2, -Math.PI/2+(score/100)*Math.PI*2);
+    ctx.strokeStyle=scoreCol; ctx.lineWidth=10*S; ctx.lineCap="round"; ctx.stroke();
+    // Score number
+    ctx.textAlign = "center";
+    font(ctx, 26, true); ctx.fillStyle = C.white; ctx.fillText(String(score), RING_CX, RING_CY+9*S);
+    font(ctx, 8); ctx.fillStyle="rgba(255,255,255,0.6)"; ctx.fillText(scoreLabel, RING_CX, RING_CY+24*S);
+    ctx.textAlign = "left";
+    font(ctx, 7.5); ctx.fillStyle="rgba(255,255,255,0.45)"; ctx.textAlign="center";
+    ctx.fillText("Portfolio", RING_CX, CARD_Y+RING_BLOCK_H+2*S);
+    ctx.fillText("Health Score", RING_CX, CARD_Y+RING_BLOCK_H+14*S);
+    ctx.textAlign="left";
 
-    ctx1.font = `${8 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx1.fillStyle = C.inkFaint; ctx1.fillText(trunc(ctx1, c.l, covCardW - 20 * SCALE), cx2 + 12 * SCALE, covCardY + 22 * SCALE);
-    ctx1.font = `bold ${15 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx1.fillStyle = c.a; ctx1.fillText(trunc(ctx1, c.v, covCardW - 20 * SCALE), cx2 + 12 * SCALE, covCardY + 46 * SCALE);
-    ctx1.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx1.fillStyle = C.inkFaint; ctx1.fillText(c.sub, cx2 + 12 * SCALE, covCardY + 66 * SCALE);
-  });
+    // 3 KPI cards — to the right of ring
+    const KX = RING_CX + RING_R + 22*S;
+    const KW = PW - MR - KX;
+    const KH = (RING_BLOCK_H - 16*S) / 3;
+    const xirrAccent = xpct2>=12?C.green:xpct2>=8?C.amber:C.red;
 
-  // ── 4 secondary stat chips ──
-  const secY = covCardY + covCardH + 14 * SCALE;
-  const secW = hipW / 4;
-  const secH = 56 * SCALE;
-  const secs = [
-    { l: "Invested",        v: fmtCur(summary.invested) },
-    { l: "Active Holdings", v: `${report.holdingsCount} funds` },
-    { l: "Top Fund Weight", v: fmtShare(report.topOneShare) },
-    { l: "Monthly Income",  v: fmtCur(summary.monthlyIncome) },
-  ];
-  secs.forEach((s, i) => {
-    const sx = hipX + i * secW;
-    roundRect(ctx1, sx, secY, secW - 8 * SCALE, secH, 6 * SCALE);
-    ctx1.fillStyle = "rgba(22,36,74,0.7)"; ctx1.fill();
-    ctx1.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx1.fillStyle = C.inkFaint; ctx1.fillText(s.l, sx + 10 * SCALE, secY + 18 * SCALE);
-    ctx1.font = `bold ${12 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx1.fillStyle = C.white; ctx1.fillText(trunc(ctx1, s.v, secW - 26 * SCALE), sx + 10 * SCALE, secY + 40 * SCALE);
-  });
+    const kpis = [
+      {l:"Total Portfolio Value",  v:fmtCur(summary.totalValue),   s:"Current market value of all funds",   a:C.green},
+      {l:"Your Annual Return",     v:fmtPct(xirrValue,2),          s:`12-14% is a good target to aim for`,  a:xirrAccent},
+      {l:"Total Profit Earned",    v:fmtCur(summary.allTimeProfit), s:`On investment of ${fmtCur(summary.invested)}`, a:(summary.allTimeProfit||0)>=0?C.green:C.red},
+    ];
+    kpis.forEach((kpi,i) => {
+      const KY = CARD_Y + i*(KH+8*S);
+      fillRR(ctx, KX, KY, KW, KH, 7*S, "rgba(22,36,74,0.85)");
+      strokeRR(ctx, KX, KY, KW, KH, 7*S, "rgba(255,255,255,0.06)", 0.5);
+      fillRR(ctx, KX, KY, KW, 4*S, 4*S, kpi.a);
+      ctx.fillStyle=kpi.a; ctx.fillRect(KX, KY+2*S, KW, 2*S);
+      font(ctx,7.5); ctx.fillStyle=C.inkFaint; ctx.fillText(kpi.l, KX+10*S, KY+19*S);
+      font(ctx,15,true); ctx.fillStyle=kpi.a; ctx.fillText(clip(ctx,kpi.v,KW-18*S), KX+10*S, KY+KH*0.58);
+      font(ctx,7); ctx.fillStyle=C.inkFaint; ctx.fillText(clip(ctx,kpi.s,KW-16*S), KX+10*S, KY+KH-10*S);
+    });
 
-  // Cover footer
-  const cfY = PH - 40 * SCALE;
-  ctx1.strokeStyle = "rgba(30,58,95,0.8)"; ctx1.lineWidth = 0.4 * SCALE;
-  ctx1.beginPath(); ctx1.moveTo(hipX, cfY); ctx1.lineTo(hipX + hipW, cfY); ctx1.stroke();
-  ctx1.font = `${7 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx1.fillStyle = "rgba(100,116,139,0.7)";
-  const discL = wrapLines(ctx1, "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on this report.", hipW, 2);
-  discL.forEach((l, i) => ctx1.fillText(l, hipX, cfY + 13 * SCALE + i * 10 * SCALE));
+    // ── 4 secondary stat chips ──
+    const SEC_Y = CARD_Y + RING_BLOCK_H + 30*S;
+    const SW    = (HW) / 4;
+    const SH    = 58*S;
+    const stats = [
+      {l:"Amount Invested",    v:fmtCur(summary.invested)},
+      {l:"Number of Funds",    v:`${report.holdingsCount} funds`},
+      {l:"Biggest Fund Share", v:fmtShare(report.topOneShare)},
+      {l:"Est. Monthly Income",v:fmtCur(summary.monthlyIncome)},
+    ];
+    stats.forEach((st,i) => {
+      const SX = HX + i*SW;
+      fillRR(ctx, SX, SEC_Y, SW-8*S, SH, 6*S, "rgba(22,36,74,0.7)");
+      strokeRR(ctx, SX, SEC_Y, SW-8*S, SH, 6*S, "rgba(255,255,255,0.06)", 0.4);
+      font(ctx,7.5); ctx.fillStyle=C.inkFaint; ctx.fillText(st.l, SX+10*S, SEC_Y+18*S);
+      font(ctx,13,true); ctx.fillStyle=C.white; ctx.fillText(clip(ctx,st.v,SW-26*S), SX+10*S, SEC_Y+42*S);
+    });
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 2 — PORTFOLIO SUMMARY
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const [cvs2, ctx2] = newCanvas();
-  ctx2.fillStyle = C.surface; ctx2.fillRect(0, 0, PW, PH);
-  drawPageChrome(ctx2, 2, logoImg);
-
-  let Y2 = BODY_TOP;
-  Y2 = drawSectionHead(ctx2, "Overview", "Portfolio at a Glance", ML, Y2, C.blue);
-
-  // Row 1: 4 metric cards
-  const cGap = 8 * SCALE, cH = 62 * SCALE, cW = (CW - cGap * 3) / 4;
-  const row1 = [
-    { l: "Total Value",      v: fmtCur(summary.totalValue),    n: "Current market value",   a: C.blue  },
-    { l: "Total Invested",   v: fmtCur(summary.invested),      n: "Net capital deployed",   a: C.inkSoft },
-    { l: "All-time Returns", v: fmtCur(summary.allTimeProfit),  n: "Unrealised + realised",  a: (summary.allTimeProfit||0)>=0?C.green:C.red },
-    { l: "Portfolio XIRR",   v: fmtPct(xirrValue, 2),          n: "Annualised true return", a: (xirrValue??0)*100>=12?C.green:C.amber },
-  ];
-  row1.forEach((c, i) => drawMetricCard(ctx2, ML + i * (cW + cGap), Y2, cW, cH, c.l, c.v, c.n, c.a));
-  Y2 += cH + 12 * SCALE;
-
-  const row2 = [
-    { l: "Active Holdings",  v: `${report.holdingsCount}`,      n: "Funds with value > 0",    a: C.purple },
-    { l: "Top Fund Weight",  v: fmtShare(report.topOneShare),   n: "Largest single position", a: report.topOneShare>0.3?C.amber:C.green },
-    { l: "Top 5 Combined",   v: fmtShare(report.topFiveShare),  n: "Core concentration",      a: report.topFiveShare>0.65?C.amber:C.green },
-    { l: "Monthly Income",   v: fmtCur(summary.monthlyIncome),  n: "25× withdrawal rule",     a: C.teal },
-  ];
-  row2.forEach((c, i) => drawMetricCard(ctx2, ML + i * (cW + cGap), Y2, cW, cH, c.l, c.v, c.n, c.a));
-  Y2 += cH + 16 * SCALE;
-
-  // Divider
-  ctx2.strokeStyle = C.border; ctx2.lineWidth = 0.5 * SCALE;
-  ctx2.beginPath(); ctx2.moveTo(ML, Y2); ctx2.lineTo(ML + CW, Y2); ctx2.stroke();
-  Y2 += 14 * SCALE;
-
-  // Executive summary
-  ctx2.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  const esLines = wrapLines(ctx2, insights.executiveSummary, CW - 32 * SCALE, 4);
-  const esH = (esLines.length * 12 + 34) * SCALE;
-  roundRect(ctx2, ML, Y2, CW, esH, 8 * SCALE);
-  ctx2.fillStyle = C.greenLt; ctx2.fill();
-  ctx2.strokeStyle = C.greenBd; ctx2.lineWidth = 0.5 * SCALE;
-  roundRect(ctx2, ML, Y2, CW, esH, 8 * SCALE); ctx2.stroke();
-  ctx2.fillStyle = C.green; roundRect(ctx2, ML, Y2, 5 * SCALE, esH, 5 * SCALE); ctx2.fill();
-  ctx2.fillRect(ML + 3 * SCALE, Y2, 2 * SCALE, esH);
-  ctx2.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx2.fillStyle = C.green; ctx2.fillText("EXECUTIVE SUMMARY", ML + 14 * SCALE, Y2 + 15 * SCALE);
-  esLines.forEach((l, i) => {
-    ctx2.font = `${9 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx2.fillStyle = C.inkMd; ctx2.fillText(l, ML + 14 * SCALE, Y2 + 27 * SCALE + i * 12 * SCALE);
-  });
-  Y2 += esH + 16 * SCALE;
-
-  ctx2.strokeStyle = C.border; ctx2.lineWidth = 0.5 * SCALE;
-  ctx2.beginPath(); ctx2.moveTo(ML, Y2); ctx2.lineTo(ML + CW, Y2); ctx2.stroke(); Y2 += 14 * SCALE;
-
-  Y2 = drawSectionHead(ctx2, "Diagnostics", "Portfolio Health Metrics", ML, Y2, C.purple);
-  Y2 = drawTable(ctx2,
-    [{ h: "Metric", w: 175 }, { h: "Value", w: 80, align: "R", numColor: true }, { h: "What It Means", w: 268 }],
-    insights.metrics.map(m => [m.title, m.value, m.note]),
-    ML, Y2, { maxLines: 2 }
-  );
+    // Cover disclaimer
+    const DY = PH - 38*S;
+    ctx.strokeStyle="rgba(26,58,110,0.8)"; ctx.lineWidth=0.4*S;
+    ctx.beginPath(); ctx.moveTo(HX,DY); ctx.lineTo(HX+HW,DY); ctx.stroke();
+    font(ctx,7); ctx.fillStyle="rgba(100,116,139,0.7)";
+    const disc2 = "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on any information in this report. Nivesify does not provide SEBI-registered investment advice.";
+    const dl2 = wrap(ctx, disc2, HW, 2);
+    dl2.forEach((l,i) => ctx.fillText(l, HX, DY+13*S+i*10*S));
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 3 — AUDIT
+  // PAGE 2 — YOUR MONEY AT A GLANCE
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const [cvs3, ctx3] = newCanvas();
-  ctx3.fillStyle = C.surface; ctx3.fillRect(0, 0, PW, PH);
-  drawPageChrome(ctx3, 3, logoImg);
+  {
+    const [c, ctx] = mkCanvas(); pages.push(c);
+    drawChrome(ctx, 2, logo);
+    let Y = BODY_TOP;
 
-  let Y3 = BODY_TOP;
-  Y3 = drawSectionHead(ctx3, "Active Funds", "Active Fund Audit", ML, Y3, C.amber);
-  ctx3.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx3.fillStyle = C.inkSoft;
-  ctx3.fillText(`${insights.activeAuditRows.length} active funds  ·  Signal = alpha + IR + benchmark gap + composite score`, ML, Y3);
-  Y3 += 14 * SCALE;
+    Y = sHead(ctx, "Your Money", "Your Money at a Glance", Y, C.blue);
 
-  Y3 = drawTable(ctx3,
-    [{ h: "Fund Name", w: 190 }, { h: "Benchmark", w: 135 }, { h: "Gap vs Bench", w: 78, align: "R", numColor: true }, { h: "Action", w: 120, numColor: true }],
-    insights.activeAuditRows.map(r => [r.name, r.benchmark || "—", r.gap || "—", r.action]),
-    ML, Y3, { maxLines: 2 }
-  );
+    const GAP = 8*S;
+    const CW4 = (CW - GAP*3) / 4;
+    const CH  = 64*S;
 
-  // Legend
-  const legY = Y3;
-  roundRect(ctx3, ML, legY, CW, 22 * SCALE, 4 * SCALE);
-  ctx3.fillStyle = C.surface; ctx3.fill();
-  ctx3.font = `bold ${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx3.fillStyle = C.inkMd; ctx3.fillText("Signal guide:", ML + 8 * SCALE, legY + 14.5 * SCALE);
-  const legItems = [{ c: C.green, l: "Continue — beating benchmark" }, { c: C.amber, l: "Review — underperforming" }];
-  let llx = ML + 90 * SCALE;
-  legItems.forEach(lg => {
-    roundRect(ctx3, llx, legY + 6.5 * SCALE, 9 * SCALE, 9 * SCALE, 2 * SCALE);
-    ctx3.fillStyle = lg.c; ctx3.fill();
-    ctx3.font = `${7.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-    ctx3.fillStyle = C.inkMd; ctx3.fillText(lg.l, llx + 13 * SCALE, legY + 14.5 * SCALE);
-    llx += ctx3.measureText(lg.l).width + 28 * SCALE;
-  });
-  Y3 += 30 * SCALE;
+    const xirrAcc = (xirrValue??0)*100>=12?C.green:(xirrValue??0)*100>=8?C.amber:C.red;
 
-  ctx3.strokeStyle = C.border; ctx3.lineWidth = 0.5 * SCALE;
-  ctx3.beginPath(); ctx3.moveTo(ML, Y3); ctx3.lineTo(ML + CW, Y3); ctx3.stroke(); Y3 += 14 * SCALE;
+    const row1 = [
+      {l:"Total Portfolio Value",  v:fmtCur(summary.totalValue),   s:"Current value of all funds",   a:C.blue},
+      {l:"Total Amount Invested",  v:fmtCur(summary.invested),      s:"Money you've put in over time", a:C.inkSoft},
+      {l:"Total Profit Earned",    v:fmtCur(summary.allTimeProfit), s:"Gains so far",                 a:(summary.allTimeProfit||0)>=0?C.green:C.red},
+      {l:"Your Annual Return",     v:fmtPct(xirrValue,2),           s:"How fast your money is growing",a:xirrAcc},
+    ];
+    row1.forEach((m,i) => metricCard(ctx, ML+i*(CW4+GAP), Y, CW4, CH, m.l, m.v, m.s, m.a));
+    Y += CH + 10*S;
 
-  Y3 = drawSectionHead(ctx3, "Passive Funds", "Passive Fund Audit", ML, Y3, C.blue);
-  ctx3.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx3.fillStyle = C.inkSoft;
-  ctx3.fillText(`${insights.passiveAuditRows.length} index / passive funds  ·  Tracking diff vs best ETF on same benchmark`, ML, Y3);
-  Y3 += 14 * SCALE;
+    const row2 = [
+      {l:"Number of Funds",        v:`${report.holdingsCount}`,      s:"Currently active",             a:C.purple},
+      {l:"Biggest Fund (% share)", v:fmtShare(report.topOneShare),   s:"% in your single largest fund",a:report.topOneShare>0.3?C.amber:C.green},
+      {l:"Top 5 Funds Combined",   v:fmtShare(report.topFiveShare),  s:"% held in your top 5",         a:report.topFiveShare>0.65?C.amber:C.green},
+      {l:"Est. Monthly Income",    v:fmtCur(summary.monthlyIncome),  s:"Based on 25× annual expenses",  a:C.teal},
+    ];
+    row2.forEach((m,i) => metricCard(ctx, ML+i*(CW4+GAP), Y, CW4, CH, m.l, m.v, m.s, m.a));
+    Y += CH + 16*S;
 
-  Y3 = drawTable(ctx3,
-    [{ h: "Fund Name", w: 185 }, { h: "Benchmark", w: 128 }, { h: "Gap (3Y)", w: 65, align: "R", numColor: true }, { h: "Track. Diff", w: 70, align: "R" }, { h: "Action", w: 75, numColor: true }],
-    insights.passiveAuditRows.map(r => [r.name, r.benchmark || "—", r.gap || "—", r.tracking || "—", r.action]),
-    ML, Y3, { maxLines: 2 }
-  );
+    // Divider
+    ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
+    ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y += 14*S;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 4 — ALLOCATION
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const [cvs4, ctx4] = newCanvas();
-  ctx4.fillStyle = C.surface; ctx4.fillRect(0, 0, PW, PH);
-  drawPageChrome(ctx4, 4, logoImg);
+    // In summary banner
+    font(ctx, 9);
+    const esLines = wrap(ctx, insights.executiveSummary, CW-30*S, 4);
+    const ESH = (esLines.length*13 + 34)*S;
+    fillRR(ctx, ML, Y, CW, ESH, 8*S, C.greenLt);
+    strokeRR(ctx, ML, Y, CW, ESH, 8*S, C.greenBd, 0.5);
+    fillRR(ctx, ML, Y, 5*S, ESH, 5*S, C.green);
+    ctx.fillStyle=C.green; ctx.fillRect(ML+3*S, Y, 2*S, ESH);
+    font(ctx,7.5,true); ctx.fillStyle=C.green; ctx.fillText("IN SUMMARY", ML+14*S, Y+15*S);
+    esLines.forEach((l,i) => { font(ctx,9); ctx.fillStyle=C.inkMd; ctx.fillText(l,ML+14*S,Y+27*S+i*13*S); });
+    Y += ESH + 16*S;
 
-  let Y4 = BODY_TOP;
-  Y4 = drawSectionHead(ctx4, "Allocation", "Portfolio Allocation Breakdown", ML, Y4, C.blue);
+    ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
+    ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y += 14*S;
 
-  const catMapP = new Map<string, { cur: number; inv: number }>();
-  report.fundDetails.forEach(f => { const e = catMapP.get(f.majorCategory) || { cur: 0, inv: 0 }; catMapP.set(f.majorCategory, { cur: e.cur + f.currentValue, inv: e.inv + f.invested }); });
-  const catItems = Array.from(catMapP.entries()).map(([n, v], i) => ({ label: n, value: v.cur, invested: v.inv, color: ACCENTS[i % ACCENTS.length] })).sort((a, b) => b.value - a.value);
+    Y = sHead(ctx, "How You Compare", "How Your Portfolio Compares to the Market", Y, C.purple);
 
-  Y4 = drawStackedBar(ctx4, catItems, summary.totalValue, ML, Y4, CW);
-
-  Y4 = drawTable(ctx4,
-    [{ h: "Category", w: 160 }, { h: "Current Value", w: 110, align: "R" }, { h: "Invested", w: 110, align: "R" }, { h: "Weight", w: 75, align: "R" }, { h: "Gain / Loss", w: 68, align: "R", numColor: true }],
-    catItems.map(c => { const g = c.value - c.invested; return [c.label, fmtCur(c.value), fmtCur(c.invested), fmtShare(summary.totalValue ? c.value / summary.totalValue : 0), `${g >= 0 ? "+" : ""}${fmtCur(g)}`]; }),
-    ML, Y4, { maxLines: 1 }
-  );
-
-  Y4 += 8 * SCALE;
-
-  Y4 = drawStackedBar(ctx4,
-    report.amcBreakdown.slice(0, 8).map((a, i) => ({ label: a.name, value: a.value, color: ACCENTS[i % ACCENTS.length] })),
-    summary.totalValue, ML, Y4, CW
-  );
-
-  Y4 = drawTable(ctx4,
-    [{ h: "Fund House (AMC)", w: 235 }, { h: "Value", w: 110, align: "R" }, { h: "Weight", w: 80, align: "R" }, { h: "No. of Funds", w: 98, align: "C" }],
-    report.amcBreakdown.slice(0, 10).map(a => [a.name, fmtCur(a.value), fmtShare(summary.totalValue ? a.value / summary.totalValue : 0), `${report.fundDetails.filter(f => f.amc === a.name).length}`]),
-    ML, Y4, { maxLines: 1 }
-  );
+    // Investor-friendly column names (no "Metric", "Value", "What It Means" jargon)
+    Y = drawTable(ctx,
+      [
+        {h:"What We Checked",     w:185},
+        {h:"Your Number",         w:90, align:"R"},
+        {h:"What This Means for You", w:248},
+      ],
+      insights.metrics.map(m => [m.title, m.value, m.note]),
+      Y, {maxLines:2}
+    );
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 5 — INSIGHTS
+  // PAGE 3 — YOUR ACTION PLAN
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const [cvs5, ctx5] = newCanvas();
-  ctx5.fillStyle = C.surface; ctx5.fillRect(0, 0, PW, PH);
-  drawPageChrome(ctx5, 5, logoImg);
+  {
+    const [c, ctx] = mkCanvas(); pages.push(c);
+    drawChrome(ctx, 3, logo);
+    let Y = BODY_TOP;
 
-  let Y5 = BODY_TOP;
-  Y5 = drawSectionHead(ctx5, "Insights", "Actionable Insights & Next Steps", ML, Y5, C.green);
-  ctx5.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx5.fillStyle = C.inkSoft;
-  ctx5.fillText("Priority-ranked findings. Each card shows the signal and the suggested next action.", ML, Y5);
-  Y5 += 14 * SCALE;
+    Y = sHead(ctx, "Your Action Plan", "What Should You Do Next?", Y, C.green);
+    font(ctx,9); ctx.fillStyle=C.inkSoft;
+    ctx.fillText("Based on your portfolio — here is what to do, explained simply.", ML, Y); Y += 16*S;
 
-  insights.insightCards.forEach((card, i) => {
-    const lt = card.title.toLowerCase();
-    const type: "critical" | "warning" | "info" | "ok" =
-      lt.includes("trailing") || lt.includes("action") || lt.includes("drag") || lt.includes("bottom") ? "critical" :
-      lt.includes("review") || lt.includes("drift") || lt.includes("need") || lt.includes("over") || lt.includes("high") ? "warning" :
-      lt.includes("beating") || lt.includes("strong") || lt.includes("healthy") ? "ok" : "info";
-
-    // If card would overflow page, start a new page — this is a simplification;
-    // for a proper solution track Y and emit new canvas pages
-    if (Y5 > BODY_BTM - 60 * SCALE) return; // skip overflow for now
-
-    Y5 = drawInsightCard(ctx5, card, i, type, ML, Y5);
-  });
+    insights.insightCards.forEach((card, i) => {
+      const lt = card.title.toLowerCase();
+      const type: CardType =
+        lt.includes("returns are below")||lt.includes("trailing")||lt.includes("too many")||lt.includes("bottom") ? "action" :
+        lt.includes("review")||lt.includes("drift")||lt.includes("high")||lt.includes("fund house") ? "review" :
+        lt.includes("excellent")||lt.includes("healthy")||lt.includes("well-structured") ? "good" : "info";
+      if (Y + 60*S > BODY_BTM) return;
+      Y = insightCard(ctx, card, i, type, Y);
+    });
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 6 — HOLDINGS
+  // PAGE 4 — YOUR FUND REPORT CARD
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const [cvs6, ctx6] = newCanvas();
-  ctx6.fillStyle = C.surface; ctx6.fillRect(0, 0, PW, PH);
-  drawPageChrome(ctx6, 6, logoImg);
+  {
+    const [c, ctx] = mkCanvas(); pages.push(c);
+    drawChrome(ctx, 4, logo);
+    let Y = BODY_TOP;
 
-  let Y6 = BODY_TOP;
-  Y6 = drawSectionHead(ctx6, "Holdings", "Full Holdings Detail", ML, Y6, C.inkSoft);
-  ctx6.font = `${8.5 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx6.fillStyle = C.inkSoft;
-  ctx6.fillText(`${report.holdingsCount} active holdings  ·  Sorted by current value  ·  XIRR shown where > 1 year data`, ML, Y6);
-  Y6 += 14 * SCALE;
+    Y = sHead(ctx, "Fund Report Card", "Which Funds to Keep and Which to Review", Y, C.amber);
+    font(ctx,9); ctx.fillStyle=C.inkSoft;
+    ctx.fillText(`${insights.activeAuditRows.length} actively managed funds — graded on whether they earn more than the market index, after fees.`, ML, Y); Y += 16*S;
 
-  Y6 = drawTable(ctx6,
-    [{ h: "Fund Name", w: 182 }, { h: "Category", w: 65 }, { h: "Invested", w: 72, align: "R" }, { h: "Current Value", w: 76, align: "R" }, { h: "Gain / Loss", w: 72, align: "R", numColor: true }, { h: "XIRR", w: 56, align: "R", numColor: true }],
-    report.fundDetails.map(f => { const g = f.profit; return [f.name, f.majorCategory, fmtCur(f.invested), fmtCur(f.currentValue), `${g >= 0 ? "+" : ""}${fmtCur(g)}`, fmtPct(f.xirr, 2)]; }),
-    ML, Y6, { maxLines: 2 }
-  );
+    // Clean up action text: remove "!", "!'", and make suggestions plain English
+    const cleanAction = (action: string): string =>
+      action.replace(/!'?\s*/g, "Try: ").replace(/→/g, "→").replace(/\s+/g," ").trim();
 
-  // Top 5 horizontal bars
-  ctx6.strokeStyle = C.border; ctx6.lineWidth = 0.5 * SCALE;
-  ctx6.beginPath(); ctx6.moveTo(ML, Y6); ctx6.lineTo(ML + CW, Y6); ctx6.stroke(); Y6 += 12 * SCALE;
-  ctx6.font = `bold ${13 * SCALE}px "DM Sans", "Inter", sans-serif`;
-  ctx6.fillStyle = C.ink; ctx6.fillText("Top 5 Holdings by Value", ML, Y6); Y6 += 16 * SCALE;
+    const actionColorFn = (raw: string): string|null => {
+      const r = raw.toLowerCase();
+      if (r.startsWith("continue")) return C.green;
+      if (r.startsWith("review")||r.startsWith("try")) return C.amber;
+      return null;
+    };
+    const gapColorFn = (raw: string): string|null => {
+      if (raw==="-"||raw==="—") return null;
+      const n = parseFloat(raw);
+      if (isNaN(n)) return null;
+      return n >= 0 ? C.green : C.red;
+    };
 
-  report.topHoldings.forEach((h, i) => {
-    if (Y6 > BODY_BTM - 28 * SCALE) return;
-    Y6 = drawHorizBar(ctx6, h.name, summary.totalValue ? h.value / summary.totalValue : 0, fmtCur(h.value), ACCENTS[i % ACCENTS.length], i + 1, ML, Y6);
-  });
+    Y = drawTable(ctx,
+      [
+        {h:"Fund Name",         w:175},
+        {h:"Market Index Used", w:140},
+        {h:"Beats Index By",    w:70, align:"R", colorFn:gapColorFn},
+        {h:"Verdict",           w:138, colorFn:actionColorFn},
+      ],
+      insights.activeAuditRows.map(r => [
+        r.name,
+        r.benchmark||"—",
+        r.gap||"—",
+        cleanAction(r.action),
+      ]),
+      Y, {maxLines:2}
+    );
+
+    // Legend
+    const LY = Y;
+    fillRR(ctx, ML, LY, CW, 24*S, 4*S, C.surface);
+    font(ctx,7.5,true); ctx.fillStyle=C.inkMd; ctx.fillText("Verdict guide:", ML+8*S, LY+15.5*S);
+    const legItems = [{c:C.green,l:"Continue — this fund beats the market index after fees"},{c:C.amber,l:"Review — costs more than it earns above the index"}];
+    let llx = ML+98*S;
+    legItems.forEach(lg => {
+      fillRR(ctx,llx,LY+7.5*S,9*S,9*S,2*S,lg.c);
+      font(ctx,7.5); ctx.fillStyle=C.inkMd; ctx.fillText(lg.l,llx+13*S,LY+15.5*S); llx+=ctx.measureText(lg.l).width+28*S;
+    });
+    Y += 32*S;
+
+    ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
+    ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y += 14*S;
+
+    Y = sHead(ctx, "Index Funds", "Your Index & ETF Funds", Y, C.blue);
+    font(ctx,9); ctx.fillStyle=C.inkSoft;
+    ctx.fillText(`${insights.passiveAuditRows.length} index/ETF funds — these should follow their index as closely and cheaply as possible.`, ML, Y); Y += 16*S;
+
+    Y = drawTable(ctx,
+      [
+        {h:"Fund Name",             w:178},
+        {h:"Tracks This Index",     w:135},
+        {h:"Return vs Index",       w:68, align:"R", colorFn:gapColorFn},
+        {h:"Tracking Accuracy",     w:72, align:"R"},
+        {h:"Verdict",               w:70, colorFn:actionColorFn},
+      ],
+      insights.passiveAuditRows.map(r => [
+        r.name, r.benchmark||"—", r.gap||"—", r.tracking||"—",
+        cleanAction(r.action),
+      ]),
+      Y, {maxLines:2}
+    );
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ASSEMBLE PDF
-  // Each canvas → JPEG → jsPDF page
+  // PAGE 5 — WHERE IS YOUR MONEY?
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
+  {
+    const [c, ctx] = mkCanvas(); pages.push(c);
+    drawChrome(ctx, 5, logo);
+    let Y = BODY_TOP;
 
-  const canvases = [cvs1, cvs2, cvs3, cvs4, cvs5, cvs6];
-  canvases.forEach((c, i) => {
+    Y = sHead(ctx, "Where Is Your Money", "Where Is Your Money Invested?", Y, C.blue);
+
+    // Category
+    const catMap = new Map<string,{cur:number;inv:number}>();
+    report.fundDetails.forEach(f => { const e=catMap.get(f.majorCategory)||{cur:0,inv:0}; catMap.set(f.majorCategory,{cur:e.cur+f.currentValue,inv:e.inv+f.invested}); });
+    const catItems = Array.from(catMap.entries()).map(([n,v],i) => ({label:n,value:v.cur,invested:v.inv,color:PALETTE[i%PALETTE.length]})).sort((a,b)=>b.value-a.value);
+
+    font(ctx,10.5,true); ctx.fillStyle=C.inkMd; ctx.fillText("By Fund Type (Equity / Debt / Hybrid etc.)", ML, Y); Y+=14*S;
+    Y = stackedBar(ctx, catItems, summary.totalValue, Y);
+    Y = drawTable(ctx,
+      [{h:"Fund Type",w:165},{h:"Worth Today",w:112,align:"R"},{h:"You Invested",w:112,align:"R"},{h:"% of Total",w:75,align:"R"},{h:"Profit/Loss",w:59,align:"R"}],
+      catItems.map(c2 => { const g=c2.value-c2.invested; return [c2.label,fmtCur(c2.value),fmtCur(c2.invested),fmtShare(summary.totalValue?c2.value/summary.totalValue:0),`${g>=0?"+":""}${fmtCur(g)}`]; }),
+      Y, {maxLines:1}
+    );
+
+    Y += 10*S;
+    font(ctx,10.5,true); ctx.fillStyle=C.inkMd; ctx.fillText("By Fund House", ML, Y); Y+=14*S;
+    Y = stackedBar(ctx, report.amcBreakdown.slice(0,8).map((a,i)=>({label:a.name,value:a.value,color:PALETTE[i%PALETTE.length]})), summary.totalValue, Y);
+    Y = drawTable(ctx,
+      [{h:"Fund House",w:232},{h:"Worth Today",w:112,align:"R"},{h:"% of Total",w:80,align:"R"},{h:"No. of Funds",w:99,align:"C"}],
+      report.amcBreakdown.slice(0,10).map(a => [a.name,fmtCur(a.value),fmtShare(summary.totalValue?a.value/summary.totalValue:0),`${report.fundDetails.filter(f=>f.amc===a.name).length}`]),
+      Y, {maxLines:1}
+    );
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PAGE 6 — ALL YOUR FUNDS
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    const [c, ctx] = mkCanvas(); pages.push(c);
+    drawChrome(ctx, 6, logo);
+    let Y = BODY_TOP;
+
+    Y = sHead(ctx, "All Your Funds", "Complete Fund List with Performance", Y, C.inkSoft);
+    font(ctx,9); ctx.fillStyle=C.inkSoft;
+    ctx.fillText(`${report.holdingsCount} funds  ·  Sorted by value  ·  Annual Return shown where more than 1 year of data exists`, ML, Y); Y+=16*S;
+
+    const profitColor = (raw: string): string|null => {
+      if (raw.startsWith("+")) return C.green;
+      if (raw.startsWith("-")) return C.red;
+      return null;
+    };
+    const xirrColor = (raw: string): string|null => {
+      if (raw==="N/A") return C.inkFaint;
+      const n = parseFloat(raw);
+      if (isNaN(n)) return null;
+      return n<0?C.red:n>=12?C.green:C.inkMd;
+    };
+
+    Y = drawTable(ctx,
+      [
+        {h:"Fund Name",     w:175},
+        {h:"Type",          w:60},
+        {h:"You Invested",  w:72, align:"R"},
+        {h:"Worth Today",   w:76, align:"R"},
+        {h:"Profit / Loss", w:74, align:"R", colorFn:profitColor},
+        {h:"Annual Return", w:66, align:"R", colorFn:xirrColor},
+      ],
+      report.fundDetails.map(f => {
+        const g=f.profit;
+        return [f.name, f.majorCategory, fmtCur(f.invested), fmtCur(f.currentValue), `${g>=0?"+":""}${fmtCur(g)}`, fmtPct(f.xirr,2)];
+      }),
+      Y, {maxLines:2}
+    );
+
+    // Top 5 visual — full-width bars with proper scaling
+    if (Y + 30*S < BODY_BTM) {
+      ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
+      ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y+=12*S;
+      font(ctx,13,true); ctx.fillStyle=C.ink; ctx.fillText("Your 5 Largest Holdings", ML, Y); Y+=16*S;
+
+      report.topHoldings.forEach((h,i) => {
+        if (Y+32*S > BODY_BTM) return;
+        const pct = summary.totalValue ? h.value/summary.totalValue : 0;
+        Y = horizBar(ctx, h.name, pct, fmtCur(h.value), PALETTE[i%PALETTE.length], i+1, Y);
+      });
+    }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ASSEMBLE PDF — PNG pages (no JPEG blur)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const doc = new jsPDF({unit:"pt", format:"a4", compress:true});
+  pages.forEach((cv, i) => {
     if (i > 0) doc.addPage();
-    const imgData = c.toDataURL("image/jpeg", 0.96);
-    doc.addImage(imgData, "JPEG", 0, 0, PW_PT, PH_PT);
+    const img = cv.toDataURL("image/png");
+    doc.addImage(img, "PNG", 0, 0, 595, 842);
   });
-
   doc.save("nivesify-portfolio-report.pdf");
 };
