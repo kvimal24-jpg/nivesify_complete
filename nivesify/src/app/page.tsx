@@ -3,400 +3,157 @@
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   RESPONSIVE CSS
-   ───────────────────────────────────────────────────────────────────────── */
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* ── HERO ── */
-  .hero-layout {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 40px;
-    align-items: center;
+  .hero-grid {
+    display: grid; grid-template-columns: 1fr; gap: 40px; align-items: center;
   }
-  @media (min-width: 960px) {
-    .hero-layout { grid-template-columns: 1fr 1fr; gap: 64px; }
-  }
-  .hero-preview-panel { display: none; }
-  @media (min-width: 960px) { .hero-preview-panel { display: block; } }
+  @media (min-width: 900px) { .hero-grid { grid-template-columns: 1fr 1fr; gap: 64px; } }
+  .hero-visual { display: none; }
+  @media (min-width: 900px) { .hero-visual { display: block; } }
 
-  /* ── NAV CARDS — 2 col mobile, 4 col desktop ── */
-  .nav-cards {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+  .tool-cards {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   }
+  @media (min-width: 600px) { .tool-cards { grid-template-columns: repeat(4,1fr); gap: 12px; } }
+
+  .story-row {
+    display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center;
+  }
+  @media (min-width: 700px) { .story-row { grid-template-columns: 1fr 1fr; gap: 56px; } }
+
+  .story-flip > *:first-child { order: 1; }
   @media (min-width: 700px) {
-    .nav-cards { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .story-flip > *:first-child { order: 2; }
+    .story-flip > *:last-child  { order: 1; }
   }
 
-  /* ── FEATURE GRID — 1 col mobile, 2 col md ── */
-  .feature-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px;
+  .steps-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   }
-  @media (min-width: 600px) {
-    .feature-grid { grid-template-columns: repeat(2, 1fr); }
-  }
+  @media (min-width: 600px) { .steps-row { grid-template-columns: repeat(4,1fr); gap: 14px; } }
 
-  /* ── STEPS ── */
-  .steps-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-  @media (min-width: 700px) {
-    .steps-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; }
-  }
+  .card-lift { transition: box-shadow .25s, transform .25s; }
+  .card-lift:hover { box-shadow: 0 16px 48px rgba(0,0,0,.11) !important; transform: translateY(-4px) !important; }
 
-  /* ── WEALTH ── */
-  .wealth-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 28px;
+  .tool-lift { transition: box-shadow .2s, transform .2s; }
+  .tool-lift:hover { box-shadow: 0 8px 24px rgba(0,0,0,.10) !important; transform: translateY(-3px) !important; }
+
+  .cta-p { transition: transform .18s, box-shadow .18s; }
+  .cta-p:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(5,150,105,.40) !important; }
+
+  .cta-g { transition: transform .18s, box-shadow .18s; }
+  .cta-g:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08) !important; }
+
+  .banner-lift { transition: transform .25s, box-shadow .25s; }
+  .banner-lift:hover { transform: translateY(-3px); box-shadow: 0 20px 56px rgba(0,0,0,.22) !important; }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); }
   }
-  @media (min-width: 700px) {
-    .wealth-grid { grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
+  .float { animation: float 4.5s ease-in-out infinite; }
+
+  @keyframes blink {
+    0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.45; transform:scale(1.6); }
   }
+  .blink { animation: blink 2s ease-in-out infinite; }
 
-  /* ── PHILOSOPHY ── */
-  .philosophy-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 36px;
-  }
-  @media (min-width: 700px) {
-    .philosophy-grid { grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
-  }
-
-  /* ── QUICKLINKS ── */
-  .quicklinks-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 9px;
-  }
-  @media (min-width: 480px) {
-    .quicklinks-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-
-  /* ── WHYMF ── */
-  .whymf-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-  @media (min-width: 700px) {
-    .whymf-grid { grid-template-columns: 1fr auto; gap: 32px; align-items: center; }
-  }
-  .whymf-book { display: none; }
-  @media (min-width: 700px) { .whymf-book { display: block; } }
-
-  /* ── HOVER FX ── */
-  .card-lift { transition: box-shadow 0.28s ease, transform 0.28s ease; cursor: pointer; }
-  .card-lift:hover { box-shadow: 0 18px 56px rgba(0,0,0,0.11) !important; transform: translateY(-4px) !important; }
-
-  .nav-card-lift { transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease; cursor: pointer; }
-  .nav-card-lift:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.10) !important; transform: translateY(-3px) !important; }
-
-  .link-lift { transition: box-shadow 0.22s ease, transform 0.22s ease; }
-  .link-lift:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.09) !important; transform: translateY(-2px) !important; }
-
-  .cta-green { transition: transform 0.18s, box-shadow 0.18s; }
-  .cta-green:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(5,150,105,0.44) !important; }
-
-  .cta-white { transition: transform 0.18s, box-shadow 0.18s; }
-  .cta-white:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.10) !important; }
-
-  .dark-lift { transition: transform 0.28s ease, box-shadow 0.28s ease; }
-  .dark-lift:hover { transform: translateY(-3px); box-shadow: 0 20px 56px rgba(0,0,0,0.24) !important; }
-
-  /* ── TICKER ANIMATION ── */
-  @keyframes ticker {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-  }
-  .ticker-track {
-    display: flex;
-    animation: ticker 28s linear infinite;
-    width: max-content;
-  }
-  .ticker-track:hover { animation-play-state: paused; }
-
-  /* ── PULSE ── */
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.6; transform: scale(1.5); }
-  }
-  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
-
-  /* ── HERO BADGE SHIMMER ── */
   @keyframes shimmer {
     0%   { background-position: -200% center; }
-    100% { background-position: 200% center; }
+    100% { background-position:  200% center; }
   }
-  .shimmer-text {
-    background: linear-gradient(90deg, #059669 0%, #10b981 40%, #2563EB 60%, #059669 100%);
+  .shine {
+    background: linear-gradient(90deg,#059669 0%,#10b981 35%,#2563EB 65%,#059669 100%);
     background-size: 200% auto;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     animation: shimmer 4s linear infinite;
   }
+
+  @keyframes tick { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+  .tick { display:flex; animation: tick 32s linear infinite; width:max-content; }
+  .tick:hover { animation-play-state:paused; }
 `;
 
-/* ── SCROLL REVEAL ─────────────────────────────────────────────────────── */
-function Reveal({
-  children,
-  delay = 0,
-  style = {},
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  style?: React.CSSProperties;
-}) {
+function Reveal({ children, delay = 0, style = {} }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [vis, setVis] = useState(false);
+  const [v, setV] = useState(false);
   useEffect(() => {
-    const ob = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) { setVis(true); ob.disconnect(); }
-      },
-      { threshold: 0.04 }
-    );
+    const ob = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setV(true); ob.disconnect(); } }, { threshold: 0.05 });
     if (ref.current) ob.observe(ref.current);
     return () => ob.disconnect();
   }, []);
   return (
-    <div
-      ref={ref}
-      style={{
-        opacity: vis ? 1 : 0,
-        transform: vis ? "translateY(0)" : "translateY(22px)",
-        transition: `opacity 0.65s ease ${delay}ms, transform 0.65s ease ${delay}ms`,
-        ...style,
-      }}
-    >
+    <div ref={ref} style={{ opacity: v?1:0, transform: v?"translateY(0)":"translateY(22px)", transition:`opacity .65s ease ${delay}ms, transform .65s ease ${delay}ms`, ...style }}>
       {children}
     </div>
   );
 }
 
-/* ── SPARKLINE ─────────────────────────────────────────────────────────── */
-function Spark({
-  pts,
-  color,
-  w = 56,
-  h = 22,
-}: {
-  pts: number[];
-  color: string;
-  w?: number;
-  h?: number;
-}) {
-  const mn = Math.min(...pts), mx = Math.max(...pts), rng = mx - mn || 1;
-  const xs = pts.map((_, i) => (i / (pts.length - 1)) * w);
-  const ys = pts.map((v) => h - ((v - mn) / rng) * (h - 5) - 2);
-  const line = xs.map((x, i) => `${i ? "L" : "M"}${x},${ys[i]}`).join(" ");
-  const uid = `s${color.replace(/[^a-z0-9]/gi, "")}`;
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible", flexShrink: 0 }}>
-      <defs>
-        <linearGradient id={uid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${line} L${w},${h} L0,${h} Z`} fill={`url(#${uid})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="3" fill={color} />
-    </svg>
-  );
-}
-
-/* ── DONUT ─────────────────────────────────────────────────────────────── */
-function Donut({ segs, size = 96 }: { segs: { pct: number; color: string }[]; size?: number }) {
-  const r = size * 0.37, cx = size / 2, cy = size / 2, C = 2 * Math.PI * r;
-  let cum = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-      {segs.map((s, i) => {
-        const dash = (s.pct / 100) * C, off = C - (cum / 100) * C;
-        cum += s.pct;
-        return (
-          <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={s.color}
-            strokeWidth={size * 0.14} strokeDasharray={`${dash} ${C - dash}`}
-            strokeDashoffset={off}
-            style={{ transformOrigin: `${cx}px ${cy}px`, transform: "rotate(-90deg)" }}
-          />
-        );
-      })}
-      <circle cx={cx} cy={cy} r={r * 0.58} fill="white" />
-      <text x={cx} y={cy - 4} textAnchor="middle" fontSize={size * 0.10} fontWeight="800" fill="#0F172A" fontFamily="DM Sans,system-ui">₹47.3L</text>
-      <text x={cx} y={cy + 11} textAnchor="middle" fontSize={size * 0.085} fill="#059669" fontFamily="DM Sans,system-ui">↑18.4%</text>
-    </svg>
-  );
-}
-
 const SEGS = [
-  { pct: 42, color: "#2563EB", label: "Equity MF",  val: "₹19.9L" },
-  { pct: 18, color: "#059669", label: "Debt MF",    val: "₹8.5L"  },
-  { pct: 16, color: "#D97706", label: "PF/EPF",     val: "₹7.6L"  },
-  { pct: 14, color: "#7C3AED", label: "Gold",        val: "₹6.6L"  },
-  { pct: 10, color: "#0891B2", label: "FD/Cash",    val: "₹4.7L"  },
+  { pct:42, color:"#2563EB", label:"Equity MF",  val:"₹19.9L" },
+  { pct:18, color:"#059669", label:"Debt MF",    val:"₹8.5L"  },
+  { pct:16, color:"#D97706", label:"PF / EPF",   val:"₹7.6L"  },
+  { pct:14, color:"#7C3AED", label:"Gold",        val:"₹6.6L"  },
+  { pct:10, color:"#0891B2", label:"FD / Cash",  val:"₹4.7L"  },
 ];
 
-function NetWorthPreview() {
+function Donut({ size = 96 }: { size?: number }) {
+  const r = size * 0.36, cx = size/2, cy = size/2, C = 2*Math.PI*r; let cum = 0;
   return (
-    <div>
-      <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 10 }}>
-        <Donut segs={SEGS} size={96} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {SEGS.map((s, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-              <div style={{ width: 7, height: 7, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 10, color: "#374151", fontWeight: 600, flex: 1, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</span>
-              <span style={{ fontSize: 10, fontWeight: 800, color: s.color }}>{s.val}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ borderTop: "1px solid #F1F5F9", paddingTop: 7, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: "#0F172A" }}>Total Net Worth</span>
-        <span style={{ fontSize: 13, fontWeight: 900, color: "#059669" }}>₹47.3L ↑ 18.4%</span>
-      </div>
-    </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink:0 }}>
+      {SEGS.map((s,i)=>{ const dash=(s.pct/100)*C, off=C-(cum/100)*C; cum+=s.pct;
+        return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={s.color} strokeWidth={size*.14} strokeDasharray={`${dash} ${C-dash}`} strokeDashoffset={off} style={{ transformOrigin:`${cx}px ${cy}px`, transform:"rotate(-90deg)" }}/>;
+      })}
+      <circle cx={cx} cy={cy} r={r*.55} fill="white"/>
+      <text x={cx} y={cy-5} textAnchor="middle" fontSize={size*.10} fontWeight="900" fill="#0F172A" fontFamily="DM Sans,system-ui">₹47.3L</text>
+      <text x={cx} y={cy+10} textAnchor="middle" fontSize={size*.085} fill="#059669" fontFamily="DM Sans,system-ui">↑18.4%</text>
+    </svg>
   );
 }
 
-/* ── FUND TABLE ─────────────────────────────────────────────────────────── */
-const FUNDS = [
-  { name: "Mirae Asset Large Cap",  xirr: 16.2, bench: 14.1, alpha: "+2.1%", rating: "HOLD"   as const, pts: [38,40,43,41,47,50,52,55,57,62], color: "#059669" },
-  { name: "Parag Parikh Flexi Cap", xirr: 18.7, bench: 14.1, alpha: "+4.6%", rating: "HOLD"   as const, pts: [35,38,43,46,44,50,55,57,62,67], color: "#2563EB" },
-  { name: "HDFC Mid Cap Opp.",      xirr: 11.3, bench: 14.1, alpha: "-2.8%", rating: "REVIEW" as const, pts: [50,48,51,46,44,47,43,45,44,44], color: "#D97706" },
-  { name: "SBI Small Cap",          xirr:  9.1, bench: 14.1, alpha: "-5.0%", rating: "EXIT"   as const, pts: [55,52,48,44,40,42,38,35,33,31], color: "#DC2626" },
-];
-const RS = {
-  HOLD:   { c: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
-  REVIEW: { c: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
-  EXIT:   { c: "#DC2626", bg: "#FEF2F2", bd: "#FECACA" },
-};
-function FundRow({ f, animate, delay }: { f: typeof FUNDS[0]; animate: boolean; delay: number }) {
-  const rs = RS[f.rating];
+function Spark({ pts, color, w=56, h=20 }: { pts:number[]; color:string; w?:number; h?:number }) {
+  const mn=Math.min(...pts), mx=Math.max(...pts), rng=mx-mn||1;
+  const xs=pts.map((_,i)=>(i/(pts.length-1))*w);
+  const ys=pts.map(v=>h-((v-mn)/rng)*(h-4)-2);
+  const d=xs.map((x,i)=>`${i?"L":"M"}${x},${ys[i]}`).join(" ");
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 48px 40px 48px", gap: 7, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #F1F5F9", opacity: animate ? 1 : 0, transform: animate ? "translateX(0)" : "translateX(-8px)", transition: `opacity 0.45s ease ${delay}ms, transform 0.45s ease ${delay}ms` }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#0F172A", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{f.name}</div>
-        <div style={{ fontSize: 9, color: f.xirr >= f.bench ? "#059669" : "#DC2626", fontWeight: 600 }}>XIRR {f.xirr}% · {f.alpha}</div>
-      </div>
-      <Spark pts={f.pts} color={f.color} w={44} h={20} />
-      <div style={{ fontSize: 10, fontWeight: 700, color: f.xirr >= f.bench ? "#059669" : "#DC2626" }}>{f.xirr}%</div>
-      <div style={{ fontSize: 8.5, fontWeight: 800, padding: "2px 5px", borderRadius: 100, background: rs.bg, border: `1px solid ${rs.bd}`, color: rs.c, textAlign: "center" as const, whiteSpace: "nowrap" as const }}>{f.rating}</div>
-    </div>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow:"visible", flexShrink:0 }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx={xs[xs.length-1]} cy={ys[ys.length-1]} r="3" fill={color}/>
+    </svg>
   );
 }
 
-/* ── STYLE BOX ─────────────────────────────────────────────────────────── */
-function StyleBox() {
-  const cols = ["Value", "Blend", "Growth", "Best Ideas"];
-  const rows = ["Large", "Mid", "Small", "Flexi"];
-  const filled: Record<string, { color: string; label: string }> = {
-    "0-0": { color: "#2563EB", label: "Nifty 50"   }, "0-1": { color: "#7C3AED", label: "UTI Nifty" }, "0-3": { color: "#059669", label: "PP Flexi"  },
-    "1-1": { color: "#D97706", label: "HDFC Mid"   }, "1-2": { color: "#0891B2", label: "Axis Mid"  },
-    "2-0": { color: "#DC2626", label: "SBI Sm."    }, "2-1": { color: "#D97706", label: "Nippon Sm."},
-    "3-1": { color: "#059669", label: "Mirae Fl."  }, "3-3": { color: "#7C3AED", label: "PPFAS"     },
-  };
-  return (
-    <div>
-      <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 7 }}>Fund Style Matrix</div>
-      <div style={{ display: "grid", gridTemplateColumns: "34px repeat(4,1fr)", gap: 3 }}>
-        <div />
-        {cols.map((c, i) => <div key={i} style={{ fontSize: 7, fontWeight: 700, color: "#64748B", textAlign: "center" as const }}>{c}</div>)}
-        {rows.map((row, ri) => [
-          <div key={`r${ri}`} style={{ fontSize: 8, fontWeight: 700, color: "#94A3B8", display: "flex", alignItems: "center" }}>{row}</div>,
-          ...cols.map((_, ci) => {
-            const k = `${ri}-${ci}`, h = filled[k];
-            return (
-              <div key={k} style={{ height: 22, borderRadius: 4, background: h ? `${h.color}1E` : "#F8FAFC", border: `1.5px solid ${h ? h.color + "55" : "#E2E8F0"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {h && <span style={{ fontSize: 6, fontWeight: 800, color: h.color, textAlign: "center" as const, lineHeight: 1.1, padding: "0 1px" }}>{h.label}</span>}
-              </div>
-            );
-          })
-        ])}
-      </div>
-    </div>
-  );
-}
-
-/* ── FIRE VIZ ───────────────────────────────────────────────────────────── */
-function FireViz() {
-  return (
-    <div>
-      <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.07em", textTransform: "uppercase" as const, marginBottom: 9 }}>Life Goal Tracker</div>
-      {[
-        { label: "Car",  yr: "2Y",  val: "₹8L",  pct: 82, color: "#2563EB" },
-        { label: "Home", yr: "8Y",  val: "₹60L", pct: 42, color: "#7C3AED" },
-        { label: "Edu",  yr: "12Y", val: "₹25L", pct: 28, color: "#D97706" },
-        { label: "FIRE", yr: "20Y", val: "₹3Cr", pct: 14, color: "#059669" },
-      ].map((g, i) => (
-        <div key={i} style={{ marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-            <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: g.color }}>{g.label}</span>
-              <span style={{ fontSize: 9, color: "#94A3B8" }}>in {g.yr}</span>
-            </div>
-            <span style={{ fontSize: 10, fontWeight: 800, color: g.color }}>{g.val}</span>
-          </div>
-          <div style={{ height: 6, background: "#F1F5F9", borderRadius: 100, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${g.pct}%`, background: `linear-gradient(90deg,${g.color},${g.color}99)`, borderRadius: 100 }} />
-          </div>
-        </div>
-      ))}
-      <div style={{ marginTop: 10, background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 8, padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "#059669" }}>
-        🎯 FIRE at 47 — ₹3.2Cr corpus projected
-      </div>
-    </div>
-  );
-}
-
-/* ── WEALTH CHART ───────────────────────────────────────────────────────── */
 function WealthChart() {
-  const W = 300, H = 140;
-  const fd = [10, 10.7, 11.5, 12.3, 13.2, 14.2, 15.2, 16.3, 17.5, 18.8];
-  const mf = [10, 11.4, 13.1, 15.0, 17.3, 19.8, 22.8, 26.2, 30.1, 34.6];
-  const toX = (i: number) => 10 + (i / 9) * (W - 20);
-  const toY = (v: number) => H - 14 - ((v - 8) / 30) * (H - 30);
-  const fdP = fd.map((v, i) => `${i ? "L" : "M"}${toX(i)},${toY(v)}`).join(" ");
-  const mfP = mf.map((v, i) => `${i ? "L" : "M"}${toX(i)},${toY(v)}`).join(" ");
+  const W=280, H=128;
+  const fd=[10,10.7,11.5,12.3,13.2,14.2,15.2,16.3,17.5,18.8];
+  const mf=[10,11.4,13.1,15.0,17.3,19.8,22.8,26.2,30.1,34.6];
+  const tx=(i:number)=>8+(i/9)*(W-16);
+  const ty=(v:number)=>H-12-((v-8)/30)*(H-28);
+  const fdP=fd.map((v,i)=>`${i?"L":"M"}${tx(i)},${ty(v)}`).join(" ");
+  const mfP=mf.map((v,i)=>`${i?"L":"M"}${tx(i)},${ty(v)}`).join(" ");
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-        <defs>
-          <linearGradient id="wm3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#059669" stopOpacity="0.2" /><stop offset="100%" stopColor="#059669" stopOpacity="0" /></linearGradient>
-          <linearGradient id="wf3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#94A3B8" stopOpacity="0.12" /><stop offset="100%" stopColor="#94A3B8" stopOpacity="0" /></linearGradient>
-        </defs>
-        {[0.3, 0.6].map((p, i) => <line key={i} x1="10" y1={H * p} x2={W - 10} y2={H * p} stroke="#F1F5F9" strokeWidth="1" />)}
-        <path d={`${fdP} L${toX(9)},${H} L${toX(0)},${H} Z`} fill="url(#wf3)" />
-        <path d={fdP} fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <path d={`${mfP} L${toX(9)},${H} L${toX(0)},${H} Z`} fill="url(#wm3)" />
-        <path d={mfP} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={toX(9)} cy={toY(mf[9])} r="4" fill="#059669" />
-        <rect x={toX(9) + 6} y={toY(mf[9]) - 9} width={52} height={16} rx="4" fill="#059669" />
-        <text x={toX(9) + 10} y={toY(mf[9]) + 3} fontSize="8.5" fontWeight="800" fill="white" fontFamily="DM Sans,system-ui">₹34.6L MF</text>
-        <circle cx={toX(9)} cy={toY(fd[9])} r="3" fill="#94A3B8" />
-        <text x={toX(9) + 6} y={toY(fd[9]) + 4} fontSize="8" fill="#94A3B8" fontFamily="DM Sans,system-ui">₹18.8L FD</text>
-        {["Y1","","Y3","","Y5","","Y7","","","Y10"].map((l, i) => l && (
-          <text key={i} x={toX(i)} y={H + 1} fontSize="7.5" fill="#CBD5E1" fontFamily="DM Sans,system-ui" textAnchor="middle">{l}</text>
-        ))}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:"auto", display:"block" }}>
+        <defs><linearGradient id="gm2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#059669" stopOpacity=".18"/><stop offset="100%" stopColor="#059669" stopOpacity="0"/></linearGradient></defs>
+        {[.3,.6].map((p,i)=><line key={i} x1="8" y1={H*p} x2={W-8} y2={H*p} stroke="#F1F5F9" strokeWidth="1"/>)}
+        <path d={`${fdP} L${tx(9)},${H} L${tx(0)},${H} Z`} fill="rgba(148,163,184,.08)"/>
+        <path d={fdP} fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="4 3"/>
+        <path d={`${mfP} L${tx(9)},${H} L${tx(0)},${H} Z`} fill="url(#gm2)"/>
+        <path d={mfP} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx={tx(9)} cy={ty(mf[9])} r="4" fill="#059669"/>
+        <rect x={tx(9)+6} y={ty(mf[9])-10} width={54} height={18} rx="4" fill="#059669"/>
+        <text x={tx(9)+10} y={ty(mf[9])+3} fontSize="9" fontWeight="800" fill="white" fontFamily="DM Sans,system-ui">₹34.6L MF</text>
+        <circle cx={tx(9)} cy={ty(fd[9])} r="3" fill="#94A3B8"/>
+        <text x={tx(9)+6} y={ty(fd[9])+4} fontSize="8" fill="#94A3B8" fontFamily="DM Sans,system-ui">₹18.8L FD</text>
+        {["Y1","","Y3","","Y5","","Y7","","","Y10"].map((l,i)=>l&&<text key={i} x={tx(i)} y={H+2} fontSize="7.5" fill="#CBD5E1" fontFamily="DM Sans,system-ui" textAnchor="middle">{l}</text>)}
       </svg>
-      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 7, flexWrap: "wrap" as const }}>
-        {[
-          { color: "#059669", label: "Equity MF (~14% CAGR)", dash: false },
-          { color: "#CBD5E1", label: "FD post-tax (~5%)",      dash: true },
-        ].map((l, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={{ width: 16, height: 2, background: l.dash ? "none" : l.color, backgroundImage: l.dash ? `repeating-linear-gradient(90deg,${l.color} 0,${l.color} 4px,transparent 4px,transparent 7px)` : "none", borderRadius: 1 }} />
-            <span style={{ fontSize: 10, color: "#64748B", fontWeight: 600 }}>{l.label}</span>
+      <div style={{ display:"flex", gap:14, justifyContent:"center", marginTop:10, flexWrap:"wrap" as const }}>
+        {[{c:"#059669",l:"Equity MF (~14% CAGR)",dash:false},{c:"#CBD5E1",l:"FD post-tax (~5%)",dash:true}].map((i2,i)=>(
+          <div key={i} style={{ display:"flex", alignItems:"center", gap:5 }}>
+            <div style={{ width:16, height:2, background:i2.dash?"none":i2.c, backgroundImage:i2.dash?`repeating-linear-gradient(90deg,${i2.c} 0,${i2.c} 4px,transparent 4px,transparent 7px)`:"none", borderRadius:1 }}/>
+            <span style={{ fontSize:10, color:"#64748B", fontWeight:600 }}>{i2.l}</span>
           </div>
         ))}
       </div>
@@ -404,250 +161,158 @@ function WealthChart() {
   );
 }
 
-/* ── TICKER BAR ─────────────────────────────────────────────────────────── */
-const TICKER_ITEMS = [
-  { label: "Net Worth Tracker", icon: "📊" },
-  { label: "XIRR Calculator",   icon: "⚡" },
-  { label: "Fund Health Check", icon: "🏥" },
-  { label: "FIRE Calculator",   icon: "🔥" },
-  { label: "MF Style Matrix",   icon: "🗺️" },
-  { label: "Goal Planner",      icon: "🎯" },
-  { label: "Fund Comparison",   icon: "🔬" },
-  { label: "SIP Tracker",       icon: "📈" },
-  { label: "Retirement Planner",icon: "🏖️" },
-  { label: "Alpha Screener",    icon: "💡" },
+const FUNDS = [
+  { name:"Parag Parikh Flexi Cap", xirr:18.7, alpha:"+4.6%", tag:"HOLD",   tc:"#059669", tb:"#ECFDF5", tbd:"#A7F3D0", pts:[35,38,43,46,50,55,57,62,67,72], color:"#2563EB" },
+  { name:"HDFC Mid Cap Opp.",      xirr:11.3, alpha:"-2.8%", tag:"REVIEW", tc:"#D97706", tb:"#FFFBEB", tbd:"#FDE68A", pts:[50,48,46,44,47,43,45,44,44,42], color:"#D97706" },
+  { name:"SBI Small Cap",          xirr: 9.1, alpha:"-5.0%", tag:"EXIT",   tc:"#DC2626", tb:"#FEF2F2", tbd:"#FECACA", pts:[55,52,48,44,40,38,35,33,31,28], color:"#DC2626" },
 ];
-function TickerBar() {
-  const items = [...TICKER_ITEMS, ...TICKER_ITEMS]; // doubled for seamless loop
-  return (
-    <div style={{ overflow: "hidden", borderTop: "1px solid #E2E8F0", borderBottom: "1px solid #E2E8F0", background: "#F8FAFC", padding: "10px 0" }}>
-      <div className="ticker-track">
-        {items.map((item, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 24px", whiteSpace: "nowrap" as const, borderRight: "1px solid #E2E8F0", height: 28 }}>
-            <span style={{ fontSize: 14 }}>{item.icon}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>{item.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   MAIN PAGE
-   ═══════════════════════════════════════════════════════════════════════════ */
+const TOOLS = [
+  { href:"/dashboard",                          icon:"📊", label:"Money Dashboard",  sub:"Net worth · all assets",    color:"#2563EB", bg:"#EFF6FF", bd:"#BFDBFE", bar:"linear-gradient(90deg,#2563EB,#7C3AED)" },
+  { href:"/mutual-fund-health-check/dashboard", icon:"🏥", label:"Fund Health Check", sub:"XIRR · signals · alpha",   color:"#059669", bg:"#ECFDF5", bd:"#A7F3D0", bar:"linear-gradient(90deg,#059669,#0891B2)" },
+  { href:"/mutual-fund-match",                  icon:"🗺️", label:"MF World",          sub:"Explore & compare funds",  color:"#7C3AED", bg:"#F5F3FF", bd:"#DDD6FE", bar:"linear-gradient(90deg,#7C3AED,#2563EB)" },
+  { href:"/dashboard/calculators",              icon:"🧮", label:"Life Calculators",  sub:"FIRE · goals · retirement",color:"#D97706", bg:"#FFFBEB", bd:"#FDE68A", bar:"linear-gradient(90deg,#D97706,#DC2626)" },
+];
+
+const TICK = ["📊 Net Worth","🏥 Fund Health Check","⚡ True XIRR","🔥 FIRE Planner","🗺️ MF Style Matrix","🎯 Goal Tracker","🔬 Fund Comparison","📈 SIP Tracker","🏖️ Retirement","💡 Alpha Screener"];
+
 export default function Home() {
-  const [entered, setEntered] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setEntered(true), 60);
-    return () => clearTimeout(t);
-  }, []);
+  const [on, setOn] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setOn(true), 60); return () => clearTimeout(t); }, []);
 
-  const tableRef = useRef<HTMLDivElement>(null);
-  const [tableVis, setTableVis] = useState(false);
+  const [fv, setFv] = useState(false);
+  const fref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const ob = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setTableVis(true); ob.disconnect(); } },
-      { threshold: 0.1 }
-    );
-    if (tableRef.current) ob.observe(tableRef.current);
+    const ob = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setFv(true); ob.disconnect(); } }, { threshold:.1 });
+    if (fref.current) ob.observe(fref.current);
     return () => ob.disconnect();
   }, []);
 
-  const fade = (delay: number): React.CSSProperties => ({
-    opacity: entered ? 1 : 0,
-    transform: entered ? "translateY(0)" : "translateY(20px)",
-    transition: `opacity 0.65s ease ${delay}ms, transform 0.65s ease ${delay}ms`,
+  const fi = (d:number):React.CSSProperties => ({
+    opacity: on?1:0, transform: on?"translateY(0)":"translateY(20px)",
+    transition: `opacity .65s ease ${d}ms, transform .65s ease ${d}ms`,
   });
 
-  const NAV = [
-    { href: "/dashboard",                          icon: "📊", label: "Money Dashboard",  sub: "Net worth · all assets",     color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE", bar: "linear-gradient(90deg,#2563EB,#7C3AED)" },
-    { href: "/mutual-fund-health-check/dashboard", icon: "🏥", label: "Fund Health Check", sub: "XIRR · signals · alpha",     color: "#059669", bg: "#ECFDF5", bd: "#A7F3D0", bar: "linear-gradient(90deg,#059669,#0891B2)" },
-    { href: "/mutual-fund-match",                  icon: "🗺️", label: "MF World",          sub: "Explore & compare funds",    color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE", bar: "linear-gradient(90deg,#7C3AED,#2563EB)" },
-    { href: "/dashboard/calculators",              icon: "🧮", label: "Life Calculators",  sub: "FIRE · goals · retirement",  color: "#D97706", bg: "#FFFBEB", bd: "#FDE68A", bar: "linear-gradient(90deg,#D97706,#DC2626)" },
-  ];
-
   return (
-    <main style={{ background: "#F8FAFC", minHeight: "100vh", fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", color: "#1F2937" }}>
+    <main style={{ background:"#F8FAFC", minHeight:"100vh", fontFamily:"'DM Sans',system-ui,-apple-system,sans-serif", color:"#1F2937" }}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ① HERO — full-width, leads with what the product does
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{
-        background: "linear-gradient(150deg,#F0FDF4 0%,#EFF6FF 50%,#FFF7ED 100%)",
-        borderBottom: "1px solid #E2E8F0",
-        position: "relative",
-        overflow: "hidden",
-        padding: "clamp(40px,7vw,80px) clamp(16px,4vw,32px) clamp(36px,6vw,68px)",
-      }}>
-        {/* Background texture */}
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 1px 1px, rgba(16,185,129,0.07) 1px, transparent 0)", backgroundSize: "28px 28px", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: -120, right: -100, width: 600, height: 600, background: "radial-gradient(circle,rgba(59,130,246,0.09) 0%,transparent 65%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -80, left: -80, width: 500, height: 500, background: "radial-gradient(circle,rgba(16,185,129,0.07) 0%,transparent 65%)", pointerEvents: "none" }} />
+      {/* ━━━━━━━ 1. HERO ━━━━━━━ */}
+      <section style={{ background:"linear-gradient(155deg,#F0FDF4 0%,#EFF6FF 55%,#FFF7ED 100%)", borderBottom:"1px solid #E2E8F0", position:"relative", overflow:"hidden", padding:"clamp(44px,7vw,88px) clamp(16px,4vw,32px) clamp(40px,6vw,72px)" }}>
+        <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 1px 1px,rgba(16,185,129,.07) 1px,transparent 0)", backgroundSize:"28px 28px", pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", top:-120, right:-100, width:600, height:600, background:"radial-gradient(circle,rgba(59,130,246,.08) 0%,transparent 65%)", pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", bottom:-80, left:-80, width:500, height:500, background:"radial-gradient(circle,rgba(16,185,129,.07) 0%,transparent 65%)", pointerEvents:"none" }}/>
 
-        <div style={{ maxWidth: 1160, margin: "0 auto", position: "relative" }}>
-          <div className="hero-layout">
-
-            {/* LEFT: copy */}
+        <div style={{ maxWidth:1120, margin:"0 auto", position:"relative" }}>
+          <div className="hero-grid">
             <div>
-              {/* Live badge */}
-              <div style={fade(60)}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 100, padding: "5px 14px", marginBottom: 20 }}>
-                  <span className="pulse-dot" style={{ width: 7, height: 7, background: "#10B981", borderRadius: "50%", flexShrink: 0, display: "block" }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#065F46", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Free · Built for Indian Investors</span>
+              <div style={fi(50)}>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(16,185,129,.10)", border:"1px solid rgba(16,185,129,.25)", borderRadius:100, padding:"5px 14px", marginBottom:22 }}>
+                  <span className="blink" style={{ width:7, height:7, background:"#10B981", borderRadius:"50%", display:"block", flexShrink:0 }}/>
+                  <span style={{ fontSize:11, fontWeight:700, color:"#065F46", letterSpacing:".08em", textTransform:"uppercase" as const }}>Free · Built for Indian Investors</span>
                 </div>
               </div>
-
-              {/* H1 */}
-              <div style={fade(110)}>
-                <h1 style={{ fontSize: "clamp(2rem,5.8vw,3.7rem)", fontWeight: 900, color: "#0F172A", lineHeight: 1.06, letterSpacing: "-0.04em", margin: "0 0 14px" }}>
-                  Your complete
-                  <br />financial picture.
-                  <br />
-                  <span className="shimmer-text">Finally clear.</span>
+              <div style={fi(100)}>
+                <h1 style={{ fontSize:"clamp(2rem,5.8vw,3.8rem)", fontWeight:900, color:"#0F172A", lineHeight:1.06, letterSpacing:"-.04em", margin:"0 0 18px" }}>
+                  Your complete<br/>financial picture.<br/><span className="shine">Finally clear.</span>
                 </h1>
               </div>
-
-              {/* Plain-English explainer — the most important addition */}
-              <div style={fade(175)}>
-                <p style={{ fontSize: "clamp(14px,2vw,17px)", color: "#334155", lineHeight: 1.8, maxWidth: 460, marginBottom: 10, fontWeight: 500 }}>
-                  Track <strong style={{ color: "#0F172A" }}>all your investments</strong> in one place, see if your <strong style={{ color: "#0F172A" }}>mutual funds are actually working</strong>, and plan every <strong style={{ color: "#0F172A" }}>big life goal</strong> — with real numbers, not guesswork.
+              <div style={fi(160)}>
+                <p style={{ fontSize:"clamp(14px,1.9vw,17px)", color:"#334155", lineHeight:1.8, maxWidth:460, margin:"0 0 8px", fontWeight:500 }}>
+                  Track <strong style={{ color:"#0F172A" }}>all your investments</strong> in one place. Know if your <strong style={{ color:"#0F172A" }}>mutual funds are actually earning</strong>. Plan every <strong style={{ color:"#0F172A" }}>big life goal</strong> with real numbers — not guesswork.
                 </p>
               </div>
-
-              {/* Who this is for */}
-              <div style={fade(210)}>
-                <p style={{ fontSize: "clamp(12px,1.6vw,13.5px)", color: "#059669", fontWeight: 700, fontStyle: "italic", margin: "0 0 26px" }}>
-                  Thoughtful Money, Better Life. — For salaried Indians with MFs, PF, FDs &amp; goals.
+              <div style={fi(195)}>
+                <p style={{ fontSize:"clamp(12px,1.5vw,13px)", color:"#059669", fontWeight:700, fontStyle:"italic", margin:"0 0 28px" }}>
+                  For salaried Indians with MFs, PF, FDs &amp; life goals.
                 </p>
               </div>
-
-              {/* CTAs */}
-              <div style={{ ...fade(265), display: "flex", gap: 11, flexWrap: "wrap" as const }}>
-                <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration: "none" }}>
-                  <div className="cta-green" style={{ background: "linear-gradient(90deg,#059669,#2563EB)", color: "white", borderRadius: 14, padding: "13px 22px", fontSize: 14, fontWeight: 800, boxShadow: "0 4px 20px rgba(5,150,105,0.28)", display: "flex", alignItems: "center", gap: 7, cursor: "pointer", minHeight: 48 }}>
+              <div style={{ ...fi(245), display:"flex", gap:10, flexWrap:"wrap" as const, marginBottom:24 }}>
+                <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration:"none" }}>
+                  <button className="cta-p" style={{ background:"linear-gradient(90deg,#059669,#2563EB)", color:"white", border:"none", borderRadius:13, padding:"13px 22px", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:7, boxShadow:"0 4px 20px rgba(5,150,105,.28)", minHeight:48 }}>
                     Check My Funds 🏥
-                  </div>
+                  </button>
                 </Link>
-                <Link href="/dashboard" style={{ textDecoration: "none" }}>
-                  <div className="cta-white" style={{ background: "white", color: "#0F172A", borderRadius: 14, padding: "13px 22px", fontSize: 14, fontWeight: 700, border: "1.5px solid #E2E8F0", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 7, cursor: "pointer", minHeight: 48 }}>
+                <Link href="/dashboard" style={{ textDecoration:"none" }}>
+                  <button className="cta-g" style={{ background:"white", color:"#0F172A", border:"1.5px solid #E2E8F0", borderRadius:13, padding:"13px 22px", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:7, boxShadow:"0 2px 8px rgba(0,0,0,.05)", minHeight:48 }}>
                     See My Net Worth →
-                  </div>
+                  </button>
                 </Link>
               </div>
-
-              {/* Trust signals */}
-              <div style={{ ...fade(320), display: "flex", gap: 18, marginTop: 22, flexWrap: "wrap" as const }}>
-                {[
-                  { icon: "🔒", text: "No login to explore" },
-                  { icon: "✅", text: "No ads, ever" },
-                  { icon: "🇮🇳", text: "India-specific data" },
-                ].map((t, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ fontSize: 13 }}>{t.icon}</span>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: "#64748B" }}>{t.text}</span>
-                  </div>
+              <div style={{ ...fi(295), display:"flex", gap:20, flexWrap:"wrap" as const }}>
+                {[["🔒","No login to explore"],["✅","No ads, ever"],["🇮🇳","India-specific data"]].map(([ic,tx],i)=>(
+                  <span key={i} style={{ display:"flex", alignItems:"center", gap:5, fontSize:11.5, fontWeight:600, color:"#64748B" }}><span>{ic}</span>{tx}</span>
                 ))}
               </div>
             </div>
 
-            {/* RIGHT: preview — desktop only */}
-            <div className="hero-preview-panel">
-              <div style={{ background: "white", borderRadius: 24, border: "1.5px solid #E2E8F0", boxShadow: "0 28px 88px rgba(0,0,0,0.10)", overflow: "hidden" }}>
-                {/* Browser chrome */}
-                <div style={{ background: "#F8FAFC", borderBottom: "1px solid #F1F5F9", padding: "9px 14px", display: "flex", alignItems: "center", gap: 6 }}>
-                  {["#FC5F57","#FEBC2E","#27C840"].map((c, i) => (
-                    <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />
-                  ))}
-                  <div style={{ flex: 1, background: "#F1F5F9", borderRadius: 5, height: 16, marginLeft: 8, display: "flex", alignItems: "center", paddingLeft: 8 }}>
-                    <span style={{ fontSize: 8.5, color: "#94A3B8", fontWeight: 600 }}>nivesify.com/dashboard</span>
+            <div className="hero-visual">
+              <div className="float" style={{ background:"white", borderRadius:22, border:"1.5px solid #E2E8F0", boxShadow:"0 28px 80px rgba(0,0,0,.10)", overflow:"hidden" }}>
+                <div style={{ background:"#F8FAFC", borderBottom:"1px solid #F1F5F9", padding:"9px 14px", display:"flex", alignItems:"center", gap:6 }}>
+                  {["#FC5F57","#FEBC2E","#27C840"].map((c,i)=><div key={i} style={{ width:10, height:10, borderRadius:"50%", background:c }}/>)}
+                  <div style={{ flex:1, background:"#F1F5F9", borderRadius:5, height:16, marginLeft:8, display:"flex", alignItems:"center", paddingLeft:8 }}>
+                    <span style={{ fontSize:8.5, color:"#94A3B8", fontWeight:600 }}>nivesify.com/dashboard</span>
                   </div>
                 </div>
-                {/* Tab strip */}
-                <div style={{ borderBottom: "1px solid #F1F5F9", padding: "0 14px", display: "flex" }}>
-                  {["Overview","Health Check","Fund World"].map((t, i) => (
-                    <div key={i} style={{ padding: "8px 11px", fontSize: 10, fontWeight: i === 0 ? 800 : 600, color: i === 0 ? "#2563EB" : "#94A3B8", borderBottom: i === 0 ? "2px solid #2563EB" : "2px solid transparent" }}>{t}</div>
-                  ))}
-                </div>
-                <div style={{ padding: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div style={{ padding:18 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
                     <div>
-                      <div style={{ fontSize: 9.5, color: "#94A3B8", fontWeight: 600 }}>Total Net Worth</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: "#0F172A", lineHeight: 1 }}>₹47.3L</div>
-                      <div style={{ fontSize: 10.5, color: "#059669", fontWeight: 700, marginTop: 2 }}>↑ +18.4% · ₹7.3L gain</div>
+                      <div style={{ fontSize:10, color:"#94A3B8", fontWeight:600, marginBottom:2 }}>Total Net Worth</div>
+                      <div style={{ fontSize:24, fontWeight:900, color:"#0F172A", lineHeight:1 }}>₹47.3L</div>
+                      <div style={{ fontSize:11, color:"#059669", fontWeight:700, marginTop:3 }}>↑ +18.4% · ₹7.3L gain this year</div>
                     </div>
-                    <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 10, padding: "6px 10px", textAlign: "center" as const }}>
-                      <div style={{ fontSize: 9.5, color: "#059669", fontWeight: 700 }}>Health Score</div>
-                      <div style={{ fontSize: 20, fontWeight: 900, color: "#059669" }}>84/100</div>
+                    <div style={{ background:"#ECFDF5", border:"1px solid #A7F3D0", borderRadius:10, padding:"7px 12px", textAlign:"center" as const }}>
+                      <div style={{ fontSize:9.5, color:"#059669", fontWeight:700 }}>Health Score</div>
+                      <div style={{ fontSize:22, fontWeight:900, color:"#059669" }}>84/100</div>
                     </div>
                   </div>
-                  <NetWorthPreview />
+                  <div style={{ display:"flex", gap:14, alignItems:"center", marginBottom:12 }}>
+                    <Donut size={92}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      {SEGS.map((s,i)=>(
+                        <div key={i} style={{ display:"flex", alignItems:"center", gap:5, marginBottom:5 }}>
+                          <div style={{ width:7, height:7, borderRadius:2, background:s.color, flexShrink:0 }}/>
+                          <span style={{ fontSize:10, color:"#374151", fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>{s.label}</span>
+                          <span style={{ fontSize:10, fontWeight:800, color:s.color }}>{s.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ borderTop:"1px solid #F1F5F9", paddingTop:8, display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:11, fontWeight:800, color:"#0F172A" }}>Total Net Worth</span>
+                    <span style={{ fontSize:13, fontWeight:900, color:"#059669" }}>₹47.3L ↑ 18.4%</span>
+                  </div>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ② FEATURE TICKER
-          ═══════════════════════════════════════════════════════════════════ */}
-      <TickerBar />
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          ③ COMPACT NAV CARDS — 2 col mobile / 4 col desktop
-             Simple, scannable, icon-first
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{ background: "white", borderBottom: "1.5px solid #E2E8F0", padding: "clamp(20px,3.5vw,32px) clamp(16px,4vw,32px)" }}>
-        <div style={{ maxWidth: 1160, margin: "0 auto" }}>
-
-          <Reveal>
-            <div style={{ textAlign: "center" as const, marginBottom: 18 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.10em", textTransform: "uppercase" as const, margin: 0 }}>
-                Four tools. One platform. Everything you need.
-              </p>
+      {/* ━━━━━━━ TICKER ━━━━━━━ */}
+      <div style={{ overflow:"hidden", borderBottom:"1px solid #E2E8F0", background:"#F8FAFC", padding:"10px 0" }}>
+        <div className="tick">
+          {[...TICK,...TICK].map((item,i)=>(
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:6, padding:"0 22px", whiteSpace:"nowrap" as const, borderRight:"1px solid #E2E8F0", height:26 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:"#475569" }}>{item}</span>
             </div>
-          </Reveal>
+          ))}
+        </div>
+      </div>
 
-          <div className="nav-cards">
-            {NAV.map((c, i) => (
-              <Reveal key={i} delay={i * 55}>
-                <Link href={c.href} style={{ textDecoration: "none", display: "block" }}>
-                  <div className="nav-card-lift" style={{
-                    background: "white",
-                    border: `1.5px solid ${c.bd}`,
-                    borderRadius: 18,
-                    padding: "clamp(14px,2.5vw,18px) clamp(12px,2vw,16px)",
-                    display: "flex",
-                    flexDirection: "column" as const,
-                    gap: 8,
-                    position: "relative",
-                    overflow: "hidden",
-                    boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-                    minHeight: "clamp(110px,15vw,128px)",
-                  }}>
-                    {/* Top accent bar */}
-                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.bar, borderRadius: "18px 18px 0 0" }} />
-
-                    {/* Icon */}
-                    <div style={{
-                      width: 40, height: 40, borderRadius: 11,
-                      background: c.bg, border: `1.5px solid ${c.bd}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 20, marginTop: 4, flexShrink: 0,
-                    }}>
-                      {c.icon}
-                    </div>
-
-                    {/* Text */}
-                    <div>
-                      <div style={{ fontSize: "clamp(12px,2vw,13.5px)", fontWeight: 800, color: "#0F172A", lineHeight: 1.2, marginBottom: 3 }}>{c.label}</div>
-                      <div style={{ fontSize: "clamp(10px,1.5vw,11px)", color: "#64748B", lineHeight: 1.4 }}>{c.sub}</div>
-                    </div>
-
-                    <div style={{ fontSize: 11, fontWeight: 700, color: c.color, marginTop: "auto" }}>Open →</div>
+      {/* ━━━━━━━ 2. TOOL CARDS ━━━━━━━ */}
+      <section style={{ background:"white", borderBottom:"1px solid #E2E8F0", padding:"clamp(18px,3vw,26px) clamp(16px,4vw,32px)" }}>
+        <div style={{ maxWidth:1120, margin:"0 auto" }}>
+          <div className="tool-cards">
+            {TOOLS.map((t,i)=>(
+              <Reveal key={i} delay={i*55}>
+                <Link href={t.href} style={{ textDecoration:"none", display:"block" }}>
+                  <div className="tool-lift" style={{ background:t.bg, border:`1.5px solid ${t.bd}`, borderRadius:15, padding:"clamp(13px,2vw,17px) clamp(12px,1.8vw,15px)", position:"relative", overflow:"hidden", boxShadow:"0 2px 8px rgba(0,0,0,.04)" }}>
+                    <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:t.bar, borderRadius:"15px 15px 0 0" }}/>
+                    <div style={{ fontSize:"clamp(20px,2.5vw,24px)", marginBottom:7, marginTop:3 }}>{t.icon}</div>
+                    <div style={{ fontSize:"clamp(11.5px,1.7vw,13px)", fontWeight:800, color:"#0F172A", lineHeight:1.2, marginBottom:3 }}>{t.label}</div>
+                    <div style={{ fontSize:"clamp(9.5px,1.3vw,11px)", color:"#64748B", lineHeight:1.4, marginBottom:8 }}>{t.sub}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:t.color }}>Open →</div>
                   </div>
                 </Link>
               </Reveal>
@@ -656,150 +321,182 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ④ FEATURE SHOWCASE — cards with live preview visuals
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{ maxWidth: 1160, margin: "0 auto", padding: "clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
+      {/* ━━━━━━━ 3. KNOW YOUR NET WORTH ━━━━━━━ */}
+      <section style={{ maxWidth:1120, margin:"0 auto", padding:"clamp(40px,6vw,72px) clamp(16px,4vw,32px)" }}>
         <Reveal>
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.20)", borderRadius: 100, padding: "4px 12px", marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Everything in one place</span>
+          <div className="story-row">
+            <div>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(37,99,235,.08)", border:"1px solid rgba(37,99,235,.20)", borderRadius:100, padding:"4px 12px", marginBottom:12 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:"#1D4ED8", letterSpacing:".08em", textTransform:"uppercase" as const }}>Start here</span>
+              </div>
+              <h2 style={{ fontSize:"clamp(1.3rem,3.5vw,2rem)", fontWeight:900, color:"#0F172A", lineHeight:1.15, letterSpacing:"-.03em", margin:"0 0 14px" }}>
+                Do you actually know<br/>how much you're worth?
+              </h2>
+              <p style={{ fontSize:"clamp(13px,1.7vw,15px)", color:"#475569", lineHeight:1.85, maxWidth:420, margin:"0 0 12px" }}>
+                Most people have money spread across mutual funds, PF, FDs, gold, and savings accounts — with no single view of the full picture. Just a rough guess.
+              </p>
+              <p style={{ fontSize:"clamp(13px,1.7vw,15px)", color:"#0F172A", fontWeight:700, lineHeight:1.75, maxWidth:420, margin:"0 0 26px" }}>
+                The Money Dashboard pulls everything together — one number, one screen, total clarity.
+              </p>
+              <Link href="/dashboard" style={{ textDecoration:"none" }}>
+                <div className="cta-g" style={{ display:"inline-flex", alignItems:"center", gap:7, background:"white", border:"1.5px solid #BFDBFE", borderRadius:12, padding:"11px 18px", fontSize:13, fontWeight:700, color:"#2563EB", cursor:"pointer", boxShadow:"0 2px 8px rgba(0,0,0,.05)" }}>
+                  📊 Open Money Dashboard →
+                </div>
+              </Link>
             </div>
-            <h2 style={{ fontSize: "clamp(18px,3.5vw,28px)", fontWeight: 900, color: "#0F172A", margin: 0, letterSpacing: "-0.02em" }}>
-              A complete home for your financial life.
-            </h2>
+
+            <div>
+              <div className="card-lift" style={{ background:"white", borderRadius:20, border:"1.5px solid #E2E8F0", overflow:"hidden", boxShadow:"0 6px 28px rgba(0,0,0,.07)" }}>
+                <div style={{ height:4, background:"linear-gradient(90deg,#2563EB,#7C3AED)" }}/>
+                <div style={{ padding:"18px 18px 14px", background:"linear-gradient(135deg,#EFF6FF,#F5F3FF)" }}>
+                  <div style={{ fontSize:10, color:"#94A3B8", fontWeight:600, marginBottom:4 }}>Total Net Worth</div>
+                  <div style={{ fontSize:26, fontWeight:900, color:"#0F172A", lineHeight:1 }}>₹47.3L</div>
+                  <div style={{ fontSize:11, color:"#059669", fontWeight:700, marginTop:4 }}>↑ +18.4% · ₹7.3L gain this year</div>
+                </div>
+                <div style={{ padding:"16px 18px 18px" }}>
+                  <div style={{ display:"flex", gap:12, alignItems:"center", marginBottom:14 }}>
+                    <Donut size={84}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      {SEGS.map((s,i)=>(
+                        <div key={i} style={{ display:"flex", alignItems:"center", gap:5, marginBottom:5 }}>
+                          <div style={{ width:7, height:7, borderRadius:2, background:s.color, flexShrink:0 }}/>
+                          <span style={{ fontSize:10, color:"#374151", fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>{s.label}</span>
+                          <span style={{ fontSize:10, fontWeight:800, color:s.color }}>{s.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ borderTop:"1px solid #F1F5F9", paddingTop:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ fontSize:12, fontWeight:800, color:"#0F172A" }}>Total Net Worth</span>
+                    <span style={{ fontSize:14, fontWeight:900, color:"#059669" }}>₹47.3L ↑ 18.4%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </Reveal>
+      </section>
 
-        <div className="feature-grid">
-
-          {/* Dashboard */}
-          <Reveal delay={0}>
-            <Link href="/dashboard" style={{ textDecoration: "none", display: "block", height: "100%" }}>
-              <div className="card-lift" style={{ background: "white", borderRadius: 20, border: "1.5px solid #E2E8F0", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" as const, boxShadow: "0 4px 18px rgba(0,0,0,0.05)" }}>
-                <div style={{ height: 4, background: "linear-gradient(90deg,#2563EB,#7C3AED)" }} />
-                <div style={{ background: "linear-gradient(135deg,#EFF6FF,#F5F3FF)", padding: "16px 16px 12px", borderBottom: "1px solid #F1F5F9" }}>
-                  <NetWorthPreview />
-                </div>
-                <div style={{ padding: "14px 16px 16px", flex: 1, display: "flex", flexDirection: "column" as const }}>
-                  <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: "#EFF6FF", border: "1.5px solid #BFDBFE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📊</div>
-                    <div>
-                      <h3 style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0, lineHeight: 1.2 }}>My Money Dashboard</h3>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginTop: 1 }}>Know exactly where you stand</div>
+      {/* ━━━━━━━ 4. FUND HEALTH — flipped layout ━━━━━━━ */}
+      <section style={{ background:"white", borderTop:"1px solid #E2E8F0", borderBottom:"1px solid #E2E8F0" }}>
+        <div style={{ maxWidth:1120, margin:"0 auto", padding:"clamp(40px,6vw,72px) clamp(16px,4vw,32px)" }}>
+          <Reveal>
+            <div className="story-row story-flip">
+              {/* Visual — shows second on mobile, first on desktop */}
+              <div ref={fref}>
+                <div className="card-lift" style={{ background:"white", borderRadius:20, border:"1.5px solid #E2E8F0", overflow:"hidden", boxShadow:"0 6px 28px rgba(0,0,0,.07)" }}>
+                  <div style={{ height:4, background:"linear-gradient(90deg,#059669,#0891B2)" }}/>
+                  <div style={{ padding:"14px 16px", background:"linear-gradient(135deg,#ECFDF5,#ECFEFF)", borderBottom:"1px solid #F1F5F9" }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 44px 36px 46px", gap:6, paddingBottom:8, borderBottom:"1px solid #D1FAE5", marginBottom:2 }}>
+                      {["Fund","Trend","XIRR","Signal"].map((h,i)=>(
+                        <div key={i} style={{ fontSize:8.5, fontWeight:700, color:"#6EE7B7", textTransform:"uppercase" as const, letterSpacing:".05em" }}>{h}</div>
+                      ))}
                     </div>
-                  </div>
-                  <p style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.75, margin: "0 0 10px", flex: 1 }}>All your investments — mutual funds, PF, FDs, gold, cash. One unified net worth view with live allocation breakdown and annual growth tracking.</p>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2563EB" }}>Open Dashboard →</div>
-                </div>
-              </div>
-            </Link>
-          </Reveal>
-
-          {/* Health Check */}
-          <Reveal delay={80}>
-            <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration: "none", display: "block", height: "100%" }}>
-              <div ref={tableRef} className="card-lift" style={{ background: "white", borderRadius: 20, border: "1.5px solid #E2E8F0", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" as const, boxShadow: "0 4px 18px rgba(0,0,0,0.05)" }}>
-                <div style={{ height: 4, background: "linear-gradient(90deg,#059669,#0891B2)" }} />
-                <div style={{ background: "linear-gradient(135deg,#ECFDF5,#ECFEFF)", padding: "12px 14px 8px", borderBottom: "1px solid #F1F5F9" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 46px 38px 46px", gap: 7, padding: "2px 0 7px", borderBottom: "1px solid #E2E8F0", marginBottom: 1 }}>
-                    {["Fund","Trend","XIRR","Signal"].map((h, i) => (
-                      <div key={i} style={{ fontSize: 8, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>{h}</div>
+                    {FUNDS.map((fu,i)=>(
+                      <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 44px 36px 46px", gap:6, alignItems:"center", padding:"9px 0", borderBottom:i<FUNDS.length-1?"1px solid #F1F5F9":"none", opacity:fv?1:0, transform:fv?"translateX(0)":"translateX(-10px)", transition:`opacity .45s ease ${i*90}ms, transform .45s ease ${i*90}ms` }}>
+                        <div>
+                          <div style={{ fontSize:10.5, fontWeight:700, color:"#0F172A", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" as const }}>{fu.name}</div>
+                          <div style={{ fontSize:9, fontWeight:600, color:fu.xirr>=14?"#059669":"#DC2626" }}>XIRR {fu.xirr}% · {fu.alpha}</div>
+                        </div>
+                        <Spark pts={fu.pts} color={fu.color} w={40} h={18}/>
+                        <div style={{ fontSize:10, fontWeight:700, color:fu.xirr>=14?"#059669":"#DC2626" }}>{fu.xirr}%</div>
+                        <div style={{ fontSize:8.5, fontWeight:800, padding:"2px 5px", borderRadius:100, background:fu.tb, border:`1px solid ${fu.tbd}`, color:fu.tc, textAlign:"center" as const, whiteSpace:"nowrap" as const }}>{fu.tag}</div>
+                      </div>
                     ))}
                   </div>
-                  {FUNDS.map((f, i) => <FundRow key={i} f={f} animate={tableVis} delay={i * 80} />)}
-                </div>
-                <div style={{ padding: "14px 16px 16px", flex: 1, display: "flex", flexDirection: "column" as const }}>
-                  <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: "#ECFDF5", border: "1.5px solid #A7F3D0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🏥</div>
-                    <div>
-                      <h3 style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0, lineHeight: 1.2 }}>Fund Health Check</h3>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginTop: 1 }}>Let returns justify effort</div>
+                  <div style={{ padding:"12px 16px" }}>
+                    <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const, alignItems:"center" }}>
+                      {[["HOLD","#059669","#ECFDF5","#A7F3D0"],["REVIEW","#D97706","#FFFBEB","#FDE68A"],["EXIT","#DC2626","#FEF2F2","#FECACA"]].map(([l,c,bg,bd],i)=>(
+                        <div key={i} style={{ background:bg, border:`1px solid ${bd}`, borderRadius:100, padding:"3px 9px", fontSize:9.5, fontWeight:800, color:c }}>{l}</div>
+                      ))}
+                      <span style={{ fontSize:10, color:"#94A3B8", fontWeight:600 }}>— every fund gets a clear verdict</span>
                     </div>
                   </div>
-                  <p style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.75, margin: "0 0 10px", flex: 1 }}>Upload your CAS. Get XIRR, benchmark comparison, and clear Hold / Review / Exit signals for every fund you own. No jargon.</p>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#059669" }}>Check Portfolio →</div>
                 </div>
               </div>
-            </Link>
-          </Reveal>
 
-          {/* MF World */}
-          <Reveal delay={120}>
-            <Link href="/mutual-fund-match" style={{ textDecoration: "none", display: "block", height: "100%" }}>
-              <div className="card-lift" style={{ background: "white", borderRadius: 20, border: "1.5px solid #E2E8F0", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" as const, boxShadow: "0 4px 18px rgba(0,0,0,0.05)" }}>
-                <div style={{ height: 4, background: "linear-gradient(90deg,#7C3AED,#2563EB)" }} />
-                <div style={{ background: "linear-gradient(135deg,#F5F3FF,#EFF6FF)", padding: "16px 16px 12px", borderBottom: "1px solid #F1F5F9" }}>
-                  <StyleBox />
+              {/* Text */}
+              <div>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(5,150,105,.08)", border:"1px solid rgba(5,150,105,.20)", borderRadius:100, padding:"4px 12px", marginBottom:12 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:"#059669", letterSpacing:".08em", textTransform:"uppercase" as const }}>The hard truth</span>
                 </div>
-                <div style={{ padding: "14px 16px 16px", flex: 1, display: "flex", flexDirection: "column" as const }}>
-                  <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: "#F5F3FF", border: "1.5px solid #DDD6FE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🗺️</div>
-                    <div>
-                      <h3 style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0, lineHeight: 1.2 }}>The Mutual Fund World</h3>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginTop: 1 }}>Discover, analyse, decide</div>
-                    </div>
+                <h2 style={{ fontSize:"clamp(1.3rem,3.5vw,2rem)", fontWeight:900, color:"#0F172A", lineHeight:1.15, letterSpacing:"-.03em", margin:"0 0 14px" }}>
+                  Are your mutual funds<br/>actually earning for you?
+                </h2>
+                <p style={{ fontSize:"clamp(13px,1.7vw,15px)", color:"#475569", lineHeight:1.85, maxWidth:420, margin:"0 0 12px" }}>
+                  A fund's brochure might say 18% returns. But your actual XIRR — accounting for every SIP date and amount — is often very different. And if it's below its benchmark, you're losing ground silently.
+                </p>
+                <p style={{ fontSize:"clamp(13px,1.7vw,15px)", color:"#0F172A", fontWeight:700, lineHeight:1.75, maxWidth:420, margin:"0 0 26px" }}>
+                  Fund Health Check gives every fund a clear signal: Hold, Review, or Exit. No jargon needed.
+                </p>
+                <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration:"none" }}>
+                  <div className="cta-g" style={{ display:"inline-flex", alignItems:"center", gap:7, background:"white", border:"1.5px solid #A7F3D0", borderRadius:12, padding:"11px 18px", fontSize:13, fontWeight:700, color:"#059669", cursor:"pointer", boxShadow:"0 2px 8px rgba(0,0,0,.05)" }}>
+                    🏥 Check My Portfolio →
                   </div>
-                  <p style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.75, margin: "0 0 10px", flex: 1 }}>India's full MF universe via live style-box matrix. Compare active vs passive, filter by alpha, find the right fund for every portfolio slot.</p>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#7C3AED" }}>Explore Fund World →</div>
-                </div>
+                </Link>
               </div>
-            </Link>
+            </div>
           </Reveal>
-
-          {/* Calculators */}
-          <Reveal delay={160}>
-            <Link href="/dashboard/calculators" style={{ textDecoration: "none", display: "block", height: "100%" }}>
-              <div className="card-lift" style={{ background: "white", borderRadius: 20, border: "1.5px solid #E2E8F0", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" as const, boxShadow: "0 4px 18px rgba(0,0,0,0.05)" }}>
-                <div style={{ height: 4, background: "linear-gradient(90deg,#D97706,#DC2626)" }} />
-                <div style={{ background: "linear-gradient(135deg,#FFFBEB,#FEF2F2)", padding: "16px 16px 12px", borderBottom: "1px solid #F1F5F9" }}>
-                  <FireViz />
-                </div>
-                <div style={{ padding: "14px 16px 16px", flex: 1, display: "flex", flexDirection: "column" as const }}>
-                  <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: "#FFFBEB", border: "1.5px solid #FDE68A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🧮</div>
-                    <div>
-                      <h3 style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", margin: 0, lineHeight: 1.2 }}>Life Calculators</h3>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 600, marginTop: 1 }}>Decide with real numbers</div>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.75, margin: "0 0 10px", flex: 1 }}>FIRE, retirement, education, big purchases — model real life decisions with numbers. Work backwards from your goal to today's SIP.</p>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#D97706" }}>Open Calculators →</div>
-                </div>
-              </div>
-            </Link>
-          </Reveal>
-
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ⑤ HOW IT WORKS
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{ background: "white", borderTop: "1px solid #E2E8F0", borderBottom: "1px solid #E2E8F0", padding: "clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
-        <div style={{ maxWidth: 1160, margin: "0 auto" }}>
-          <Reveal>
-            <div style={{ textAlign: "center" as const, marginBottom: 26 }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 100, padding: "4px 12px", marginBottom: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>How it works</span>
+      {/* ━━━━━━━ 5. THE REAL GAP ━━━━━━━ */}
+      <section style={{ maxWidth:1120, margin:"0 auto", padding:"clamp(36px,6vw,68px) clamp(16px,4vw,32px)" }}>
+        <Reveal>
+          <div style={{ background:"white", borderRadius:22, border:"1.5px solid #E2E8F0", padding:"clamp(20px,4vw,38px)", boxShadow:"0 4px 22px rgba(0,0,0,.05)" }}>
+            <div className="story-row">
+              <div>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(5,150,105,.08)", border:"1px solid rgba(5,150,105,.20)", borderRadius:100, padding:"4px 11px", marginBottom:12 }}>
+                  <span style={{ fontSize:10.5, fontWeight:700, color:"#059669", letterSpacing:".08em", textTransform:"uppercase" as const }}>The real gap</span>
+                </div>
+                <h2 style={{ fontSize:"clamp(1.2rem,3vw,1.7rem)", fontWeight:800, color:"#0F172A", margin:"0 0 10px", lineHeight:1.2, letterSpacing:"-.02em" }}>
+                  ₹10L. 10 years.<br/><span style={{ color:"#059669" }}>One choice. Massive difference.</span>
+                </h2>
+                <p style={{ fontSize:"clamp(12px,1.6vw,14px)", color:"#475569", lineHeight:1.85, maxWidth:360, margin:"0 0 18px" }}>
+                  Equity mutual funds, held patiently, have significantly outperformed FDs after tax. The investment vehicle matters as much as the discipline.
+                </p>
+                <div style={{ display:"flex", gap:10, flexWrap:"wrap" as const, marginBottom:14 }}>
+                  {[{label:"Equity MF",val:"₹34.6L",note:"~14% CAGR",color:"#059669",bg:"#ECFDF5",bd:"#A7F3D0"},{label:"FD post-tax",val:"₹18.8L",note:"~5% real",color:"#94A3B8",bg:"#F8FAFC",bd:"#E2E8F0"}].map((s,i)=>(
+                    <div key={i} style={{ background:s.bg, border:`1.5px solid ${s.bd}`, borderRadius:12, padding:"10px 14px" }}>
+                      <div style={{ fontSize:9.5, fontWeight:600, color:"#64748B", marginBottom:2 }}>{s.label} · {s.note}</div>
+                      <div style={{ fontSize:22, fontWeight:900, color:s.color }}>{s.val}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:9, padding:"7px 11px", fontSize:11, color:"#991B1B", fontWeight:600, maxWidth:300 }}>
+                  ⚠️ Past performance is not a guarantee of future returns.
+                </div>
               </div>
-              <h2 style={{ fontSize: "clamp(17px,3.5vw,27px)", fontWeight: 900, color: "#0F172A", margin: 0, letterSpacing: "-0.02em" }}>From confusion to clarity in minutes.</h2>
+              <WealthChart/>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ━━━━━━━ 6. HOW IT WORKS ━━━━━━━ */}
+      <section style={{ background:"white", borderTop:"1px solid #E2E8F0", borderBottom:"1px solid #E2E8F0", padding:"clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
+        <div style={{ maxWidth:1120, margin:"0 auto" }}>
+          <Reveal>
+            <div style={{ textAlign:"center" as const, marginBottom:28 }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(124,58,237,.08)", border:"1px solid rgba(124,58,237,.20)", borderRadius:100, padding:"4px 12px", marginBottom:10 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:"#7C3AED", letterSpacing:".08em", textTransform:"uppercase" as const }}>How it works</span>
+              </div>
+              <h2 style={{ fontSize:"clamp(17px,3.5vw,26px)", fontWeight:900, color:"#0F172A", margin:0, letterSpacing:"-.02em" }}>From confusion to clarity in minutes.</h2>
             </div>
           </Reveal>
-
-          <div className="steps-grid">
+          <div className="steps-row">
             {[
-              { step: "01", icon: "📤", title: "Upload your CAS",       desc: "Import your consolidated account statement or add investments manually across MFs, PF, FDs, gold.", color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
-              { step: "02", icon: "⚡", title: "Instant analysis",      desc: "We calculate true XIRR, benchmark alpha, and a portfolio health score — automatically, in seconds.", color: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
-              { step: "03", icon: "🚦", title: "Get clear signals",     desc: "Every fund gets Hold, Review, or Exit. No jargon — just the next action to take.", color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE" },
-              { step: "04", icon: "🚀", title: "Act with confidence",   desc: "Explore better funds, plan your goals, track net worth — in one calm, clutter-free space.", color: "#D97706", bg: "#FFFBEB", bd: "#FDE68A" },
-            ].map((s, i) => (
-              <Reveal key={i} delay={i * 70}>
-                <div style={{ background: s.bg, border: `1.5px solid ${s.bd}`, borderRadius: 16, padding: "clamp(14px,2.5vw,20px) clamp(14px,2vw,18px)", position: "relative", height: "100%", boxSizing: "border-box" as const }}>
-                  <div style={{ position: "absolute", top: 10, right: 12, fontSize: 11, fontWeight: 900, color: s.color, opacity: 0.20 }}>{s.step}</div>
-                  <div style={{ fontSize: "clamp(22px,3.5vw,28px)", marginBottom: 10 }}>{s.icon}</div>
-                  <div style={{ fontSize: "clamp(12px,1.8vw,13.5px)", fontWeight: 800, color: s.color, marginBottom: 5 }}>{s.title}</div>
-                  <p style={{ fontSize: "clamp(11px,1.5vw,12px)", color: "#475569", lineHeight: 1.7, margin: 0 }}>{s.desc}</p>
+              {n:"01",icon:"📤",title:"Upload CAS",body:"Import your consolidated account statement or add investments manually.",color:"#2563EB",bg:"#EFF6FF",bd:"#BFDBFE"},
+              {n:"02",icon:"⚡",title:"Instant analysis",body:"True XIRR, benchmark alpha, and a portfolio health score — automatically.",color:"#059669",bg:"#ECFDF5",bd:"#A7F3D0"},
+              {n:"03",icon:"🚦",title:"Clear signals",body:"Hold, Review, or Exit for every fund. No jargon — just what to do next.",color:"#7C3AED",bg:"#F5F3FF",bd:"#DDD6FE"},
+              {n:"04",icon:"🚀",title:"Act with confidence",body:"Explore better funds, plan goals, track net worth — all in one calm place.",color:"#D97706",bg:"#FFFBEB",bd:"#FDE68A"},
+            ].map((s,i)=>(
+              <Reveal key={i} delay={i*70}>
+                <div style={{ background:s.bg, border:`1.5px solid ${s.bd}`, borderRadius:16, padding:"clamp(15px,2.5vw,20px)", position:"relative", height:"100%", boxSizing:"border-box" as const }}>
+                  <div style={{ position:"absolute", top:10, right:12, fontSize:10, fontWeight:900, color:s.color, opacity:.18 }}>{s.n}</div>
+                  <div style={{ fontSize:"clamp(22px,3vw,26px)", marginBottom:10 }}>{s.icon}</div>
+                  <div style={{ fontSize:"clamp(12px,1.8vw,13.5px)", fontWeight:800, color:s.color, marginBottom:6 }}>{s.title}</div>
+                  <p style={{ fontSize:"clamp(11px,1.5vw,12px)", color:"#475569", lineHeight:1.7, margin:0 }}>{s.body}</p>
                 </div>
               </Reveal>
             ))}
@@ -807,133 +504,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ⑥ WEALTH COMPARISON
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{ maxWidth: 1160, margin: "0 auto", padding: "clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
+      {/* ━━━━━━━ 7. WHY MF GUIDE ━━━━━━━ */}
+      <section style={{ maxWidth:1120, margin:"0 auto", padding:"clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
         <Reveal>
-          <div style={{ background: "white", borderRadius: 22, border: "1.5px solid #E2E8F0", padding: "clamp(20px,4vw,36px)", boxShadow: "0 4px 22px rgba(0,0,0,0.05)" }}>
-            <div className="wealth-grid">
-              <div>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.2)", borderRadius: 100, padding: "4px 11px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "#059669", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>The real gap</span>
+          <Link href="/why-mutual-fund" style={{ textDecoration:"none", display:"block" }}>
+            <div className="banner-lift" style={{ background:"linear-gradient(135deg,#0F172A 0%,#1E3A8A 55%,#065F46 100%)", borderRadius:22, padding:"clamp(24px,4vw,44px)", position:"relative", overflow:"hidden" }}>
+              <div style={{ position:"absolute", top:-60, right:-60, width:300, height:300, background:"radial-gradient(circle,rgba(16,185,129,.18) 0%,transparent 70%)", pointerEvents:"none" }}/>
+              <div style={{ position:"relative", maxWidth:560 }}>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:7, background:"rgba(255,255,255,.10)", border:"1px solid rgba(255,255,255,.18)", borderRadius:100, padding:"4px 13px", marginBottom:14 }}>
+                  <span style={{ fontSize:10.5, fontWeight:700, color:"#A7F3D0", letterSpacing:".08em", textTransform:"uppercase" as const }}>New to investing?</span>
                 </div>
-                <h2 style={{ fontSize: "clamp(16px,3vw,23px)", fontWeight: 800, color: "#0F172A", margin: "0 0 9px", lineHeight: 1.25, letterSpacing: "-0.02em" }}>
-                  ₹10L invested for 10 years.<br />
-                  <span style={{ color: "#059669" }}>One decision. Massive difference.</span>
+                <h2 style={{ fontSize:"clamp(16px,3.5vw,24px)", fontWeight:900, color:"white", margin:"0 0 10px", lineHeight:1.2 }}>
+                  Why Mutual Funds? Read the Complete Guide →
                 </h2>
-                <p style={{ fontSize: "clamp(12px,1.7vw,13.5px)", color: "#475569", lineHeight: 1.8, maxWidth: 360, marginBottom: 14 }}>
-                  Equity mutual funds held patiently have significantly outperformed FDs over 10 years, after tax. Staying invested in the right vehicle matters more than chasing rates.
+                <p style={{ fontSize:"clamp(12px,1.6vw,13px)", color:"rgba(255,255,255,.60)", margin:"0 0 16px", lineHeight:1.75 }}>
+                  What a mutual fund is, how NAV works, pros &amp; cons, the Iron-Clad Framework, and how to start — all in one place. Free, no sign-up.
                 </p>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, marginBottom: 12 }}>
-                  {[
-                    { label: "Equity MF", val: "₹34.6L", note: "~14% CAGR", color: "#059669", bg: "#ECFDF5", bd: "#A7F3D0" },
-                    { label: "FD post-tax", val: "₹18.8L", note: "~5% real", color: "#94A3B8", bg: "#F8FAFC", bd: "#E2E8F0" },
-                  ].map((s, i) => (
-                    <div key={i} style={{ background: s.bg, border: `1.5px solid ${s.bd}`, borderRadius: 12, padding: "10px 14px" }}>
-                      <div style={{ fontSize: 9.5, fontWeight: 600, color: "#64748B", marginBottom: 1 }}>{s.label} · {s.note}</div>
-                      <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.val}</div>
-                    </div>
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const }}>
+                  {["What is a MF","How NAV works","Pros & Cons","Iron-Clad Structure","How to Start","FAQs"].map((tag,i)=>(
+                    <div key={i} style={{ background:"rgba(255,255,255,.09)", border:"1px solid rgba(255,255,255,.15)", borderRadius:100, padding:"3px 10px", fontSize:10, fontWeight:600, color:"rgba(255,255,255,.80)" }}>{tag}</div>
                   ))}
                 </div>
-                <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 9, padding: "7px 11px", fontSize: 11, color: "#991B1B", fontWeight: 600 }}>
-                  ⚠️ Past performance is not a guarantee of future returns.
-                </div>
-              </div>
-              <div><WealthChart /></div>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          ⑦ WHY MUTUAL FUNDS TEASER
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{ maxWidth: 1160, margin: "0 auto", padding: "0 clamp(16px,4vw,32px) clamp(28px,5vw,52px)" }}>
-        <Reveal>
-          <Link href="/why-mutual-fund" style={{ textDecoration: "none", display: "block" }}>
-            <div className="dark-lift whymf-grid" style={{ background: "linear-gradient(135deg,#0F172A 0%,#1E3A8A 55%,#065F46 100%)", borderRadius: 22, padding: "clamp(22px,4vw,40px)", position: "relative", overflow: "hidden", cursor: "pointer" }}>
-              <div style={{ position: "absolute", top: -60, right: -60, width: 280, height: 280, background: "radial-gradient(circle,rgba(16,185,129,0.17) 0%,transparent 70%)", pointerEvents: "none" }} />
-              <div style={{ position: "relative" }}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.17)", borderRadius: 100, padding: "4px 12px", marginBottom: 12 }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "#A7F3D0", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>New to investing?</span>
-                </div>
-                <h2 style={{ fontSize: "clamp(16px,3.5vw,23px)", fontWeight: 900, color: "white", margin: "0 0 8px", lineHeight: 1.2 }}>
-                  Why Mutual Funds? Complete Guide →
-                </h2>
-                <p style={{ fontSize: "clamp(11.5px,1.7vw,12.5px)", color: "rgba(255,255,255,0.60)", margin: "0 0 14px", lineHeight: 1.7, maxWidth: 480 }}>
-                  From what a mutual fund is, to NAV, pros &amp; cons, costs, the Iron-Clad Framework, and how to start — all in one place.
-                </p>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
-                  {["What is a MF","How NAV works","Pros & Cons","Iron-Clad Structure","3 Pillars","How to Start","FAQs"].map((tag, i) => (
-                    <div key={i} style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 100, padding: "3px 9px", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.80)" }}>{tag}</div>
-                  ))}
-                </div>
-              </div>
-              <div className="whymf-book" style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.17)", borderRadius: 16, padding: "20px 22px", textAlign: "center" as const, flexShrink: 0, position: "relative" }}>
-                <div style={{ fontSize: 34, marginBottom: 8 }}>📖</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "white", marginBottom: 3 }}>Read the Guide</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.50)" }}>Free · No sign-up</div>
               </div>
             </div>
           </Link>
         </Reveal>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ⑧ PHILOSOPHY + QUICK LINKS
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{ background: "white", borderTop: "1px solid #E2E8F0", padding: "clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
-        <div style={{ maxWidth: 1160, margin: "0 auto" }}>
-          <div className="philosophy-grid">
-
-            <Reveal>
-              <div>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.2)", borderRadius: 100, padding: "4px 12px", marginBottom: 12 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#059669", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Our philosophy</span>
-                </div>
-                <h2 style={{ fontSize: "clamp(17px,3vw,24px)", fontWeight: 900, color: "#0F172A", margin: "0 0 4px", lineHeight: 1.2, letterSpacing: "-0.02em" }}>
-                  Thoughtful Money,<br />Better Life.
-                </h2>
-                <blockquote style={{ fontSize: "clamp(12.5px,1.8vw,14px)", color: "#475569", fontStyle: "italic", borderLeft: "3px solid #A7F3D0", paddingLeft: 14, margin: "12px 0 14px", lineHeight: 1.7 }}>
-                  "Enough is not a number. It's the moment money stops interfering with life."
-                </blockquote>
-                <p style={{ fontSize: "clamp(12px,1.6vw,13px)", color: "#64748B", lineHeight: 1.8, maxWidth: 400, marginBottom: 18 }}>
-                  Nivesify is a calm, non-transactional space for Indian investors. No ads. No product push. No spam. Just clear, honest help with your money.
-                </p>
-                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" as const }}>
-                  {["✅ No ads","✅ No product push","✅ No spam","✅ Just clarity"].map((t, i) => (
-                    <div key={i} style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 100, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: "#059669" }}>{t}</div>
-                  ))}
-                </div>
+      {/* ━━━━━━━ 8. PHILOSOPHY ━━━━━━━ */}
+      <section style={{ background:"white", borderTop:"1px solid #E2E8F0", padding:"clamp(28px,5vw,52px) clamp(16px,4vw,32px)" }}>
+        <div style={{ maxWidth:1120, margin:"0 auto" }}>
+          <Reveal>
+            <div style={{ maxWidth:540 }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(5,150,105,.08)", border:"1px solid rgba(5,150,105,.20)", borderRadius:100, padding:"4px 12px", marginBottom:12 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:"#059669", letterSpacing:".08em", textTransform:"uppercase" as const }}>Our philosophy</span>
               </div>
-            </Reveal>
-
-            <Reveal delay={100}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.09em", textTransform: "uppercase" as const, marginBottom: 13 }}>Quick access</div>
-                <div className="quicklinks-grid">
-                  {[
-                    { href: "/dashboard",                          icon: "📊", label: "Dashboard",    desc: "Net worth"     },
-                    { href: "/mutual-fund-health-check/dashboard", icon: "🏥", label: "Health Check",  desc: "XIRR · signals"},
-                    { href: "/mutual-fund-match",                  icon: "🗺️", label: "MF World",      desc: "Explore funds" },
-                    { href: "/why-mutual-fund",                    icon: "📖", label: "Why MF?",       desc: "Beginner guide"},
-                    { href: "/dashboard/calculators",              icon: "🧮", label: "Calculators",   desc: "FIRE · goals"  },
-                    { href: "/mutual-fund-match",                  icon: "🔬", label: "Compare Funds", desc: "Side by side"  },
-                  ].map((l, i) => (
-                    <Link key={i} href={l.href} style={{ textDecoration: "none" }}>
-                      <div className="link-lift" style={{ background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 12, padding: "clamp(10px,1.5vw,13px)", cursor: "pointer", minHeight: 80 }}>
-                        <div style={{ fontSize: 20, marginBottom: 5 }}>{l.icon}</div>
-                        <div style={{ fontSize: "clamp(10.5px,1.4vw,12px)", fontWeight: 800, color: "#0F172A", marginBottom: 2 }}>{l.label}</div>
-                        <div style={{ fontSize: "clamp(9px,1.2vw,10px)", color: "#94A3B8", fontWeight: 600 }}>{l.desc}</div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+              <h2 style={{ fontSize:"clamp(1.2rem,3vw,1.7rem)", fontWeight:900, color:"#0F172A", margin:"0 0 4px", lineHeight:1.2, letterSpacing:"-.02em" }}>
+                Thoughtful Money, Better Life.
+              </h2>
+              <blockquote style={{ fontSize:"clamp(12.5px,1.8vw,14px)", color:"#475569", fontStyle:"italic", borderLeft:"3px solid #A7F3D0", paddingLeft:14, margin:"12px 0 14px", lineHeight:1.75 }}>
+                "Enough is not a number. It's the moment money stops interfering with life."
+              </blockquote>
+              <p style={{ fontSize:"clamp(12px,1.5vw,13px)", color:"#64748B", lineHeight:1.85, marginBottom:18 }}>
+                Nivesify is a calm, non-transactional space. No ads. No product push. No spam. Just clear, honest help with your money.
+              </p>
+              <div style={{ display:"flex", gap:7, flexWrap:"wrap" as const }}>
+                {["✅ No ads","✅ No product push","✅ No spam","✅ Just clarity"].map((t,i)=>(
+                  <div key={i} style={{ background:"#ECFDF5", border:"1px solid #A7F3D0", borderRadius:100, padding:"4px 12px", fontSize:11, fontWeight:700, color:"#059669" }}>{t}</div>
+                ))}
               </div>
-            </Reveal>
-
-          </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
