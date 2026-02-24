@@ -83,16 +83,6 @@ const CSS = `
     .story-duo.flip > div:last-child  { order: 2; }
   }
 
-  /* ── STEPS ── */
-  .steps-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-  @media (min-width: 600px) {
-    .steps-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  }
-
   /* ── ANIMATIONS ── */
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(28px); }
