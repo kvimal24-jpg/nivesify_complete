@@ -485,7 +485,7 @@ export default function Home() {
               {/* Social proof / trust row */}
               <div className="fade-up-5" style={{ display: "flex", gap: 24, flexWrap: "wrap" as const, paddingTop: 28, borderTop: "1px solid rgba(255,255,255,.09)" }}>
                 {[
-                  { num: "4", label: "Free tools" },
+                  { num: "25+", label: "Free tools" },
                   { num: "0", label: "Ads. Ever." },
                   { num: "100%", label: "India-specific" },
                 ].map((s, i) => (
@@ -602,7 +602,7 @@ export default function Home() {
                 </p>
 
                 {/* Mini feature list */}
-                {["All investments in one view","Annual growth tracked","Allocation breakdown with donut chart","No manual entry — upload CAS"].map((f, i) => (
+                {["All investments in one view","Annual growth tracked","Allocation breakdown with donut chart"].map((f, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#ECFDF5", border: "1.5px solid #A7F3D0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: "#00A862" }}>✓</span>
@@ -712,9 +712,22 @@ export default function Home() {
                 </p>
                 <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration: "none" }}>
                   <button className="cta-main" style={{ background: "#00C97B", color: "var(--ink)", border: "none", borderRadius: 13, padding: "13px 22px", fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 6px 24px rgba(0,201,123,.35)" }}>
-                    🏥 Check My Portfolio
+                    🏥 Check My Portfolio — Upload CAS
                   </button>
                 </Link>
+                {/* Crisp 3-step process — inline, no separate section needed */}
+                <div style={{ marginTop: 20, display: "flex", flexDirection: "column" as const, gap: 8 }}>
+                  {[
+                    ["📤", "Upload CAS from CAMS / KFintech"],
+                    ["⚡", "Get true XIRR, alpha & health score instantly"],
+                    ["🚦", "Hold, Review or Exit — clear signal per fund"],
+                  ].map(([ic, tx], i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{ic}</span>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,.50)", fontWeight: 600 }}>{tx}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </SR>
@@ -765,38 +778,6 @@ export default function Home() {
               </div>
             </div>
           </SR>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════════════
-          HOW IT WORKS — 4 steps, clean
-      ══════════════════════════════════════════════════════════════════ */}
-      <section style={{ background: "var(--mist)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: "clamp(40px,6vw,72px) clamp(16px,4vw,48px)" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <SR>
-            <div style={{ textAlign: "center" as const, marginBottom: 36 }}>
-              <h2 style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: "clamp(1.4rem,3.5vw,2.2rem)", fontWeight: 900, color: "var(--ink)", letterSpacing: "-.03em", margin: 0 }}>
-                From scattered to clear — in 3 minutes.
-              </h2>
-            </div>
-          </SR>
-          <div className="steps-grid">
-            {[
-              { n: "01", icon: "📤", title: "Upload your CAS", body: "Import your consolidated account statement from CAMS or KFintech. Or add investments manually.", color: "#2563EB", bg: "white", bd: "#BFDBFE" },
-              { n: "02", icon: "⚡", title: "Get instant analysis", body: "True XIRR per fund, alpha vs benchmark, risk rating, and a portfolio health score — automatically.", color: "#00A862", bg: "white", bd: "#A7F3D0" },
-              { n: "03", icon: "🚦", title: "See clear signals", body: "Every fund gets a verdict: Hold, Review, or Exit. No finance degree needed to understand it.", color: "#7C3AED", bg: "white", bd: "#DDD6FE" },
-              { n: "04", icon: "🎯", title: "Plan & act", body: "Explore better funds, model your FIRE date, plan goals. Your whole financial life in one calm place.", color: "#B45309", bg: "white", bd: "#FDE68A" },
-            ].map((s, i) => (
-              <SR key={i} delay={i * 80}>
-                <div style={{ background: s.bg, border: `1.5px solid ${s.bd}`, borderRadius: 18, padding: "clamp(18px,2.5vw,24px)", position: "relative", height: "100%", boxShadow: "0 2px 12px rgba(0,0,0,.04)" }}>
-                  <div style={{ position: "absolute", top: 12, right: 16, fontFamily: "Fraunces, Georgia, serif", fontSize: 13, fontWeight: 900, color: s.color, opacity: .15 }}>{s.n}</div>
-                  <div style={{ fontSize: "clamp(24px,3vw,30px)", marginBottom: 12 }}>{s.icon}</div>
-                  <div style={{ fontSize: "clamp(13px,1.8vw,14.5px)", fontWeight: 800, color: s.color, marginBottom: 8, letterSpacing: "-.01em" }}>{s.title}</div>
-                  <p style={{ fontSize: "clamp(11.5px,1.4vw,12.5px)", color: "var(--slate)", lineHeight: 1.72, margin: 0 }}>{s.body}</p>
-                </div>
-              </SR>
-            ))}
-          </div>
         </div>
       </section>
 
