@@ -145,11 +145,7 @@ export default function Footer() {
               { label: "Privacy Policy", href: "/privacy" },
               { label: "About", href: "/about" },
             ].map((l) => (
-              <Link key={l.href} href={l.href} style={{ fontSize: 12, color: "rgba(255,255,255,.25)", textDecoration: "none", transition: "color .18s", fontFamily: "'DM Sans',system-ui" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,.55)")}
-                onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,.25)")}>
-                {l.label}
-              </Link>
+              <Link key={l.href} href={l.href} className="ft-link">{l.label}</Link>
             ))}
           </div>
           <p style={{ fontSize: 12, fontStyle: "italic", color: "rgba(255,255,255,.20)", fontFamily: "'Fraunces',Georgia,serif" }}>

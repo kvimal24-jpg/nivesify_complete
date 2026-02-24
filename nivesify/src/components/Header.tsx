@@ -177,8 +177,8 @@ export default function Header() {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <div key={item.label} style={{ position: "relative" }}
-                  onMouseEnter={() => item.sub && openDropdown(item.label)}
-                  onMouseLeave={() => item.sub && scheduleClose()}>
+                  onMouseEnter={item.sub ? () => openDropdown(item.label) : undefined}
+                  onMouseLeave={item.sub ? () => scheduleClose() : undefined}>
 
                   {item.sub ? (
                     <button onClick={() => setActiveDropdown(activeDropdown === item.label ? null : item.label)}
