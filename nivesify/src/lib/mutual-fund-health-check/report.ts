@@ -20,468 +20,388 @@ export type ReportData = { holdingsCount: number; topOneShare: number; topFiveSh
 // ─────────────────────────────────────────────────────────────────────────────
 const fmtCur = (v: number): string => {
   const n = Number.isFinite(v) ? v : 0;
-  const a = Math.abs(n), sign = n < 0 ? "-" : "";
-  if (a >= 10_000_000) return `${sign}₹${(a/10_000_000).toFixed(2)} Cr`;
-  if (a >= 100_000)    return `${sign}₹${(a/100_000).toFixed(2)} L`;
-  if (a >= 1_000)      return `${sign}₹${new Intl.NumberFormat("en-IN",{maximumFractionDigits:0}).format(a)}`;
-  return `${sign}₹${a.toFixed(0)}`;
+  const a = Math.abs(n), sg = n < 0 ? "-" : "";
+  if (a >= 10_000_000) return `${sg}₹${(a/10_000_000).toFixed(2)} Cr`;
+  if (a >= 100_000)    return `${sg}₹${(a/100_000).toFixed(2)} L`;
+  if (a >= 1_000)      return `${sg}₹${new Intl.NumberFormat("en-IN",{maximumFractionDigits:0}).format(a)}`;
+  return `${sg}₹${a.toFixed(0)}`;
 };
-const fmtPct = (v: number|null, d = 2) => (v === null || !Number.isFinite(v)) ? "N/A" : `${(v*100).toFixed(d)}%`;
-const fmtShare = (v: number) => `${(Math.max(0,v)*100).toFixed(1)}%`;
-
-const classifyCategory = (c?: string) => {
-  if (!c) return "Other";
-  const l = c.toLowerCase();
-  if (l.includes("equity")) return "Equity";
-  if (l.includes("debt") || l.includes("bond") || l.includes("gilt")) return "Debt";
-  if (l.includes("hybrid") || l.includes("balanced")) return "Hybrid";
-  return "Other";
-};
-const deriveAmc = (meta?: MatchingScheme, fb?: string) => {
-  if (meta?.amc) return meta.amc;
-  const n = meta?.schemeName || fb || "";
-  return (n.match(/^(.*?Mutual Fund)/i)?.[1] ?? n.split(" ")[0]) || "Other";
-};
-const buildMetaMap = (txns: InvestmentsData["transactions"] = [], lookup?: Map<number,MatchingScheme>) => {
-  const m = new Map<number,MatchingScheme>();
-  txns.forEach(t => { if (t.matchingScheme?.schemeCode) m.set(t.matchingScheme.schemeCode, t.matchingScheme); });
-  lookup?.forEach((s,c) => m.set(c, {...(m.get(c) ?? {} as MatchingScheme), ...s}));
-  return m;
-};
+const fmtPct  = (v: number|null, d=2) => (!v||!Number.isFinite(v)) ? "N/A" : `${(v*100).toFixed(d)}%`;
+const fmtShr  = (v: number) => `${(Math.max(0,v)*100).toFixed(1)}%`;
+const catOf   = (c?: string) => { if (!c) return "Other"; const l=c.toLowerCase(); if (l.includes("equity")) return "Equity"; if (l.includes("debt")||l.includes("bond")||l.includes("gilt")) return "Debt"; if (l.includes("hybrid")||l.includes("balanced")) return "Hybrid"; return "Other"; };
+const amcOf   = (m?: MatchingScheme, fb?: string) => { if (m?.amc) return m.amc; const n=m?.schemeName||fb||""; return (n.match(/^(.*?Mutual Fund)/i)?.[1]??n.split(" ")[0])||"Other"; };
+const mkMeta  = (txns: InvestmentsData["transactions"]=[], lk?: Map<number,MatchingScheme>) => { const m=new Map<number,MatchingScheme>(); txns.forEach(t=>{if(t.matchingScheme?.schemeCode)m.set(t.matchingScheme.schemeCode,t.matchingScheme);}); lk?.forEach((s,c)=>m.set(c,{...(m.get(c)??{}as MatchingScheme),...s})); return m; };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // buildReportData
 // ─────────────────────────────────────────────────────────────────────────────
 export const buildReportData = (data: InvestmentsData, portfolio: Portfolio, totalValue: number, xirrValue: number|null, schemeLookup?: Map<number,MatchingScheme>): ReportData => {
-  const nomineeMap = data.nominees || {};
-  const meta = buildMetaMap(data.transactions || [], schemeLookup);
-  const active = portfolio.filter(r => r.currentValue > 0);
-  const sorted = [...active].sort((a,b) => b.currentValue - a.currentValue);
-  const holdingsCount = active.length;
-  const topOneShare = totalValue ? (sorted[0]?.currentValue||0)/totalValue : 0;
-  const topFiveShare = totalValue ? sorted.slice(0,5).reduce((s,f) => s+f.currentValue,0)/totalValue : 0;
-
-  const schemeRoot: SchemeBreakdownNode = {name:"All Schemes",children:[]};
-  const majMap = new Map<string,SchemeBreakdownNode>();
-  active.forEach(row => {
-    const m2 = meta.get(row.schemeCode), maj = classifyCategory(m2?.schemeCategory), sub = m2?.schemeCategory || "Uncategorized";
-    if (!majMap.has(maj)) { const node = {name:maj,children:[] as SchemeBreakdownNode[],size:0}; majMap.set(maj,node); schemeRoot.children?.push(node); }
-    const majNode = majMap.get(maj)!;
-    let subNode = majNode.children?.find(ch => ch.name === sub);
-    if (!subNode) { subNode = {name:sub,children:[],size:0}; majNode.children?.push(subNode); }
-    const v = Math.max(0, row.currentValue);
-    subNode.children?.push({name:row.mfName,size:v,value:v});
-    (subNode as any).size = (subNode.size||0)+v; (majNode as any).size = (majNode.size||0)+v;
-  });
-  const amcMap = new Map<string,number>();
-  active.forEach(row => { const amc = deriveAmc(meta.get(row.schemeCode), row.mfName); amcMap.set(amc, (amcMap.get(amc)||0)+Math.max(0,row.currentValue)); });
-  const amcBreakdown = Array.from(amcMap.entries()).map(([name,value]) => ({name,value})).sort((a,b) => b.value-a.value);
-  const topAmcShare = totalValue ? (amcBreakdown[0]?.value||0)/totalValue : 0;
-
-  const allocMap = new Map<string,number>();
-  active.forEach(row => { const b = classifyCategory(meta.get(row.schemeCode)?.schemeCategory); allocMap.set(b,(allocMap.get(b)||0)+Math.max(0,row.currentValue)); });
-  const eq   = totalValue ? (allocMap.get("Equity")||0)/totalValue : 0;
-  const debt = totalValue ? (allocMap.get("Debt")||0)/totalValue : 0;
-  const hyb  = totalValue ? (allocMap.get("Hybrid")||0)/totalValue : 0;
-
-  const insights: ReportInsight[] = [];
-  const add = (i: ReportInsight) => insights.push(i);
-
-  if (holdingsCount > 8)
-    add({title:"You have too many funds",signal:holdingsCount>10?"Strong":"Watch-worthy",observation:`You hold ${holdingsCount} funds.`,meaning:"More than 6-8 funds rarely improves returns. It just spreads your attention and adds clutter.",reassurance:"This is very common and easy to fix.",suggestedCheck:"Pick the best fund in each category. Let go of the rest.",severity:"warning"});
-  else if (holdingsCount > 6)
-    add({title:"Slightly too many funds",signal:"Elevated",observation:`You hold ${holdingsCount} funds.`,meaning:"More than 6-7 funds adds complexity without much benefit.",reassurance:"Each fund should have a clear reason to exist in your portfolio.",suggestedCheck:"Check if any two funds do the same job. Keep the better one.",severity:"info"});
-
-  if (topOneShare >= 0.2) {
-    const sig = topOneShare >= 0.4 ? "Strong" : topOneShare >= 0.3 ? "Watch-worthy" : "Elevated";
-    add({title:"One fund holds a lot of your money",signal:sig,observation:`Your biggest fund is ${fmtShare(topOneShare)} of your portfolio.`,meaning:"If this fund drops, a large chunk of your wealth gets affected.",reassurance:"Fine if you chose it intentionally. Risky if it grew big by accident.",suggestedCheck:"Ask yourself: would you put this much in this one fund today?",severity:sig==="Strong"?"warning":"info"});
-  }
-  if (topFiveShare >= 0.65) {
-    const sig = topFiveShare >= 0.8 ? "Strong" : "Watch-worthy";
-    add({title:"5 funds drive most of your returns",signal:sig,observation:`Your top 5 funds hold ${fmtShare(topFiveShare)}.`,meaning:"Your overall returns depend heavily on how these 5 perform.",reassurance:"This is healthy if those 5 funds are from different categories.",suggestedCheck:"Are all 5 from different market segments? If yes, you're fine.",severity:"info"});
-  }
-  if (topAmcShare >= 0.35) {
-    const sig = topAmcShare >= 0.5 ? "Strong" : "Elevated";
-    add({title:"One fund house manages too much",signal:sig,observation:`One fund house manages ${fmtShare(topAmcShare)} of your money.`,meaning:"If that company faces problems, a big part of your money is at risk.",reassurance:"Large AMCs are regulated and generally safe. Still worth diversifying.",suggestedCheck:"Try to spread money across at least 2-3 different fund houses.",severity:sig==="Strong"?"warning":"info"});
-  }
-  const xpct = (xirrValue ?? 0) * 100;
-  if (xirrValue !== null && xpct < 7 && eq >= 0.4)
-    add({title:"Returns are below expectations",signal:"Watch-worthy",observation:`Your annual return is ${xpct.toFixed(2)}%.`,meaning:"For an equity-heavy portfolio, this is lower than what a simple index fund offers.",reassurance:"Returns can look low in a bad market phase. Check the 3-year picture.",suggestedCheck:"Find which funds are dragging returns. The Fund Report Card on Page 4 shows this.",severity:"warning"});
-  else if (xirrValue !== null && xpct >= 13)
-    add({title:"Excellent returns!",signal:"Strong",observation:`Your annual return is ${xpct.toFixed(2)}%.`,meaning:"This is better than what most investors earn. Your discipline is paying off.",reassurance:"Keep your SIPs running. Don't let short-term dips shake you.",suggestedCheck:"Review once a year to ensure the same funds are still performing.",severity:"positive"});
-
-  if (eq > 0 && eq < 0.25)
-    add({title:"Very little in growth funds",signal:"Watch-worthy",observation:`Only ${fmtShare(eq)} is in equity / growth funds.`,meaning:"With such low equity, your money may not grow faster than inflation.",reassurance:"Right approach if your goal is within 1-3 years.",suggestedCheck:"If investing for 5+ years, consider adding equity (growth) funds.",severity:"info"});
-  if (eq > 0.88)
-    add({title:"Very high equity — know your risk",signal:eq>0.93?"Aggressive":"Strong",observation:`${fmtShare(eq)} is in equity / growth funds.`,meaning:"High growth potential, but also larger drops during market downturns.",reassurance:"Perfect for long-term goals. Just ensure you can handle a -30% dip without panic.",suggestedCheck:"Keep 6 months of expenses in a safe fund or savings account.",severity:"info"});
-  if (!insights.length)
-    add({title:"Portfolio looks well-structured",signal:"Normal",observation:"No major issues found.",meaning:"Your portfolio is properly diversified with no obvious red flags.",reassurance:"Keep investing regularly and review once a year.",suggestedCheck:"Stay the course. Small tweaks are fine but avoid over-trading.",severity:"positive"});
-
-  const fundDetails = sorted.map(fund => {
-    const m2 = meta.get(fund.schemeCode);
-    const cf = buildCashflows(fund.allTransactions.map(t => ({amount:Math.abs(t.amount),date:new Date(t.date),type:t.type==="Investment"?"buy" as const:"sell" as const})), fund.currentValue, new Date(), fund.currentValue>0);
-    const folios = Array.from(new Set(fund.allTransactions.map(t => t.folio?.split("/")[0].trim()).filter(Boolean) as string[]));
-    const flags = folios.map(f => nomineeMap[f]).filter(f => f !== undefined);
-    let ns: "yes"|"no"|"partial"|"unknown" = "unknown";
-    if (flags.length) { const y = flags.some(f => f===true), n = flags.some(f => f===false); ns = y&&n?"partial":y?"yes":"no"; if (flags.length<folios.length) ns="partial"; }
-    return {name:fund.mfName,invested:fund.currentInvested,currentValue:fund.currentValue,profit:fund.profit,units:fund.currentUnits||0,nav:fund.latestPrice||0,xirr:xirr(cf),nomineeStatus:ns,amc:deriveAmc(m2,fund.mfName),schemeCategory:m2?.schemeCategory||"Uncategorized",majorCategory:classifyCategory(m2?.schemeCategory)};
-  });
-
-  const hasWarning = insights.some(i => i.severity === "warning");
-  return {holdingsCount,topOneShare,topFiveShare,topAmcShare,insights,insightSummary:hasWarning?"Some funds need attention. Your action plan is on Page 3.":"Your portfolio is on track. Keep investing steadily.",schemeBreakdown:schemeRoot,amcBreakdown,topHoldings:sorted.slice(0,5).map(f => ({name:f.mfName,value:f.currentValue})),fundDetails};
+  const nomMap=data.nominees||{};
+  const meta=mkMeta(data.transactions||[],schemeLookup);
+  const active=portfolio.filter(r=>r.currentValue>0);
+  const sorted=[...active].sort((a,b)=>b.currentValue-a.currentValue);
+  const holdingsCount=active.length;
+  const topOneShare=totalValue?(sorted[0]?.currentValue||0)/totalValue:0;
+  const topFiveShare=totalValue?sorted.slice(0,5).reduce((s,f)=>s+f.currentValue,0)/totalValue:0;
+  const schemeRoot: SchemeBreakdownNode={name:"All Schemes",children:[]};
+  const majMap=new Map<string,SchemeBreakdownNode>();
+  active.forEach(row=>{const m2=meta.get(row.schemeCode),maj=catOf(m2?.schemeCategory),sub=m2?.schemeCategory||"Uncategorized";if(!majMap.has(maj)){const nd={name:maj,children:[]as SchemeBreakdownNode[],size:0};majMap.set(maj,nd);schemeRoot.children?.push(nd);}const mn=majMap.get(maj)!;let sn=mn.children?.find(ch=>ch.name===sub);if(!sn){sn={name:sub,children:[],size:0};mn.children?.push(sn);}const v=Math.max(0,row.currentValue);sn.children?.push({name:row.mfName,size:v,value:v});(sn as any).size=(sn.size||0)+v;(mn as any).size=(mn.size||0)+v;});
+  const amcMap=new Map<string,number>();
+  active.forEach(r=>{const a=amcOf(meta.get(r.schemeCode),r.mfName);amcMap.set(a,(amcMap.get(a)||0)+Math.max(0,r.currentValue));});
+  const amcBreakdown=Array.from(amcMap.entries()).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+  const topAmcShare=totalValue?(amcBreakdown[0]?.value||0)/totalValue:0;
+  const allocMap=new Map<string,number>();
+  active.forEach(r=>{const b=catOf(meta.get(r.schemeCode)?.schemeCategory);allocMap.set(b,(allocMap.get(b)||0)+Math.max(0,r.currentValue));});
+  const eq=totalValue?(allocMap.get("Equity")||0)/totalValue:0;
+  const insights: ReportInsight[]=[];
+  const add=(i: ReportInsight)=>insights.push(i);
+  if(holdingsCount>8) add({title:"Too many funds — time to simplify",signal:holdingsCount>10?"Strong":"Watch-worthy",observation:`You hold ${holdingsCount} different funds.`,meaning:"More than 6-8 funds doesn't help. It just spreads your money thin without improving returns.",reassurance:"This is fixable — consolidate similar funds into one.",suggestedCheck:"Pick the best fund in each category and exit the rest.",severity:"warning"});
+  if(topOneShare>=0.3) add({title:"Too much riding on one fund",signal:topOneShare>=0.4?"Strong":"Watch-worthy",observation:`${fmtShr(topOneShare)} of your money is in a single fund.`,meaning:"If that one fund has a bad year, your entire portfolio gets hit hard.",reassurance:"Fine if it's intentional. Risky if it grew this large by accident.",suggestedCheck:"Ask yourself: would you invest this much in this fund if starting fresh?",severity:"warning"});
+  if(topAmcShare>=0.4) add({title:"One fund company holds too much",signal:"Strong",observation:`${fmtShr(topAmcShare)} managed by a single fund house.`,meaning:"Concentration in one company adds unnecessary operational risk.",reassurance:"Large AMCs are very regulated. Still worth spreading across 3+ companies.",suggestedCheck:"Aim for no single fund house to hold more than 35% of your money.",severity:"warning"});
+  const xpct=(xirrValue??0)*100;
+  if(xirrValue!==null&&xpct<8&&eq>=0.4) add({title:"Your returns are below what they should be",signal:"Watch-worthy",observation:`Your money is growing at ${xpct.toFixed(1)}% per year.`,meaning:"With so much in equity, a simple index fund would have done better.",reassurance:"Returns can look low in a market downturn. Check the 3-5 year picture.",suggestedCheck:"Page 4 shows which funds are dragging your returns.",severity:"warning"});
+  else if(xirrValue!==null&&xpct>=13) add({title:"Excellent — your money is growing really well",signal:"Strong",observation:`Your money grows at ${xpct.toFixed(1)}% per year — beating most investors.`,meaning:"You are earning significantly more than FDs (7%) and the inflation rate (6%).",reassurance:"Your discipline and choice of funds is working. Keep going.",suggestedCheck:"Review once a year. Don't let short-term news disturb your plan.",severity:"positive"});
+  if(eq>0.9) add({title:"Very aggressive — high growth, high risk",signal:"Aggressive",observation:`${fmtShr(eq)} of your money is in equity / stock market funds.`,meaning:"This is great for long-term growth, but your portfolio can fall 30-40% in a bad year.",reassurance:"Absolutely right if your goal is 7+ years away and you can stomach volatility.",suggestedCheck:"Keep 6 months of expenses in savings/liquid funds as a safety buffer.",severity:"info"});
+  if(!insights.length) add({title:"Your portfolio is well-structured",signal:"Normal",observation:"No major concentration or performance issues found.",meaning:"Good spread of funds, no single big risk, returns are decent.",reassurance:"Keep your SIPs running and review once a year.",suggestedCheck:"You are on track. Small annual tweaks are fine — avoid over-trading.",severity:"positive"});
+  const fundDetails=sorted.map(f=>{const m2=meta.get(f.schemeCode);const cf=buildCashflows(f.allTransactions.map(t=>({amount:Math.abs(t.amount),date:new Date(t.date),type:t.type==="Investment"?"buy" as const:"sell" as const})),f.currentValue,new Date(),f.currentValue>0);const fls=Array.from(new Set(f.allTransactions.map(t=>t.folio?.split("/")[0].trim()).filter(Boolean) as string[]));const flags=fls.map(ff=>nomMap[ff]).filter(ff=>ff!==undefined);let ns: "yes"|"no"|"partial"|"unknown"="unknown";if(flags.length){const y=flags.some(ff=>ff===true),n=flags.some(ff=>ff===false);ns=y&&n?"partial":y?"yes":"no";if(flags.length<fls.length)ns="partial";}return{name:f.mfName,invested:f.currentInvested,currentValue:f.currentValue,profit:f.profit,units:f.currentUnits||0,nav:f.latestPrice||0,xirr:xirr(cf),nomineeStatus:ns,amc:amcOf(m2,f.mfName),schemeCategory:m2?.schemeCategory||"Uncategorized",majorCategory:catOf(m2?.schemeCategory)};});
+  return{holdingsCount,topOneShare,topFiveShare,topAmcShare,insights,insightSummary:insights.some(i=>i.severity==="warning")?"Some funds need attention — see your action plan.":"Portfolio is on track. Keep investing regularly.",schemeBreakdown:schemeRoot,amcBreakdown,topHoldings:sorted.slice(0,5).map(f=>({name:f.mfName,value:f.currentValue})),fundDetails};
 };
 
 export const formatCurrencyPlain = fmtCur;
-export const tooltips = {totalValue:"Latest market value of all mutual fund holdings.",invested:"Total amount invested (net of redemptions).",allTimeReturns:"Unrealised + realised gains.",xirr:"Annualised return based on cashflows.",monthlyIncome:"Illustrative income if portfolio is 25x yearly expenses.",holdings:"Funds with value > 0.",topFund:"Share of the largest single fund.",topFive:"Share of the top 5 funds combined."};
+export const tooltips = {totalValue:"Current market value of all funds.",invested:"Net amount invested.",allTimeReturns:"Total gains (unrealised + realised).",xirr:"True annualised return.",monthlyIncome:"Estimated monthly income using 25x rule.",holdings:"Funds with value > 0.",topFund:"Largest single position.",topFive:"Top 5 combined."};
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PDF ENGINE  —  Canvas → PNG → jsPDF
-// Scale 3 = pixel-perfect at any zoom. PNG = no JPEG blur.
-// Every bug from all previous versions fixed.
+// PDF ENGINE  — Canvas → JPEG (fast!)
+//
+// KEY DECISIONS:
+//   S = 2       → 1190×1684px canvas = sharp but NOT huge
+//   JPEG 0.93   → ~120KB per page = 720KB total = instant download
+//   No PNG      → PNG at this size would be 3-4MB per page = browser hangs
+//   System font → no load delay, guaranteed available
 // ─────────────────────────────────────────────────────────────────────────────
 
-// A4 = 595 × 842 pt. Canvas at 3× = 1785 × 2526 px.
-const S   = 3;
-const PW  = 595 * S;
-const PH  = 842 * S;
-const ML  = 44  * S;   // left margin (pts × S)
-const MR  = 44  * S;
+const S   = 2;
+const PW  = 595 * S;    // 1190px
+const PH  = 842 * S;    // 1684px
+const ML  = 40  * S;
+const MR  = 40  * S;
 const CW  = PW - ML - MR;
+const FF  = "system-ui,'Segoe UI','Helvetica Neue',Arial,sans-serif";
 
-const F   = "'Segoe UI','Helvetica Neue',Arial,sans-serif";
+// ── Colour palette — high contrast everywhere ─────────────────────────────────
+// Cover: dark background (#0D1B2A) with light text
+// Body pages: white background (#FFFFFF) with dark text
+// All text/background combos meet WCAG AA contrast
 
-// ── Palette ──
-const C = {
-  navy:    "#0B1E3D", navyMd:  "#142952", navyLt:  "#1a3a6e",
-  green:   "#0D9F6F", greenDk: "#085c40", greenLt: "#E6FAF3", greenBd: "#6EE7B7",
-  blue:    "#2563EB", blueLt:  "#EFF6FF",
-  amber:   "#D97706", amberLt: "#FFFBEB", amberBd: "#FCD34D",
-  red:     "#DC2626", redLt:   "#FEF2F2", redBd:   "#FCA5A5",
-  purple:  "#7C3AED", teal:    "#0891B2",
-  ink:     "#0F172A", inkMd:   "#334155", inkSoft: "#64748B", inkFaint:"#94A3B8",
-  surface: "#F8FAFC", surfMd:  "#F1F5F9", white:   "#FFFFFF",
-  border:  "#E2E8F0", borderMd:"#CBD5E1",
-};
-const PALETTE = ["#2563EB","#0D9F6F","#D97706","#7C3AED","#DC2626","#0891B2","#C2410C","#BE185D"];
+const COVER_BG   = "#0D1B2A";   // very dark navy
+const COVER_BG2  = "#132338";   // slightly lighter navy
+
+const GREEN      = "#10B981";   // emerald
+const GREEN_DK   = "#059669";
+const GREEN_DKK  = "#065F46";
+const GREEN_LT   = "#D1FAE5";
+const GREEN_BD   = "#6EE7B7";
+
+const AMBER      = "#F59E0B";
+const AMBER_LT   = "#FEF3C7";
+const AMBER_BD   = "#FCD34D";
+const AMBER_DK   = "#92400E";
+
+const RED        = "#EF4444";
+const RED_DK     = "#991B1B";
+const RED_LT     = "#FEF2F2";
+const RED_BD     = "#FCA5A5";
+
+const BLUE       = "#3B82F6";
+const BLUE_LT    = "#EFF6FF";
+const BLUE_DK    = "#1E40AF";
+
+const INK        = "#111827";   // near-black — readable on white
+const INK2       = "#374151";
+const INK3       = "#6B7280";
+const INK4       = "#9CA3AF";
+const WHITE      = "#FFFFFF";
+const SURF       = "#F9FAFB";
+const SURF2      = "#F3F4F6";
+const BDR        = "#E5E7EB";
+const BDR2       = "#D1D5DB";
+
+// Cover text colours — on dark background
+const CV_TXT     = "#F9FAFB";   // almost white
+const CV_SUB     = "#9CA3AF";   // grey
+const CV_DIM     = "#6B7280";   // dimmer grey
+
+const PALETTE = [BLUE, GREEN, AMBER, "#8B5CF6", RED, "#06B6D4", "#EC4899", "#14B8A6"];
 
 type Ctx = CanvasRenderingContext2D;
 
-// ── Drawing helpers ──────────────────────────────────────────────────────────
+// ── Primitives ────────────────────────────────────────────────────────────────
 
-/** Draw a rounded rect path (no fill/stroke — caller does that) */
 function rrPath(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
-  const R = Math.min(r, w/2, h/2);
+  const R=Math.min(r,w/2,h/2);
   ctx.beginPath();
-  ctx.moveTo(x+R, y);
-  ctx.lineTo(x+w-R, y); ctx.arcTo(x+w, y, x+w, y+R, R);
-  ctx.lineTo(x+w, y+h-R); ctx.arcTo(x+w, y+h, x+w-R, y+h, R);
-  ctx.lineTo(x+R, y+h); ctx.arcTo(x, y+h, x, y+h-R, R);
-  ctx.lineTo(x, y+R); ctx.arcTo(x, y, x+R, y, R);
+  ctx.moveTo(x+R,y); ctx.lineTo(x+w-R,y); ctx.arcTo(x+w,y,x+w,y+R,R);
+  ctx.lineTo(x+w,y+h-R); ctx.arcTo(x+w,y+h,x+w-R,y+h,R);
+  ctx.lineTo(x+R,y+h); ctx.arcTo(x,y+h,x,y+h-R,R);
+  ctx.lineTo(x,y+R); ctx.arcTo(x,y,x+R,y,R);
   ctx.closePath();
 }
-const fillRR = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number, col: string) => {
-  rrPath(ctx,x,y,w,h,r); ctx.fillStyle = col; ctx.fill();
-};
-const strokeRR = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number, col: string, lw = 0.5) => {
-  ctx.save(); rrPath(ctx,x,y,w,h,r); ctx.strokeStyle = col; ctx.lineWidth = lw*S; ctx.stroke(); ctx.restore();
+const fillR  = (ctx: Ctx, x: number, y: number, w: number, h: number, r: number, c: string) => { rrPath(ctx,x,y,w,h,r); ctx.fillStyle=c; ctx.fill(); };
+const strokeR= (ctx: Ctx, x: number, y: number, w: number, h: number, r: number, c: string, lw=0.5) => { rrPath(ctx,x,y,w,h,r); ctx.strokeStyle=c; ctx.lineWidth=lw*S; ctx.stroke(); };
+
+// Set font. Returns approx line height.
+const F = (ctx: Ctx, pt: number, bold=false, italic=false) => {
+  ctx.font=`${italic?"italic ":""}${bold?700:400} ${pt*S}px ${FF}`;
 };
 
-/** Set font. Returns approximate line-height in px. */
-const font = (ctx: Ctx, pt: number, bold = false, italic = false): number => {
-  ctx.font = `${italic?"italic ":""}${bold?700:400} ${pt*S}px ${F}`;
-  return pt * S * 1.3;
+// Truncate text to maxPx. Font must be set.
+const clip = (ctx: Ctx, t: string, maxPx: number): string => {
+  if (!t) return "";
+  if (ctx.measureText(t).width<=maxPx) return t;
+  let lo=0,hi=t.length;
+  while(lo<hi-1){const mid=(lo+hi)>>1;ctx.measureText(t.slice(0,mid)+"…").width<=maxPx?(lo=mid):(hi=mid);}
+  return t.slice(0,lo)+"…";
 };
 
-/** Clip text to maxPx; append "…" if too wide. Caller must set font first. */
-const clip = (ctx: Ctx, text: string, maxPx: number): string => {
-  if (!text) return "";
-  if (ctx.measureText(text).width <= maxPx) return text;
-  let lo = 0, hi = text.length;
-  while (lo < hi - 1) {
-    const mid = (lo + hi) >> 1;
-    ctx.measureText(text.slice(0,mid)+"…").width <= maxPx ? (lo = mid) : (hi = mid);
-  }
-  return text.slice(0, lo) + "…";
-};
-
-/** Word-wrap into lines, each ≤ maxPx. Caller must set font first. */
-const wrap = (ctx: Ctx, text: string, maxPx: number, maxLines = 99): string[] => {
-  const words = String(text||"").split(/\s+/);
-  const lines: string[] = [];
-  let cur = "";
+// Word-wrap. Font must be set.
+const wrap = (ctx: Ctx, t: string, maxPx: number, maxL=99): string[] => {
+  const words=String(t||"").split(/\s+/);
+  const lines: string[]=[];
+  let cur="";
   for (const w of words) {
-    const test = cur ? cur+" "+w : w;
-    if (ctx.measureText(test).width > maxPx && cur) {
-      lines.push(cur);
-      cur = w;
-      if (lines.length >= maxLines-1) break;
-    } else cur = test;
+    const test=cur?cur+" "+w:w;
+    if (ctx.measureText(test).width>maxPx&&cur){lines.push(cur);cur=w;if(lines.length>=maxL-1)break;}
+    else cur=test;
   }
-  if (cur) {
-    if (lines.length >= maxLines) lines[lines.length-1] = clip(ctx, lines[lines.length-1]+" "+cur, maxPx);
-    else lines.push(cur);
-  }
-  return lines.slice(0, maxLines);
+  if (cur) lines.length>=maxL?(lines[lines.length-1]=clip(ctx,lines[lines.length-1]+" "+cur,maxPx)):lines.push(cur);
+  return lines.slice(0,maxL);
 };
+
+// Jargon replacement — applied to ALL text coming from backend
+const plain = (t: string): string => t
+  .replace(/Market hurdle \(Nifty 50 TRI 10Y\)/gi, "Stock market 10-year avg return")
+  .replace(/Nifty 50 TRI 10Y/gi, "Stock market benchmark (10yr)")
+  .replace(/Nifty 50 TRI/gi, "Nifty 50")
+  .replace(/\bTRI\b/g, "")
+  .replace(/\bXIRR\b/g, "Annual Return")
+  .replace(/\bxirr\b/g, "annual return")
+  .replace(/Active winners/gi, "Funds beating the market")
+  .replace(/Consistency check/gi, "Funds above category average")
+  .replace(/Low-ranked funds/gi, "Underperforming funds")
+  .replace(/Style tilt \(mid\/small\)/gi, "Mid & Small-Cap exposure")
+  .replace(/Risk profile/gi, "Risk score (1=safe, 10=aggressive)")
+  .replace(/Long-term index reference/gi, "The bar your funds must beat")
+  .replace(/Active money beating benchmark/gi, "Funds earning above index (by value)")
+  .replace(/Funds above category average/gi, "Funds ranking above average in their group")
+  .replace(/Bottom 25% of peers/gi, "In the bottom 25% of similar funds")
+  .replace(/Higher swings if >50%/gi, "Above 50% means bigger price swings")
+  .replace(/1 low risk • 10 high risk/gi, "Reflects equity & small-cap exposure")
+  .replace(/\bbenchmark\b/gi, "market index")
+  .replace(/\balpha offenders?\b/gi, "underperforming funds")
+  .replace(/bottom.?quartile/gi, "bottom 25% performers")
+  .replace(/\bdrag\b/gi, "reduction in your returns")
+  .replace(/\btracking drift\b/gi, "index tracking gap")
+  .replace(/\btrailing\b/gi, "below")
+  .replace(/lock-in periods/gi, "lock-in restrictions")
+  .replace(/exit loads/gi, "exit charges")
+  .replace(/\s{2,}/g, " ")
+  .trim();
 
 // ── Page chrome ───────────────────────────────────────────────────────────────
-const HDR = 56 * S;
-const FTR = 34 * S;
-const BODY_TOP = HDR + 16*S;
-const BODY_BTM = PH - FTR - 10*S;
+const HDR  = 54 * S;
+const FTR  = 30 * S;
+const TOP  = HDR + 16*S;
+const BTM  = PH - FTR - 8*S;
 
-const drawChrome = (ctx: Ctx, pageNum: number, logo: HTMLImageElement|null) => {
-  // Header band
-  ctx.fillStyle = C.navy; ctx.fillRect(0, 0, PW, HDR);
-  ctx.fillStyle = C.green; ctx.fillRect(0, HDR-2*S, PW, 2*S);
+const chrome = (ctx: Ctx, pg: number, logo: HTMLImageElement|null) => {
+  // White header with green bottom accent
+  ctx.fillStyle = WHITE; ctx.fillRect(0,0,PW,HDR);
+  ctx.fillStyle = BDR; ctx.fillRect(0,HDR-1*S,PW,1*S);
+  ctx.fillStyle = GREEN; ctx.fillRect(0,HDR-3*S,PW,3*S);
 
-  // Logo — proportional, max height 36pt
-  let brandX = ML;
-  if (logo && logo.naturalWidth > 0) {
-    const lh = 36*S;
-    const lw = Math.round((logo.naturalWidth/logo.naturalHeight)*lh);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(logo, ML, (HDR-lh)/2, lw, lh);
-    brandX = ML + lw + 10*S;
+  let bx = ML;
+  if (logo&&logo.naturalWidth>0) {
+    const lh=32*S, lw=Math.round((logo.naturalWidth/logo.naturalHeight)*lh);
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+    ctx.drawImage(logo,ML,(HDR-lh)/2,lw,lh);
+    bx=ML+lw+10*S;
   }
-  font(ctx, 10.5, true); ctx.fillStyle = C.white;
-  ctx.fillText("Nivesify", brandX, HDR*0.47);
-  font(ctx, 8); ctx.fillStyle = C.inkFaint;
-  ctx.fillText("Thoughtful Money, Better Life", brandX, HDR*0.76);
+  F(ctx,10,true); ctx.fillStyle=INK; ctx.fillText("Nivesify",bx,HDR*0.47);
+  F(ctx,7.5); ctx.fillStyle=INK3; ctx.fillText("Thoughtful Money, Better Life",bx,HDR*0.76);
 
-  // Right side
-  font(ctx, 9, true); ctx.fillStyle = C.white;
-  const t = "Mutual Fund Health Check";
-  ctx.fillText(t, PW-MR-ctx.measureText(t).width, HDR*0.44);
-  font(ctx, 7.5); ctx.fillStyle = C.inkFaint;
-  const d = `Page ${pageNum}  ·  ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}`;
-  ctx.fillText(d, PW-MR-ctx.measureText(d).width, HDR*0.73);
+  F(ctx,9,true); ctx.fillStyle=INK;
+  const tt="Mutual Fund Health Check";
+  ctx.fillText(tt,PW-MR-ctx.measureText(tt).width,HDR*0.44);
+  F(ctx,7.5); ctx.fillStyle=INK3;
+  const ds=`Page ${pg}  ·  ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}`;
+  ctx.fillText(ds,PW-MR-ctx.measureText(ds).width,HDR*0.74);
 
   // Footer
-  const fy = PH - FTR;
-  ctx.strokeStyle = C.border; ctx.lineWidth = 0.4*S;
-  ctx.beginPath(); ctx.moveTo(ML,fy); ctx.lineTo(PW-MR,fy); ctx.stroke();
-  font(ctx, 7); ctx.fillStyle = C.inkFaint;
-  const disc = "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on any information in this report.";
-  const dl = wrap(ctx, disc, CW-50*S, 2);
-  dl.forEach((l,i) => ctx.fillText(l, ML, fy+12*S+i*10*S));
-  // Page chip
-  font(ctx, 8, true); ctx.fillStyle = C.white;
-  const pg = String(pageNum);
-  const cw2 = ctx.measureText(pg).width + 14*S;
-  fillRR(ctx, PW-MR-cw2, fy+5*S, cw2, 17*S, 4*S, C.green);
-  ctx.fillText(pg, PW-MR-cw2/2-ctx.measureText(pg).width/2, fy+16*S);
+  const fy=PH-FTR;
+  ctx.fillStyle=SURF; ctx.fillRect(0,fy,PW,FTR);
+  ctx.fillStyle=BDR; ctx.fillRect(0,fy,PW,1*S);
+  F(ctx,6.5); ctx.fillStyle=INK4;
+  const disc="Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on this report.";
+  const dl=wrap(ctx,disc,CW-50*S,2);
+  dl.forEach((l,i)=>ctx.fillText(l,ML,fy+10*S+i*9*S));
+  F(ctx,7.5,true); ctx.fillStyle=WHITE;
+  const pg2=String(pg);
+  const cw2=ctx.measureText(pg2).width+12*S;
+  fillR(ctx,PW-MR-cw2,fy+5*S,cw2,16*S,4*S,GREEN);
+  ctx.fillText(pg2,PW-MR-cw2/2-ctx.measureText(pg2).width/2,fy+14.5*S);
 };
 
-// ── Section header — FIXED NO-OVERLAP VERSION ─────────────────────────────────
-// Layout: [tag pill] then [big title on next line] then [underline]
-// Returns Y after everything including bottom padding.
-const sHead = (ctx: Ctx, tag: string, title: string, y: number, accent = C.green): number => {
-  const PILL_H  = 16 * S;
-  const PILL_PX = 10 * S;
-  const GAP     = 12 * S;   // space between pill bottom and title top
-  const TITLE_H = 20 * S;   // approximate height of 18pt text
-
-  // Pill
-  font(ctx, 7.5, true); ctx.fillStyle = C.white;
-  const tagW = ctx.measureText(tag.toUpperCase()).width + PILL_PX*2;
-  fillRR(ctx, ML, y, tagW, PILL_H, 4*S, accent);
-  ctx.fillText(tag.toUpperCase(), ML+PILL_PX, y+PILL_H*0.69);
-
-  // Title — BELOW pill, with GAP
-  const titleY = y + PILL_H + GAP + TITLE_H;  // baseline
-  font(ctx, 18, true); ctx.fillStyle = C.ink;
-  ctx.fillText(title, ML, titleY);
-
-  // Underline
-  const ulY = titleY + 5*S;
-  const ulGrad = ctx.createLinearGradient(ML, 0, ML+80*S, 0);
-  ulGrad.addColorStop(0, accent); ulGrad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = ulGrad; ctx.fillRect(ML, ulY, 80*S, 2.5*S);
-
-  return ulY + 14*S;
+// ── Section heading — pill ABOVE title, clear gap, ZERO overlap ──────────────
+// Returns Y ready for content (after underline + padding)
+const H = (ctx: Ctx, tag: string, title: string, y: number, accent=GREEN): number => {
+  // 1. Small pill
+  F(ctx,7,true); ctx.fillStyle=WHITE;
+  const tw=ctx.measureText(tag.toUpperCase()).width;
+  fillR(ctx,ML,y,tw+14*S,15*S,4*S,accent);
+  ctx.fillText(tag.toUpperCase(),ML+7*S,y+10.5*S);
+  // 2. Title — starts 14pt BELOW pill bottom (no overlap possible)
+  const ty=y+15*S+14*S;
+  F(ctx,19,true); ctx.fillStyle=INK;
+  ctx.fillText(title,ML,ty);
+  // 3. Underline — 4pt below title baseline
+  const uly=ty+5*S;
+  const g=ctx.createLinearGradient(ML,0,ML+60*S,0);
+  g.addColorStop(0,accent); g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=g; ctx.fillRect(ML,uly,60*S,2.5*S);
+  return uly+14*S;
 };
 
-// ── Metric card ───────────────────────────────────────────────────────────────
-const metricCard = (ctx: Ctx, x: number, y: number, w: number, h: number, label: string, value: string, sub: string, accent: string) => {
-  ctx.shadowColor = "rgba(0,0,0,0.07)"; ctx.shadowBlur = 6*S; ctx.shadowOffsetY = 2*S;
-  fillRR(ctx, x, y, w, h, 7*S, C.white);
-  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-  strokeRR(ctx, x, y, w, h, 7*S, C.border, 0.4);
-
-  // Accent top bar
-  fillRR(ctx, x, y, w, 4*S, 7*S, accent);
-  ctx.fillStyle = accent; ctx.fillRect(x, y+2*S, w, 2*S);
-
-  font(ctx, 8); ctx.fillStyle = C.inkFaint;
-  ctx.fillText(clip(ctx, label, w-16*S), x+10*S, y+18*S);
-  font(ctx, 14, true); ctx.fillStyle = accent;
-  ctx.fillText(clip(ctx, value, w-16*S), x+10*S, y+37*S);
-  if (sub) { font(ctx, 7.5); ctx.fillStyle = C.inkSoft; ctx.fillText(clip(ctx, sub, w-16*S), x+10*S, y+52*S); }
+// ── Light metric card ─────────────────────────────────────────────────────────
+// White card, top accent bar, label/value/sub with clear contrast
+const MC = (ctx: Ctx, x: number, y: number, w: number, h: number, label: string, value: string, sub: string, accent: string) => {
+  // Card shadow
+  ctx.shadowColor="rgba(0,0,0,0.07)"; ctx.shadowBlur=6*S; ctx.shadowOffsetY=2*S;
+  fillR(ctx,x,y,w,h,6*S,WHITE);
+  ctx.shadowColor="transparent"; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+  strokeR(ctx,x,y,w,h,6*S,BDR,0.4);
+  // Top accent bar
+  fillR(ctx,x,y,w,4*S,6*S,accent);
+  ctx.fillStyle=accent; ctx.fillRect(x,y+2*S,w,2*S);
+  // Label — dark grey, small
+  F(ctx,7.5); ctx.fillStyle=INK3;
+  ctx.fillText(clip(ctx,label,w-16*S),x+10*S,y+17*S);
+  // Value — near black, large, bold
+  F(ctx,14,true); ctx.fillStyle=INK;
+  ctx.fillText(clip(ctx,value,w-14*S),x+10*S,y+36*S);
+  // Sub — lighter grey
+  if(sub){F(ctx,7); ctx.fillStyle=INK4; ctx.fillText(clip(ctx,sub,w-14*S),x+10*S,y+50*S);}
 };
 
 // ── Table ─────────────────────────────────────────────────────────────────────
-type Col = { h: string; w: number; align?: "L"|"R"|"C"; colorFn?: (raw: string)=>string|null };
+type TC = { h: string; w: number; align?: "L"|"R"|"C"; col?: (v:string)=>string|null };
 
-const drawTable = (ctx: Ctx, cols: Col[], rows: string[][], startY: number, opts: {maxLines?: number}={}): number => {
-  const {maxLines = 3} = opts;
-  const PAD_X = 9*S, PAD_Y = 7*S, LINE_H = 12*S, ROW_MIN = 26*S, HDR_H = 23*S;
-
-  const total = cols.reduce((s,c) => s+c.w, 0);
-  const sc = CW / total;
-  const ws = cols.map(c => c.w*sc);
-  const colX = (i: number) => ML + ws.slice(0,i).reduce((s,w) => s+w, 0);
-
-  let Y = startY;
-
-  const drawHdr = () => {
-    fillRR(ctx, ML, Y, CW, HDR_H, 0, C.navyMd);
-    cols.forEach((col,i) => {
-      font(ctx, 7.5, true); ctx.fillStyle = "#94A3B8";
-      const h2 = clip(ctx, col.h, ws[i]-PAD_X*2);
-      const hw = ctx.measureText(h2).width;
-      const tx = col.align==="R"?colX(i)+ws[i]-PAD_X-hw : col.align==="C"?colX(i)+(ws[i]-hw)/2 : colX(i)+PAD_X;
-      ctx.fillText(h2, tx, Y+HDR_H*0.67);
-      if (i < cols.length-1) {
-        ctx.strokeStyle = C.navyLt; ctx.lineWidth = 0.3*S;
-        ctx.beginPath(); ctx.moveTo(colX(i)+ws[i], Y+3*S); ctx.lineTo(colX(i)+ws[i], Y+HDR_H-3*S); ctx.stroke();
-      }
-    });
-    Y += HDR_H;
-  };
-
-  drawHdr();
-
-  rows.forEach((row, ri) => {
-    const cells = cols.map((col,ci) => {
-      const raw = String(row[ci] ?? "—");
-      font(ctx, 9);
-      return { lines: wrap(ctx, raw, ws[ci]-PAD_X*2, maxLines), raw, col };
-    });
-    const maxL = Math.max(...cells.map(c => c.lines.length), 1);
-    const rowH = Math.max(ROW_MIN, maxL*LINE_H+PAD_Y*2);
-
-    ctx.fillStyle = ri%2===0 ? C.white : C.surface;
-    ctx.fillRect(ML, Y, CW, rowH);
-
-    cells.forEach(({lines, raw, col}, ci) => {
-      const cx = colX(ci);
-      const aw = ws[ci] - PAD_X*2;
-      const totalTH = lines.length * LINE_H;
-      const vOff = (rowH - totalTH) / 2;
-
-      lines.forEach((line, li) => {
-        const ty = Y + vOff + (li+1)*LINE_H - 2*S;
-        let color = C.ink;
-        if (col.colorFn) { const c2 = col.colorFn(raw); if (c2) color = c2; }
-        else if (raw.startsWith("+")) color = C.green;
-        else if (raw.startsWith("-")) color = C.red;
-        font(ctx, 9); ctx.fillStyle = color;
-        const clamped = clip(ctx, line, aw);
-        const tw = ctx.measureText(clamped).width;
-        const tx = col.align==="R"?cx+ws[ci]-PAD_X-tw : col.align==="C"?cx+(ws[ci]-tw)/2 : cx+PAD_X;
-        ctx.fillText(clamped, tx, ty);
+const TBL = (ctx: Ctx, cols: TC[], rows: string[][], y0: number, maxL=2): number => {
+  const PX=8*S, PY=6*S, LH=11*S, RMIN=23*S, HH=21*S;
+  const sc=CW/cols.reduce((s,c)=>s+c.w,0);
+  const ws=cols.map(c=>c.w*sc);
+  const cx=(i: number)=>ML+ws.slice(0,i).reduce((s,w)=>s+w,0);
+  let Y=y0;
+  // Header
+  fillR(ctx,ML,Y,CW,HH,0,INK);
+  cols.forEach((col,i)=>{
+    F(ctx,7.5,true); ctx.fillStyle=INK4;
+    const hd=clip(ctx,col.h,ws[i]-PX*2);
+    const tw=ctx.measureText(hd).width;
+    const tx=col.align==="R"?cx(i)+ws[i]-PX-tw:col.align==="C"?cx(i)+(ws[i]-tw)/2:cx(i)+PX;
+    ctx.fillText(hd,tx,Y+HH*0.67);
+    if(i<cols.length-1){ctx.strokeStyle="#374151";ctx.lineWidth=0.4*S;ctx.beginPath();ctx.moveTo(cx(i)+ws[i],Y+3*S);ctx.lineTo(cx(i)+ws[i],Y+HH-3*S);ctx.stroke();}
+  });
+  Y+=HH;
+  rows.forEach((row,ri)=>{
+    const cells=cols.map((col,ci)=>{F(ctx,8.5);return{lines:wrap(ctx,String(row[ci]??"—"),ws[ci]-PX*2,maxL),raw:String(row[ci]??""),col};});
+    const rowH=Math.max(RMIN,Math.max(...cells.map(c=>c.lines.length))*LH+PY*2);
+    ctx.fillStyle=ri%2===0?WHITE:SURF; ctx.fillRect(ML,Y,CW,rowH);
+    cells.forEach(({lines,raw,col},ci)=>{
+      const aw=ws[ci]-PX*2, tH=lines.length*LH, vO=(rowH-tH)/2;
+      lines.forEach((line,li)=>{
+        const ty=Y+vO+(li+1)*LH-2*S;
+        let color=INK;
+        if(col.col){const c2=col.col(raw);if(c2)color=c2;}
+        else if(raw.startsWith("+"))color=GREEN_DK;
+        else if(raw.startsWith("-"))color=RED_DK;
+        F(ctx,8.5); ctx.fillStyle=color;
+        const cl=clip(ctx,line,aw), tw=ctx.measureText(cl).width;
+        const tx=col.align==="R"?cx(ci)+ws[ci]-PX-tw:col.align==="C"?cx(ci)+(ws[ci]-tw)/2:cx(ci)+PX;
+        ctx.fillText(cl,tx,ty);
       });
-      if (ci < cols.length-1) {
-        ctx.strokeStyle = C.border; ctx.lineWidth = 0.3*S;
-        ctx.beginPath(); ctx.moveTo(cx+ws[ci], Y); ctx.lineTo(cx+ws[ci], Y+rowH); ctx.stroke();
-      }
+      if(ci<cols.length-1){ctx.strokeStyle=BDR;ctx.lineWidth=0.3*S;ctx.beginPath();ctx.moveTo(cx(ci)+ws[ci],Y);ctx.lineTo(cx(ci)+ws[ci],Y+rowH);ctx.stroke();}
     });
-    ctx.strokeStyle = C.border; ctx.lineWidth = 0.25*S;
-    ctx.beginPath(); ctx.moveTo(ML, Y+rowH); ctx.lineTo(ML+CW, Y+rowH); ctx.stroke();
-    Y += rowH;
+    ctx.strokeStyle=BDR;ctx.lineWidth=0.25*S;ctx.beginPath();ctx.moveTo(ML,Y+rowH);ctx.lineTo(ML+CW,Y+rowH);ctx.stroke();
+    Y+=rowH;
   });
-  return Y + 8*S;
+  return Y+6*S;
 };
 
-// ── Stacked bar ───────────────────────────────────────────────────────────────
-const stackedBar = (ctx: Ctx, items: {label:string;value:number;color:string}[], total: number, y: number): number => {
-  const BH = 16*S;
-  fillRR(ctx, ML, y, CW, BH, 3*S, C.surfMd);
-  let bx = ML;
-  items.forEach((item,i) => {
-    const bw = total>0?(item.value/total)*CW:0; if (bw<1) return;
-    ctx.fillStyle = item.color;
-    if (i===0) { rrPath(ctx,bx,y,bw,BH,3*S); ctx.fill(); }
-    else if (i===items.length-1) { ctx.fillRect(bx,y,bw-3*S,BH); rrPath(ctx,bx+bw-3*S,y,3*S,BH,3*S); ctx.fill(); }
-    else ctx.fillRect(bx, y, bw, BH);
-    bx += bw;
+// ── Stacked bar chart ─────────────────────────────────────────────────────────
+const BAR = (ctx: Ctx, items: {label:string;value:number;color:string}[], total: number, y: number): number => {
+  const BH=14*S;
+  fillR(ctx,ML,y,CW,BH,3*S,SURF2);
+  let bx=ML;
+  items.forEach((it,i)=>{
+    const bw=total>0?(it.value/total)*CW:0; if(bw<1) return;
+    ctx.fillStyle=it.color;
+    if(i===0){rrPath(ctx,bx,y,bw,BH,3*S);ctx.fill();}
+    else if(i===items.length-1){ctx.fillRect(bx,y,bw-3*S,BH);rrPath(ctx,bx+bw-3*S,y,3*S,BH,3*S);ctx.fill();}
+    else ctx.fillRect(bx,y,bw,BH);
+    bx+=bw;
   });
-  strokeRR(ctx, ML, y, CW, BH, 3*S, C.borderMd, 0.5);
-  y += BH + 8*S;
-  let lx = ML;
-  items.forEach(item => {
-    const pct = total>0?(item.value/total)*100:0; if (pct < 0.5) return;
-    font(ctx, 7.5); ctx.fillStyle = C.inkMd;
-    const lbl = `${item.label.slice(0,18)}  ${pct.toFixed(1)}%`;
-    const lw = ctx.measureText(lbl).width + 16*S;
-    if (lx+lw > ML+CW-8*S) { y += 13*S; lx = ML; }
-    fillRR(ctx, lx, y-6*S, 9*S, 9*S, 2*S, item.color);
-    ctx.fillText(lbl, lx+13*S, y+1*S);
-    lx += lw + 8*S;
+  strokeR(ctx,ML,y,CW,BH,3*S,BDR2,0.4);
+  y+=BH+7*S;
+  let lx=ML;
+  items.forEach(it=>{
+    const pct=total>0?(it.value/total)*100:0; if(pct<0.5) return;
+    F(ctx,7.5); ctx.fillStyle=INK2;
+    const lbl=`${it.label.slice(0,20)}  ${pct.toFixed(1)}%`;
+    const lw=ctx.measureText(lbl).width+16*S;
+    if(lx+lw>ML+CW-4*S){y+=12*S;lx=ML;}
+    fillR(ctx,lx,y-6*S,8*S,8*S,2*S,it.color);
+    ctx.fillText(lbl,lx+12*S,y+1*S);
+    lx+=lw+7*S;
   });
-  return y + 14*S;
+  return y+13*S;
 };
 
-// ── Insight card ──────────────────────────────────────────────────────────────
-type CardType = "action"|"review"|"info"|"good";
-const insightCard = (ctx: Ctx, card: PdfInsightCard, idx: number, type: CardType, y: number): number => {
-  const pal = {
-    action: {bg:C.redLt,    border:C.redBd,   accent:C.red,    tag:"ACTION NEEDED"},
-    review: {bg:C.amberLt,  border:C.amberBd, accent:C.amber,  tag:"REVIEW THIS"},
-    info:   {bg:C.blueLt,   border:"#93C5FD", accent:C.blue,   tag:"GOOD TO KNOW"},
-    good:   {bg:C.greenLt,  border:C.greenBd, accent:C.green,  tag:"ALL GOOD"},
+// ── Action card ───────────────────────────────────────────────────────────────
+type CType = "urgent"|"review"|"info"|"good";
+const CARD = (ctx: Ctx, c2: PdfInsightCard, idx: number, type: CType, y: number): number => {
+  const P={
+    urgent:{bg:RED_LT,  brd:RED_BD,  acc:RED_DK,   tagBg:RED,  tag:"⚠  ACT NOW"},
+    review:{bg:AMBER_LT,brd:AMBER_BD, acc:AMBER_DK,  tagBg:AMBER,tag:"●  REVIEW"},
+    info:  {bg:BLUE_LT, brd:"#93C5FD",acc:BLUE_DK,  tagBg:BLUE, tag:"ℹ  GOOD TO KNOW"},
+    good:  {bg:GREEN_LT,brd:GREEN_BD, acc:GREEN_DKK, tagBg:GREEN,tag:"✓  ALL GOOD"},
   }[type];
 
-  font(ctx, 10.5, true); const tL = wrap(ctx, card.title,  CW-42*S, 2);
-  font(ctx, 9);          const sL = wrap(ctx, card.summary, CW-42*S, 4);
-  font(ctx, 8.5);        const dL = wrap(ctx, "What to do: "+card.detail, CW-42*S, 3);
-  const CH = (18 + tL.length*13.5 + sL.length*12.5 + dL.length*11.5 + 28) * S;
+  const title2=plain(c2.title), sum2=plain(c2.summary), det2=plain(c2.detail);
+  F(ctx,10.5,true); const tL=wrap(ctx,title2,CW-42*S,2);
+  F(ctx,9);         const sL=wrap(ctx,sum2,CW-42*S,4);
+  F(ctx,8.5);       const dL=wrap(ctx,"What to do: "+det2,CW-42*S,3);
+  const CH=(20+tL.length*13.5+sL.length*12.5+dL.length*11.5+28)*S;
 
-  ctx.shadowColor = "rgba(0,0,0,0.05)"; ctx.shadowBlur=6*S; ctx.shadowOffsetY=2*S;
-  fillRR(ctx, ML, y, CW, CH, 8*S, pal.bg);
+  ctx.shadowColor="rgba(0,0,0,0.06)"; ctx.shadowBlur=6*S; ctx.shadowOffsetY=2*S;
+  fillR(ctx,ML,y,CW,CH,8*S,P.bg);
   ctx.shadowColor="transparent"; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-  strokeRR(ctx, ML, y, CW, CH, 8*S, pal.border, 0.5);
-  fillRR(ctx, ML, y, 5*S, CH, 5*S, pal.accent);
-  ctx.fillStyle=pal.accent; ctx.fillRect(ML+3*S, y, 2*S, CH);
+  rrPath(ctx,ML,y,CW,CH,8*S); ctx.strokeStyle=P.brd; ctx.lineWidth=1*S; ctx.stroke();
+  fillR(ctx,ML,y,5*S,CH,5*S,P.tagBg);
+  ctx.fillStyle=P.tagBg; ctx.fillRect(ML+3*S,y,2*S,CH);
 
-  let iy = y + 14*S;
-  font(ctx, 8.5, true); ctx.fillStyle = pal.accent; ctx.fillText(`${idx+1}.`, ML+12*S, iy);
-  font(ctx, 7.5, true); ctx.fillStyle = C.white;
-  const tw2 = ctx.measureText(pal.tag).width + 12*S;
-  fillRR(ctx, ML+26*S, y+5*S, tw2, 14*S, 3*S, pal.accent);
-  ctx.fillText(pal.tag, ML+32*S, y+14.5*S);
-  iy += 15*S;
-
-  tL.forEach(l => { font(ctx,10.5,true); ctx.fillStyle=C.ink; ctx.fillText(l,ML+12*S,iy); iy+=13.5*S; });
-  iy += 3*S;
-  sL.forEach(l => { font(ctx,9); ctx.fillStyle=C.inkMd; ctx.fillText(l,ML+12*S,iy); iy+=12.5*S; });
-  iy += 5*S;
-  dL.forEach(l => { ctx.font=`italic ${8.5*S}px ${F}`; ctx.fillStyle=pal.accent; ctx.fillText(l,ML+12*S,iy); iy+=11.5*S; });
-
-  return y + CH + 10*S;
-};
-
-// ── Horizontal bar ────────────────────────────────────────────────────────────
-const horizBar = (ctx: Ctx, label: string, pct: number, value: string, accent: string, rank: number, y: number): number => {
-  const BH = 26*S;
-  // Full-width track
-  fillRR(ctx, ML, y, CW, BH, 4*S, C.surfMd);
-  // Proportional fill — minimum 60px so text is always readable
-  const bw = Math.max(pct*CW, 60*S);
-  fillRR(ctx, ML, y, bw, BH, 4*S, accent);
-
-  // Rank + fund name inside bar (white if bar is wide enough, dark otherwise)
-  font(ctx, 9, true); ctx.fillStyle = pct > 0.15 ? C.white : C.ink;
-  ctx.fillText(`${rank}.  ${clip(ctx, label, Math.max(bw-16*S, 120*S))}`, ML+9*S, y+BH*0.615);
-
-  // Value always at far right
-  const vs = `${value}  (${(pct*100).toFixed(1)}%)`;
-  font(ctx, 9, true); ctx.fillStyle = pct > 0.6 ? C.white : C.inkMd;
-  ctx.fillText(vs, ML+CW-ctx.measureText(vs).width-8*S, y+BH*0.615);
-
-  return y + BH + 6*S;
+  let iy=y+15*S;
+  F(ctx,8.5,true); ctx.fillStyle=P.acc; ctx.fillText(`${idx+1}`,ML+11*S,iy);
+  F(ctx,7,true); ctx.fillStyle=WHITE;
+  const tgW=ctx.measureText(P.tag).width+12*S;
+  fillR(ctx,ML+24*S,y+5*S,tgW,14*S,3*S,P.tagBg);
+  ctx.fillText(P.tag,ML+30*S,y+14.5*S);
+  iy+=15*S;
+  tL.forEach(l=>{F(ctx,10.5,true);ctx.fillStyle=INK;ctx.fillText(l,ML+11*S,iy);iy+=13.5*S;});
+  iy+=3*S;
+  sL.forEach(l=>{F(ctx,9);ctx.fillStyle=INK2;ctx.fillText(l,ML+11*S,iy);iy+=12.5*S;});
+  iy+=5*S;
+  dL.forEach(l=>{ctx.font=`italic ${8.5*S}px ${FF}`;ctx.fillStyle=P.acc;ctx.fillText(l,ML+11*S,iy);iy+=11.5*S;});
+  return y+CH+9*S;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -499,243 +419,237 @@ export const generatePdfReport = async (params: {
   const [{jsPDF}] = await Promise.all([import("jspdf")]);
   const {summary, report, xirrValue, logoUrl, holder, insights} = params;
 
-  // Load logo properly
   let logo: HTMLImageElement|null = null;
   try {
-    logo = await new Promise<HTMLImageElement>((res,rej) => {
-      const img = new Image(); img.crossOrigin = "anonymous";
-      img.onload = () => res(img); img.onerror = rej; img.src = logoUrl;
+    logo = await new Promise<HTMLImageElement>((res,rej)=>{
+      const img=new Image(); img.crossOrigin="anonymous";
+      img.onload=()=>res(img); img.onerror=rej; img.src=logoUrl;
     });
   } catch { /* skip */ }
 
-  const mkCanvas = (): [HTMLCanvasElement, Ctx] => {
-    const c = document.createElement("canvas");
-    c.width = PW; c.height = PH;
-    const ctx = c.getContext("2d", {alpha:false})!;
-    ctx.fillStyle = C.surface; ctx.fillRect(0,0,PW,PH);
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-    return [c, ctx];
+  const mk = (): [HTMLCanvasElement, Ctx] => {
+    const c=document.createElement("canvas");
+    c.width=PW; c.height=PH;
+    const ctx=c.getContext("2d",{alpha:false})!;
+    ctx.fillStyle=WHITE; ctx.fillRect(0,0,PW,PH);
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+    return [c,ctx];
   };
 
-  const pages: HTMLCanvasElement[] = [];
+  const pages: HTMLCanvasElement[]=[];
+  const xpct=(xirrValue??0)*100;
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 1 — COVER  "Your Portfolio Report Card"
+  // PAGE 1 — COVER
+  // Dark background. Three KPI stat boxes. Health score with explained breakdown.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    const [c, ctx] = mkCanvas(); pages.push(c);
+    const [c,ctx]=mk(); pages.push(c);
 
-    // Dark gradient background
-    const bg = ctx.createLinearGradient(0, 0, PW*0.65, PH);
-    bg.addColorStop(0, "#0B1E3D"); bg.addColorStop(0.65, "#122d5a"); bg.addColorStop(1, "#08271a");
-    ctx.fillStyle = bg; ctx.fillRect(0,0,PW,PH);
+    // ── Background ──
+    const bg=ctx.createLinearGradient(0,0,PW,PH);
+    bg.addColorStop(0,COVER_BG); bg.addColorStop(0.6,COVER_BG2); bg.addColorStop(1,"#0A1628");
+    ctx.fillStyle=bg; ctx.fillRect(0,0,PW,PH);
 
-    // Radial glows
-    const g1 = ctx.createRadialGradient(PW, 0, 0, PW, 0, 420*S);
-    g1.addColorStop(0, "rgba(13,159,111,0.18)"); g1.addColorStop(1, "rgba(13,159,111,0)");
-    ctx.fillStyle = g1; ctx.fillRect(0,0,PW,PH);
-    const g2 = ctx.createRadialGradient(0, PH, 0, 0, PH, 380*S);
-    g2.addColorStop(0, "rgba(37,99,235,0.14)"); g2.addColorStop(1, "rgba(37,99,235,0)");
-    ctx.fillStyle = g2; ctx.fillRect(0,0,PW,PH);
+    // Subtle decorative glows
+    const g1=ctx.createRadialGradient(PW,0,0,PW,0,350*S);
+    g1.addColorStop(0,"rgba(16,185,129,0.15)"); g1.addColorStop(1,"rgba(16,185,129,0)");
+    ctx.fillStyle=g1; ctx.fillRect(0,0,PW,PH);
+    const g2=ctx.createRadialGradient(0,PH,0,0,PH,280*S);
+    g2.addColorStop(0,"rgba(59,130,246,0.12)"); g2.addColorStop(1,"rgba(59,130,246,0)");
+    ctx.fillStyle=g2; ctx.fillRect(0,0,PW,PH);
 
     // Green left rail
-    const rail = ctx.createLinearGradient(0,0,0,PH);
-    rail.addColorStop(0, C.green); rail.addColorStop(1, "#065f46");
-    ctx.fillStyle = rail; ctx.fillRect(0,0,6*S,PH);
-    ctx.fillStyle = C.greenDk; ctx.fillRect(6*S,0,1*S,PH);
+    const rl=ctx.createLinearGradient(0,0,0,PH);
+    rl.addColorStop(0,GREEN); rl.addColorStop(1,GREEN_DKK);
+    ctx.fillStyle=rl; ctx.fillRect(0,0,5*S,PH);
+    ctx.fillStyle=GREEN_DKK; ctx.fillRect(5*S,0,1*S,PH);
 
-    // Logo top-left
-    let brandX = ML + 6*S;
-    if (logo && logo.naturalWidth > 0) {
-      const lh = 44*S;
-      const lw = Math.round((logo.naturalWidth/logo.naturalHeight)*lh);
-      ctx.drawImage(logo, ML+6*S, 48*S, lw, lh);
-      brandX = ML + 6*S + lw + 14*S;
+    // ── Logo (top-left) ──
+    let bx=ML+8*S;
+    if(logo&&logo.naturalWidth>0){
+      const lh=38*S, lw=Math.round((logo.naturalWidth/logo.naturalHeight)*lh);
+      ctx.drawImage(logo,ML+8*S,44*S,lw,lh); bx=ML+8*S+lw+12*S;
     }
-    font(ctx, 15, true); ctx.fillStyle = C.white; ctx.fillText("Nivesify", brandX, 68*S);
-    font(ctx, 9); ctx.fillStyle = C.inkFaint; ctx.fillText("Thoughtful Money, Better Life", brandX, 84*S);
+    F(ctx,13,true); ctx.fillStyle=CV_TXT; ctx.fillText("Nivesify",bx,62*S);
+    F(ctx,8); ctx.fillStyle=CV_SUB; ctx.fillText("Thoughtful Money, Better Life",bx,77*S);
 
-    // Report label
-    font(ctx, 8.5, true); ctx.fillStyle = C.green;
-    ctx.fillText("MUTUAL FUND HEALTH CHECK  ·  YOUR PERSONAL REPORT", ML+6*S, 140*S);
+    // ── Report label ──
+    F(ctx,8,true); ctx.fillStyle=GREEN;
+    ctx.fillText("MUTUAL FUND HEALTH CHECK  ·  PERSONAL PORTFOLIO REPORT",ML+8*S,128*S);
 
-    // Big title
-    font(ctx, 36, true); ctx.fillStyle = C.white;
-    ctx.fillText("Your Portfolio", ML+6*S, 185*S);
-    ctx.fillText("Report Card", ML+6*S, 230*S);
+    // ── Hero headline ──
+    const isGood=xpct>=10;
+    F(ctx,32,true); ctx.fillStyle=CV_TXT;
+    ctx.fillText("Your Portfolio",ML+8*S,172*S);
+    ctx.fillStyle=isGood?GREEN:AMBER;
+    ctx.fillText(isGood?"is on Track!":"Needs Attention",ML+8*S,210*S);
 
-    // Gradient underline
-    const ul = ctx.createLinearGradient(ML+6*S,0,ML+180*S,0);
-    ul.addColorStop(0, C.green); ul.addColorStop(1, "rgba(13,159,111,0)");
-    ctx.fillStyle = ul; ctx.fillRect(ML+6*S, 240*S, 180*S, 3*S);
-
-    font(ctx, 9.5); ctx.fillStyle = "rgba(148,163,184,0.85)";
-    ctx.fillText("Plain English  ·  No Jargon  ·  Clear Action Steps", ML+6*S, 258*S);
+    const ulg=ctx.createLinearGradient(ML+8*S,0,ML+8*S+150*S,0);
+    ulg.addColorStop(0,isGood?GREEN:AMBER); ulg.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=ulg; ctx.fillRect(ML+8*S,218*S,150*S,2.5*S);
+    F(ctx,9); ctx.fillStyle=CV_SUB;
+    ctx.fillText("Plain English  ·  No Jargon  ·  Clear Actions",ML+8*S,232*S);
 
     // ── Investor info box ──
-    const HX = ML+6*S, HY = 274*S, HW = CW-6*S, HH = 72*S;
-    fillRR(ctx, HX, HY, HW, HH, 8*S, "rgba(26,58,110,0.75)");
-    strokeRR(ctx, HX, HY, HW, HH, 8*S, "rgba(37,99,235,0.3)", 0.5);
-    fillRR(ctx, HX, HY, 5*S, HH, 5*S, C.green);
-    ctx.fillStyle = C.green; ctx.fillRect(HX+3*S, HY, 2*S, HH);
+    const HX=ML+8*S, HY=246*S, HW=CW-8*S, HH=66*S;
+    fillR(ctx,HX,HY,HW,HH,7*S,"rgba(19,35,56,0.9)");
+    rrPath(ctx,HX,HY,HW,HH,7*S); ctx.strokeStyle="rgba(16,185,129,0.35)"; ctx.lineWidth=1*S; ctx.stroke();
+    fillR(ctx,HX,HY,4*S,HH,4*S,GREEN);
+    ctx.fillStyle=GREEN_DKK; ctx.fillRect(HX+3*S,HY,1*S,HH);
+    F(ctx,7,true); ctx.fillStyle=CV_DIM; ctx.fillText("REPORT PREPARED FOR",HX+13*S,HY+15*S);
+    const dName=holder.name&&!holder.name.includes("@")?holder.name:(holder.email||"Investor");
+    F(ctx,13,true); ctx.fillStyle=CV_TXT; ctx.fillText(clip(ctx,dName,HW-120*S),HX+13*S,HY+31*S);
+    F(ctx,7.5); ctx.fillStyle=CV_DIM;
+    if(holder.pan) ctx.fillText(`PAN: ${holder.pan}`,HX+13*S,HY+46*S);
+    if(holder.email) ctx.fillText(clip(ctx,holder.email,HW/2-20*S),holder.pan?HX+HW*0.42:HX+13*S,HY+46*S);
+    ctx.fillText(`Generated: ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric"})}`,HX+13*S,HY+58*S);
 
-    font(ctx, 7.5, true); ctx.fillStyle = "rgba(148,163,184,0.8)";
-    ctx.fillText("REPORT PREPARED FOR", HX+14*S, HY+17*S);
+    // ── 3 Hero KPI boxes ──
+    // These sit side by side. Each box: label (top), big value (middle), sub (bottom).
+    // All text drawn with FIXED pt positions relative to box top — no overlap possible.
+    const KY=HY+HH+14*S, KH=76*S, KW=(HW-14*S)/3;
+    const xirrCol=xpct>=12?GREEN:xpct>=8?AMBER:RED;
+    const profCol=(summary.allTimeProfit||0)>=0?GREEN:RED;
 
-    // Holder name — use email as fallback if name looks like email
-    const displayName = (holder.name && !holder.name.includes("@")) ? holder.name : (holder.email || "Investor");
-    font(ctx, 13, true); ctx.fillStyle = C.white;
-    ctx.fillText(clip(ctx, displayName, HW-110*S), HX+14*S, HY+33*S);
-    font(ctx, 8); ctx.fillStyle = C.inkFaint;
-    const panStr  = holder.pan   ? `PAN: ${holder.pan}`  : "";
-    const emlStr  = holder.email ? holder.email           : "";
-    if (panStr) ctx.fillText(panStr, HX+14*S, HY+50*S);
-    if (emlStr) ctx.fillText(clip(ctx, emlStr, HW/2-20*S), panStr?HX+HW/2:HX+14*S, HY+50*S);
-    ctx.fillText(`Generated: ${new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric"})}`, HX+14*S, HY+65*S);
+    const kpiBox=(kx: number, bg2: string, brd: string, lbl: string, val: string, s1: string, s2: string, vc: string)=>{
+      fillR(ctx,kx,KY,KW,KH,7*S,bg2);
+      rrPath(ctx,kx,KY,KW,KH,7*S); ctx.strokeStyle=brd; ctx.lineWidth=0.5*S; ctx.stroke();
+      // Label at y+14
+      F(ctx,7.5); ctx.fillStyle=vc+"99";
+      ctx.fillText(clip(ctx,lbl,KW-20*S),kx+12*S,KY+14*S);
+      // Value at y+36 (22pt gap from label baseline to value baseline)
+      F(ctx,17,true); ctx.fillStyle=vc;
+      ctx.fillText(clip(ctx,val,KW-20*S),kx+12*S,KY+37*S);
+      // Sub1 at y+51
+      F(ctx,7); ctx.fillStyle=vc+"77";
+      ctx.fillText(clip(ctx,s1,KW-20*S),kx+12*S,KY+51*S);
+      // Sub2 at y+63
+      F(ctx,7); ctx.fillStyle=vc+"55";
+      ctx.fillText(clip(ctx,s2,KW-20*S),kx+12*S,KY+63*S);
+    };
 
-    // ── Health score + 3 KPI cards ──
-    const CARD_Y = HY + HH + 18*S;
-    const RING_R = 52*S;
-    const RING_CX = ML + 6*S + RING_R + 8*S;
-    const RING_CY = CARD_Y + RING_R + 14*S;
-    const RING_BLOCK_H = RING_R*2 + 32*S;
+    kpiBox(HX,"rgba(16,185,129,0.12)","rgba(16,185,129,0.3)","Total Portfolio Value",fmtCur(summary.totalValue),"Current market value of all funds",`You invested: ${fmtCur(summary.invested)}`,GREEN);
+    kpiBox(HX+KW+7*S,`rgba(${xpct>=10?"16,185,129":"245,158,11"},0.12)`,`rgba(${xpct>=10?"16,185,129":"245,158,11"},0.3)`,"Your Annual Return",fmtPct(xirrValue,2),`Market benchmark: ~14-15% per year`,xpct>=12?"Above average — great job!":xpct>=8?"Close to market — acceptable":"Below market — needs attention",xirrCol);
+    kpiBox(HX+KW*2+14*S,`rgba(${(summary.allTimeProfit||0)>=0?"16,185,129":"239,68,68"},0.12)`,`rgba(${(summary.allTimeProfit||0)>=0?"16,185,129":"239,68,68"},0.3)`,"Total Profit Earned",fmtCur(summary.allTimeProfit),`On investment of ${fmtCur(summary.invested)}`,`${fmtShr(summary.totalValue&&summary.invested?summary.allTimeProfit/summary.invested:0)} absolute gain across all funds`,profCol);
 
-    // Compute health score
-    const xpct2 = (xirrValue??0)*100;
-    const score = xpct2>=15?90:xpct2>=12?78:xpct2>=9?62:xpct2>=6?48:34;
-    const scoreLabel = score>=80?"Excellent":score>=65?"Healthy":score>=50?"Fair":"Needs Work";
-    const scoreCol = score>=65?C.green:score>=50?C.amber:C.red;
+    // ── Health Score block ──
+    // Layout: [Big score number + label | divider | 3 component bars with explanation]
+    const HSY=KY+KH+14*S, HSH=100*S, HSW=HW;
+    fillR(ctx,HX,HSY,HSW,HSH,7*S,"rgba(19,35,56,0.85)");
+    rrPath(ctx,HX,HSY,HSW,HSH,7*S); ctx.strokeStyle="rgba(255,255,255,0.06)"; ctx.lineWidth=0.5*S; ctx.stroke();
 
-    // Ring background track
-    ctx.beginPath(); ctx.arc(RING_CX, RING_CY, RING_R, 0, Math.PI*2);
-    ctx.strokeStyle="rgba(255,255,255,0.1)"; ctx.lineWidth=10*S; ctx.stroke();
-    // Ring fill
-    ctx.beginPath(); ctx.arc(RING_CX, RING_CY, RING_R, -Math.PI/2, -Math.PI/2+(score/100)*Math.PI*2);
-    ctx.strokeStyle=scoreCol; ctx.lineWidth=10*S; ctx.lineCap="round"; ctx.stroke();
-    // Score number
-    ctx.textAlign = "center";
-    font(ctx, 26, true); ctx.fillStyle = C.white; ctx.fillText(String(score), RING_CX, RING_CY+9*S);
-    font(ctx, 8); ctx.fillStyle="rgba(255,255,255,0.6)"; ctx.fillText(scoreLabel, RING_CX, RING_CY+24*S);
-    ctx.textAlign = "left";
-    font(ctx, 7.5); ctx.fillStyle="rgba(255,255,255,0.45)"; ctx.textAlign="center";
-    ctx.fillText("Portfolio", RING_CX, CARD_Y+RING_BLOCK_H+2*S);
-    ctx.fillText("Health Score", RING_CX, CARD_Y+RING_BLOCK_H+14*S);
-    ctx.textAlign="left";
+    // Score components
+    const sc1=xpct>=15?40:xpct>=12?35:xpct>=9?27:xpct>=6?18:10; // returns 40pt
+    const sc2=report.holdingsCount>=3&&report.holdingsCount<=7?30:report.holdingsCount<=10?22:14; // diversification 30pt
+    const sc3=report.topOneShare<0.25&&report.topFiveShare<0.65&&report.topAmcShare<0.4?30:report.topOneShare<0.35?22:14; // concentration 30pt
+    const total=sc1+sc2+sc3;
+    const sLbl=total>=80?"Excellent":total>=65?"Healthy":total>=50?"Fair":"Needs Work";
+    const sCol=total>=65?GREEN:total>=50?AMBER:RED;
 
-    // 3 KPI cards — to the right of ring
-    const KX = RING_CX + RING_R + 22*S;
-    const KW = PW - MR - KX;
-    const KH = (RING_BLOCK_H - 16*S) / 3;
-    const xirrAccent = xpct2>=12?C.green:xpct2>=8?C.amber:C.red;
+    // Big score on left side
+    const SLX=HX+18*S;
+    F(ctx,7,true); ctx.fillStyle=CV_DIM; ctx.fillText("YOUR PORTFOLIO HEALTH SCORE",SLX,HSY+16*S);
+    F(ctx,40,true); ctx.fillStyle=sCol; ctx.fillText(String(total),SLX,HSY+62*S);
+    F(ctx,8); ctx.fillStyle=CV_SUB; ctx.fillText(`out of 100  ·  ${sLbl}`,SLX,HSY+78*S);
+    F(ctx,7); ctx.fillStyle=CV_DIM; ctx.fillText("(see breakdown →)",SLX,HSY+90*S);
 
-    const kpis = [
-      {l:"Total Portfolio Value",  v:fmtCur(summary.totalValue),   s:"Current market value of all funds",   a:C.green},
-      {l:"Your Annual Return",     v:fmtPct(xirrValue,2),          s:`12-14% is a good target to aim for`,  a:xirrAccent},
-      {l:"Total Profit Earned",    v:fmtCur(summary.allTimeProfit), s:`On investment of ${fmtCur(summary.invested)}`, a:(summary.allTimeProfit||0)>=0?C.green:C.red},
-    ];
-    kpis.forEach((kpi,i) => {
-      const KY = CARD_Y + i*(KH+8*S);
-      fillRR(ctx, KX, KY, KW, KH, 7*S, "rgba(22,36,74,0.85)");
-      strokeRR(ctx, KX, KY, KW, KH, 7*S, "rgba(255,255,255,0.06)", 0.5);
-      fillRR(ctx, KX, KY, KW, 4*S, 4*S, kpi.a);
-      ctx.fillStyle=kpi.a; ctx.fillRect(KX, KY+2*S, KW, 2*S);
-      font(ctx,7.5); ctx.fillStyle=C.inkFaint; ctx.fillText(kpi.l, KX+10*S, KY+19*S);
-      font(ctx,15,true); ctx.fillStyle=kpi.a; ctx.fillText(clip(ctx,kpi.v,KW-18*S), KX+10*S, KY+KH*0.58);
-      font(ctx,7); ctx.fillStyle=C.inkFaint; ctx.fillText(clip(ctx,kpi.s,KW-16*S), KX+10*S, KY+KH-10*S);
+    // Divider
+    ctx.strokeStyle="rgba(255,255,255,0.08)"; ctx.lineWidth=1*S;
+    const divX=HX+110*S;
+    ctx.beginPath(); ctx.moveTo(divX,HSY+12*S); ctx.lineTo(divX,HSY+HSH-12*S); ctx.stroke();
+
+    // Score breakdown bars on right side — THIS EXPLAINS THE SCORE
+    const BDX=divX+12*S, BDW=HSW-(divX-HX)-20*S;
+    F(ctx,7,true); ctx.fillStyle=CV_DIM; ctx.fillText("HOW THE SCORE IS CALCULATED",BDX,HSY+16*S);
+
+    const scoreRow=(lbl: string, pts: number, max: number, col: string, y2: number)=>{
+      F(ctx,7.5); ctx.fillStyle=CV_SUB; ctx.fillText(lbl,BDX,y2+8*S);
+      F(ctx,7.5,true); ctx.fillStyle=col;
+      const ps=`${pts}/${max}`;
+      ctx.fillText(ps,BDX+BDW-ctx.measureText(ps).width,y2+8*S);
+      fillR(ctx,BDX,y2+11*S,BDW,5*S,2.5*S,"rgba(255,255,255,0.08)");
+      fillR(ctx,BDX,y2+11*S,Math.max((pts/max)*BDW,2*S),5*S,2.5*S,col);
+      return y2+22*S;
+    };
+
+    let by=HSY+22*S;
+    by=scoreRow(`Returns (max 40 pts) — your ${xpct.toFixed(1)}% annual return vs 14-15% market`,sc1,40,sc1>=35?GREEN:sc1>=25?AMBER:RED,by);
+    by+=3*S;
+    by=scoreRow(`Diversification (max 30 pts) — ${report.holdingsCount} funds (ideal: 4-8)`,sc2,30,sc2>=25?GREEN:sc2>=18?AMBER:RED,by);
+    by+=3*S;
+    scoreRow(`Concentration (max 30 pts) — largest fund is ${fmtShr(report.topOneShare)}`,sc3,30,sc3>=25?GREEN:sc3>=18?AMBER:RED,by);
+
+    // ── 4 stat chips ──
+    const SCY=HSY+HSH+12*S, SW=(HW/4), SH=52*S;
+    [{l:"Amount Invested",v:fmtCur(summary.invested),s:"Total put in"},{l:"Number of Funds",v:`${report.holdingsCount} funds`,s:"Currently active"},{l:"Biggest Fund Share",v:fmtShr(report.topOneShare),s:"% in one fund"},{l:"Est. Monthly Income",v:fmtCur(summary.monthlyIncome),s:"25× annual estimate"}].forEach((st,i)=>{
+      const SX=HX+i*SW;
+      fillR(ctx,SX,SCY,SW-6*S,SH,5*S,"rgba(19,35,56,0.75)");
+      rrPath(ctx,SX,SCY,SW-6*S,SH,5*S); ctx.strokeStyle="rgba(255,255,255,0.05)"; ctx.lineWidth=0.4*S; ctx.stroke();
+      F(ctx,7.5); ctx.fillStyle=CV_DIM; ctx.fillText(st.l,SX+9*S,SCY+16*S);
+      F(ctx,12,true); ctx.fillStyle=CV_TXT; ctx.fillText(clip(ctx,st.v,SW-22*S),SX+9*S,SCY+36*S);
+      F(ctx,7); ctx.fillStyle=CV_DIM; ctx.fillText(st.s,SX+9*S,SCY+48*S);
     });
 
-    // ── 4 secondary stat chips ──
-    const SEC_Y = CARD_Y + RING_BLOCK_H + 30*S;
-    const SW    = (HW) / 4;
-    const SH    = 58*S;
-    const stats = [
-      {l:"Amount Invested",    v:fmtCur(summary.invested)},
-      {l:"Number of Funds",    v:`${report.holdingsCount} funds`},
-      {l:"Biggest Fund Share", v:fmtShare(report.topOneShare)},
-      {l:"Est. Monthly Income",v:fmtCur(summary.monthlyIncome)},
-    ];
-    stats.forEach((st,i) => {
-      const SX = HX + i*SW;
-      fillRR(ctx, SX, SEC_Y, SW-8*S, SH, 6*S, "rgba(22,36,74,0.7)");
-      strokeRR(ctx, SX, SEC_Y, SW-8*S, SH, 6*S, "rgba(255,255,255,0.06)", 0.4);
-      font(ctx,7.5); ctx.fillStyle=C.inkFaint; ctx.fillText(st.l, SX+10*S, SEC_Y+18*S);
-      font(ctx,13,true); ctx.fillStyle=C.white; ctx.fillText(clip(ctx,st.v,SW-26*S), SX+10*S, SEC_Y+42*S);
-    });
-
-    // Cover disclaimer
-    const DY = PH - 38*S;
-    ctx.strokeStyle="rgba(26,58,110,0.8)"; ctx.lineWidth=0.4*S;
-    ctx.beginPath(); ctx.moveTo(HX,DY); ctx.lineTo(HX+HW,DY); ctx.stroke();
-    font(ctx,7); ctx.fillStyle="rgba(100,116,139,0.7)";
-    const disc2 = "Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on any information in this report. Nivesify does not provide SEBI-registered investment advice.";
-    const dl2 = wrap(ctx, disc2, HW, 2);
-    dl2.forEach((l,i) => ctx.fillText(l, HX, DY+13*S+i*10*S));
+    // Cover footer
+    const CFY=PH-34*S;
+    ctx.strokeStyle="rgba(19,35,56,0.9)"; ctx.lineWidth=0.4*S;
+    ctx.beginPath(); ctx.moveTo(HX,CFY); ctx.lineTo(HX+HW,CFY); ctx.stroke();
+    F(ctx,6.5); ctx.fillStyle="rgba(107,114,128,0.65)";
+    const dl2=wrap(ctx,"Past performance is not a guarantee of future results. Consult a SEBI-registered investment advisor before acting on any information in this report. Nivesify does not provide SEBI-registered investment advice.",HW,2);
+    dl2.forEach((l,i)=>ctx.fillText(l,HX,CFY+11*S+i*9*S));
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 2 — YOUR MONEY AT A GLANCE
+  // PAGE 2 — YOUR MONEY AT A GLANCE  (white background, high contrast)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    const [c, ctx] = mkCanvas(); pages.push(c);
-    drawChrome(ctx, 2, logo);
-    let Y = BODY_TOP;
+    const [c,ctx]=mk(); pages.push(c);
+    chrome(ctx,2,logo); let Y=TOP;
 
-    Y = sHead(ctx, "Your Money", "Your Money at a Glance", Y, C.blue);
+    Y=H(ctx,"Your Money","Your Money at a Glance",Y,BLUE);
 
-    const GAP = 8*S;
-    const CW4 = (CW - GAP*3) / 4;
-    const CH  = 64*S;
+    const G=7*S, CW4=(CW-G*3)/4, CH=60*S;
+    const xirrAcc=xpct>=12?GREEN:xpct>=8?AMBER:RED;
 
-    const xirrAcc = (xirrValue??0)*100>=12?C.green:(xirrValue??0)*100>=8?C.amber:C.red;
-
-    const row1 = [
-      {l:"Total Portfolio Value",  v:fmtCur(summary.totalValue),   s:"Current value of all funds",   a:C.blue},
-      {l:"Total Amount Invested",  v:fmtCur(summary.invested),      s:"Money you've put in over time", a:C.inkSoft},
-      {l:"Total Profit Earned",    v:fmtCur(summary.allTimeProfit), s:"Gains so far",                 a:(summary.allTimeProfit||0)>=0?C.green:C.red},
-      {l:"Your Annual Return",     v:fmtPct(xirrValue,2),           s:"How fast your money is growing",a:xirrAcc},
+    const r1=[
+      {l:"Total Portfolio Value",  v:fmtCur(summary.totalValue),   s:"What all your funds are worth today",  a:BLUE},
+      {l:"Total Invested",         v:fmtCur(summary.invested),      s:"Total money put in over time",         a:INK3},
+      {l:"Total Profit Earned",    v:fmtCur(summary.allTimeProfit), s:"Your gains so far (all funds)",        a:(summary.allTimeProfit||0)>=0?GREEN_DK:RED_DK},
+      {l:"Annual Return (XIRR)",   v:fmtPct(xirrValue,2),           s:"How fast your money is really growing",a:xirrAcc},
     ];
-    row1.forEach((m,i) => metricCard(ctx, ML+i*(CW4+GAP), Y, CW4, CH, m.l, m.v, m.s, m.a));
-    Y += CH + 10*S;
+    r1.forEach((m,i)=>MC(ctx,ML+i*(CW4+G),Y,CW4,CH,m.l,m.v,m.s,m.a));
+    Y+=CH+7*S;
 
-    const row2 = [
-      {l:"Number of Funds",        v:`${report.holdingsCount}`,      s:"Currently active",             a:C.purple},
-      {l:"Biggest Fund (% share)", v:fmtShare(report.topOneShare),   s:"% in your single largest fund",a:report.topOneShare>0.3?C.amber:C.green},
-      {l:"Top 5 Funds Combined",   v:fmtShare(report.topFiveShare),  s:"% held in your top 5",         a:report.topFiveShare>0.65?C.amber:C.green},
-      {l:"Est. Monthly Income",    v:fmtCur(summary.monthlyIncome),  s:"Based on 25× annual expenses",  a:C.teal},
+    const r2=[
+      {l:"Number of Funds",        v:`${report.holdingsCount}`,      s:"Active funds",                         a:"#8B5CF6"},
+      {l:"Largest Fund (% share)", v:fmtShr(report.topOneShare),     s:"% in your single biggest fund",        a:report.topOneShare>0.3?AMBER:GREEN_DK},
+      {l:"Top 5 Funds Combined",   v:fmtShr(report.topFiveShare),    s:"% held in your 5 largest funds",       a:report.topFiveShare>0.65?AMBER:GREEN_DK},
+      {l:"Est. Monthly Income",    v:fmtCur(summary.monthlyIncome),  s:"If you withdraw 4% per year (25x rule)", a:"#0891B2"},
     ];
-    row2.forEach((m,i) => metricCard(ctx, ML+i*(CW4+GAP), Y, CW4, CH, m.l, m.v, m.s, m.a));
-    Y += CH + 16*S;
+    r2.forEach((m,i)=>MC(ctx,ML+i*(CW4+G),Y,CW4,CH,m.l,m.v,m.s,m.a));
+    Y+=CH+14*S;
 
-    // Divider
-    ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
-    ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y += 14*S;
+    // Summary banner
+    ctx.strokeStyle=BDR;ctx.lineWidth=0.5*S;ctx.beginPath();ctx.moveTo(ML,Y);ctx.lineTo(ML+CW,Y);ctx.stroke();Y+=12*S;
+    const csum=plain(insights.executiveSummary);
+    F(ctx,9); const esL=wrap(ctx,csum,CW-28*S,4);
+    const ESH=(esL.length*13+30)*S;
+    fillR(ctx,ML,Y,CW,ESH,7*S,GREEN_LT);
+    rrPath(ctx,ML,Y,CW,ESH,7*S); ctx.strokeStyle=GREEN_BD; ctx.lineWidth=0.5*S; ctx.stroke();
+    fillR(ctx,ML,Y,4*S,ESH,4*S,GREEN); ctx.fillStyle=GREEN_DKK; ctx.fillRect(ML+3*S,Y,1*S,ESH);
+    F(ctx,7,true); ctx.fillStyle=GREEN_DKK; ctx.fillText("IN SUMMARY",ML+12*S,Y+13*S);
+    esL.forEach((l,i)=>{F(ctx,9);ctx.fillStyle=INK2;ctx.fillText(l,ML+12*S,Y+25*S+i*13*S);});
+    Y+=ESH+14*S;
 
-    // In summary banner
-    font(ctx, 9);
-    const esLines = wrap(ctx, insights.executiveSummary, CW-30*S, 4);
-    const ESH = (esLines.length*13 + 34)*S;
-    fillRR(ctx, ML, Y, CW, ESH, 8*S, C.greenLt);
-    strokeRR(ctx, ML, Y, CW, ESH, 8*S, C.greenBd, 0.5);
-    fillRR(ctx, ML, Y, 5*S, ESH, 5*S, C.green);
-    ctx.fillStyle=C.green; ctx.fillRect(ML+3*S, Y, 2*S, ESH);
-    font(ctx,7.5,true); ctx.fillStyle=C.green; ctx.fillText("IN SUMMARY", ML+14*S, Y+15*S);
-    esLines.forEach((l,i) => { font(ctx,9); ctx.fillStyle=C.inkMd; ctx.fillText(l,ML+14*S,Y+27*S+i*13*S); });
-    Y += ESH + 16*S;
+    ctx.strokeStyle=BDR;ctx.lineWidth=0.5*S;ctx.beginPath();ctx.moveTo(ML,Y);ctx.lineTo(ML+CW,Y);ctx.stroke();Y+=12*S;
+    Y=H(ctx,"How You Compare","How Your Portfolio Compares to the Market",Y,"#8B5CF6");
 
-    ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
-    ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y += 14*S;
-
-    Y = sHead(ctx, "How You Compare", "How Your Portfolio Compares to the Market", Y, C.purple);
-
-    // Investor-friendly column names (no "Metric", "Value", "What It Means" jargon)
-    Y = drawTable(ctx,
-      [
-        {h:"What We Checked",     w:185},
-        {h:"Your Number",         w:90, align:"R"},
-        {h:"What This Means for You", w:248},
-      ],
-      insights.metrics.map(m => [m.title, m.value, m.note]),
-      Y, {maxLines:2}
+    // Plain English metric table
+    const mRows=(insights.metrics||[]).map(m=>[plain(m.title),m.value,plain(m.note)]);
+    Y=TBL(ctx,
+      [{h:"What We Checked",w:185},{h:"Your Result",w:88,align:"R"},{h:"What This Means for You",w:250}],
+      mRows,Y,2
     );
   }
 
@@ -743,135 +657,92 @@ export const generatePdfReport = async (params: {
   // PAGE 3 — YOUR ACTION PLAN
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    const [c, ctx] = mkCanvas(); pages.push(c);
-    drawChrome(ctx, 3, logo);
-    let Y = BODY_TOP;
+    const [c,ctx]=mk(); pages.push(c);
+    chrome(ctx,3,logo); let Y=TOP;
 
-    Y = sHead(ctx, "Your Action Plan", "What Should You Do Next?", Y, C.green);
-    font(ctx,9); ctx.fillStyle=C.inkSoft;
-    ctx.fillText("Based on your portfolio — here is what to do, explained simply.", ML, Y); Y += 16*S;
+    Y=H(ctx,"Your Action Plan","What Should You Do Right Now?",Y,GREEN);
+    F(ctx,8.5); ctx.fillStyle=INK3;
+    ctx.fillText("Listed by priority. Start from #1. Written in plain English — no financial jargon.",ML,Y); Y+=15*S;
 
-    insights.insightCards.forEach((card, i) => {
-      const lt = card.title.toLowerCase();
-      const type: CardType =
-        lt.includes("returns are below")||lt.includes("trailing")||lt.includes("too many")||lt.includes("bottom") ? "action" :
-        lt.includes("review")||lt.includes("drift")||lt.includes("high")||lt.includes("fund house") ? "review" :
-        lt.includes("excellent")||lt.includes("healthy")||lt.includes("well-structured") ? "good" : "info";
-      if (Y + 60*S > BODY_BTM) return;
-      Y = insightCard(ctx, card, i, type, Y);
+    insights.insightCards.forEach((ic,i)=>{
+      const lt=plain(ic.title).toLowerCase();
+      const type: CType=lt.includes("trailing")||lt.includes("below")||lt.includes("bottom")||lt.includes("returns are below")?"urgent":lt.includes("review")||lt.includes("drift")||lt.includes("too many")||lt.includes("needs review")||lt.includes("passive")||lt.includes("too much")||lt.includes("one fund")||lt.includes("one company")?"review":lt.includes("excellent")||lt.includes("well-structured")||lt.includes("on track")?"good":"info";
+      if(Y+55*S>BTM) return;
+      Y=CARD(ctx,ic,i,type,Y);
     });
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PAGE 4 — YOUR FUND REPORT CARD
+  // PAGE 4 — FUND REPORT CARD
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    const [c, ctx] = mkCanvas(); pages.push(c);
-    drawChrome(ctx, 4, logo);
-    let Y = BODY_TOP;
+    const [c,ctx]=mk(); pages.push(c);
+    chrome(ctx,4,logo); let Y=TOP;
 
-    Y = sHead(ctx, "Fund Report Card", "Which Funds to Keep and Which to Review", Y, C.amber);
-    font(ctx,9); ctx.fillStyle=C.inkSoft;
-    ctx.fillText(`${insights.activeAuditRows.length} actively managed funds — graded on whether they earn more than the market index, after fees.`, ML, Y); Y += 16*S;
+    Y=H(ctx,"Fund Report Card","Which Funds to Keep, Which to Review",Y,AMBER);
+    F(ctx,8.5); ctx.fillStyle=INK3;
+    ctx.fillText(`${insights.activeAuditRows.length} actively managed funds — judged on whether they earn more than the market index after fees.`,ML,Y); Y+=15*S;
 
-    // Clean up action text: remove "!", "!'", and make suggestions plain English
-    const cleanAction = (action: string): string =>
-      action.replace(/!'?\s*/g, "Try: ").replace(/→/g, "→").replace(/\s+/g," ").trim();
+    const gapC=(v: string): string|null=>{if(v==="—"||v==="-")return null;const n=parseFloat(v);return isNaN(n)?null:n>=0?GREEN_DK:RED_DK;};
+    const vrdC=(v: string): string|null=>{const r=v.toLowerCase();if(r.startsWith("continue"))return GREEN_DK;if(r.startsWith("review"))return AMBER_DK;return null;};
+    const cleanA=(a: string)=>plain(a).replace(/!['']?\s*/g,"").replace(/\s+/g," ").trim();
 
-    const actionColorFn = (raw: string): string|null => {
-      const r = raw.toLowerCase();
-      if (r.startsWith("continue")) return C.green;
-      if (r.startsWith("review")||r.startsWith("try")) return C.amber;
-      return null;
-    };
-    const gapColorFn = (raw: string): string|null => {
-      if (raw==="-"||raw==="—") return null;
-      const n = parseFloat(raw);
-      if (isNaN(n)) return null;
-      return n >= 0 ? C.green : C.red;
-    };
+    Y=TBL(ctx,[
+      {h:"Fund Name",w:163},
+      {h:"Market Index Tracked",w:142},
+      {h:"Beats Market By",w:72,align:"R",col:gapC},
+      {h:"Verdict & Suggested Alternative",w:146,col:vrdC},
+    ],insights.activeAuditRows.map(r=>[r.name,r.benchmark||"—",r.gap||"—",cleanA(r.action)]),Y,3);
 
-    Y = drawTable(ctx,
-      [
-        {h:"Fund Name",         w:175},
-        {h:"Market Index Used", w:140},
-        {h:"Beats Index By",    w:70, align:"R", colorFn:gapColorFn},
-        {h:"Verdict",           w:138, colorFn:actionColorFn},
-      ],
-      insights.activeAuditRows.map(r => [
-        r.name,
-        r.benchmark||"—",
-        r.gap||"—",
-        cleanAction(r.action),
-      ]),
-      Y, {maxLines:2}
-    );
+    // Legend chip
+    const LY=Y;
+    fillR(ctx,ML,LY,CW,22*S,3*S,SURF);
+    F(ctx,7.5,true); ctx.fillStyle=INK2; ctx.fillText("How to read:",ML+8*S,LY+14.5*S);
+    [{c:GREEN_DK,l:"Continue = earning above the market index after all fees"},{c:AMBER_DK,l:"Review = not worth higher fees vs a simple index fund"}].forEach((lg,i)=>{const lx=ML+82*S+i*220*S;fillR(ctx,lx,LY+7*S,9*S,9*S,2*S,lg.c);F(ctx,7.5);ctx.fillStyle=INK2;ctx.fillText(lg.l,lx+13*S,LY+14.5*S);});
+    Y+=30*S;
 
-    // Legend
-    const LY = Y;
-    fillRR(ctx, ML, LY, CW, 24*S, 4*S, C.surface);
-    font(ctx,7.5,true); ctx.fillStyle=C.inkMd; ctx.fillText("Verdict guide:", ML+8*S, LY+15.5*S);
-    const legItems = [{c:C.green,l:"Continue — this fund beats the market index after fees"},{c:C.amber,l:"Review — costs more than it earns above the index"}];
-    let llx = ML+98*S;
-    legItems.forEach(lg => {
-      fillRR(ctx,llx,LY+7.5*S,9*S,9*S,2*S,lg.c);
-      font(ctx,7.5); ctx.fillStyle=C.inkMd; ctx.fillText(lg.l,llx+13*S,LY+15.5*S); llx+=ctx.measureText(lg.l).width+28*S;
-    });
-    Y += 32*S;
+    ctx.strokeStyle=BDR;ctx.lineWidth=0.5*S;ctx.beginPath();ctx.moveTo(ML,Y);ctx.lineTo(ML+CW,Y);ctx.stroke();Y+=12*S;
+    Y=H(ctx,"Index Funds","Your Index & ETF Funds",Y,BLUE);
+    F(ctx,8.5); ctx.fillStyle=INK3;
+    ctx.fillText(`${insights.passiveAuditRows.length} index/ETF funds — these just need to track their index as closely and cheaply as possible.`,ML,Y); Y+=15*S;
 
-    ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
-    ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y += 14*S;
-
-    Y = sHead(ctx, "Index Funds", "Your Index & ETF Funds", Y, C.blue);
-    font(ctx,9); ctx.fillStyle=C.inkSoft;
-    ctx.fillText(`${insights.passiveAuditRows.length} index/ETF funds — these should follow their index as closely and cheaply as possible.`, ML, Y); Y += 16*S;
-
-    Y = drawTable(ctx,
-      [
-        {h:"Fund Name",             w:178},
-        {h:"Tracks This Index",     w:135},
-        {h:"Return vs Index",       w:68, align:"R", colorFn:gapColorFn},
-        {h:"Tracking Accuracy",     w:72, align:"R"},
-        {h:"Verdict",               w:70, colorFn:actionColorFn},
-      ],
-      insights.passiveAuditRows.map(r => [
-        r.name, r.benchmark||"—", r.gap||"—", r.tracking||"—",
-        cleanAction(r.action),
-      ]),
-      Y, {maxLines:2}
-    );
+    Y=TBL(ctx,[
+      {h:"Fund Name",w:175},
+      {h:"Tracks This Index",w:133},
+      {h:"Return vs Index",w:68,align:"R",col:gapC},
+      {h:"How Closely It Tracks",w:70,align:"R"},
+      {h:"Verdict",w:77,col:vrdC},
+    ],insights.passiveAuditRows.map(r=>[r.name,r.benchmark||"—",r.gap||"—",r.tracking||"—",cleanA(r.action)]),Y,2);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // PAGE 5 — WHERE IS YOUR MONEY?
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    const [c, ctx] = mkCanvas(); pages.push(c);
-    drawChrome(ctx, 5, logo);
-    let Y = BODY_TOP;
+    const [c,ctx]=mk(); pages.push(c);
+    chrome(ctx,5,logo); let Y=TOP;
 
-    Y = sHead(ctx, "Where Is Your Money", "Where Is Your Money Invested?", Y, C.blue);
+    Y=H(ctx,"Where Is Your Money","Where Is Your Money Invested?",Y,BLUE);
 
-    // Category
-    const catMap = new Map<string,{cur:number;inv:number}>();
-    report.fundDetails.forEach(f => { const e=catMap.get(f.majorCategory)||{cur:0,inv:0}; catMap.set(f.majorCategory,{cur:e.cur+f.currentValue,inv:e.inv+f.invested}); });
-    const catItems = Array.from(catMap.entries()).map(([n,v],i) => ({label:n,value:v.cur,invested:v.inv,color:PALETTE[i%PALETTE.length]})).sort((a,b)=>b.value-a.value);
+    const catMap=new Map<string,{cur:number;inv:number}>();
+    report.fundDetails.forEach(f=>{const e=catMap.get(f.majorCategory)||{cur:0,inv:0};catMap.set(f.majorCategory,{cur:e.cur+f.currentValue,inv:e.inv+f.invested});});
+    const cats=Array.from(catMap.entries()).map(([n,v],i)=>({label:n,value:v.cur,invested:v.inv,color:PALETTE[i%PALETTE.length]})).sort((a,b)=>b.value-a.value);
 
-    font(ctx,10.5,true); ctx.fillStyle=C.inkMd; ctx.fillText("By Fund Type (Equity / Debt / Hybrid etc.)", ML, Y); Y+=14*S;
-    Y = stackedBar(ctx, catItems, summary.totalValue, Y);
-    Y = drawTable(ctx,
-      [{h:"Fund Type",w:165},{h:"Worth Today",w:112,align:"R"},{h:"You Invested",w:112,align:"R"},{h:"% of Total",w:75,align:"R"},{h:"Profit/Loss",w:59,align:"R"}],
-      catItems.map(c2 => { const g=c2.value-c2.invested; return [c2.label,fmtCur(c2.value),fmtCur(c2.invested),fmtShare(summary.totalValue?c2.value/summary.totalValue:0),`${g>=0?"+":""}${fmtCur(g)}`]; }),
-      Y, {maxLines:1}
+    F(ctx,10,true); ctx.fillStyle=INK2; ctx.fillText("By Fund Type (Equity, Debt, Hybrid, etc.)",ML,Y); Y+=12*S;
+    Y=BAR(ctx,cats,summary.totalValue,Y);
+    Y=TBL(ctx,
+      [{h:"Fund Type",w:160},{h:"Worth Today",w:110,align:"R"},{h:"You Invested",w:110,align:"R"},{h:"% of Portfolio",w:75,align:"R"},{h:"Profit / Loss",w:68,align:"R"}],
+      cats.map(ci=>{const g=ci.value-ci.invested;return[ci.label,fmtCur(ci.value),fmtCur(ci.invested),fmtShr(summary.totalValue?ci.value/summary.totalValue:0),`${g>=0?"+":""}${fmtCur(g)}`];}),
+      Y,1
     );
 
-    Y += 10*S;
-    font(ctx,10.5,true); ctx.fillStyle=C.inkMd; ctx.fillText("By Fund House", ML, Y); Y+=14*S;
-    Y = stackedBar(ctx, report.amcBreakdown.slice(0,8).map((a,i)=>({label:a.name,value:a.value,color:PALETTE[i%PALETTE.length]})), summary.totalValue, Y);
-    Y = drawTable(ctx,
-      [{h:"Fund House",w:232},{h:"Worth Today",w:112,align:"R"},{h:"% of Total",w:80,align:"R"},{h:"No. of Funds",w:99,align:"C"}],
-      report.amcBreakdown.slice(0,10).map(a => [a.name,fmtCur(a.value),fmtShare(summary.totalValue?a.value/summary.totalValue:0),`${report.fundDetails.filter(f=>f.amc===a.name).length}`]),
-      Y, {maxLines:1}
+    Y+=8*S;
+    F(ctx,10,true); ctx.fillStyle=INK2; ctx.fillText("By Fund House",ML,Y); Y+=12*S;
+    Y=BAR(ctx,report.amcBreakdown.slice(0,8).map((a,i)=>({label:a.name,value:a.value,color:PALETTE[i%PALETTE.length]})),summary.totalValue,Y);
+    Y=TBL(ctx,
+      [{h:"Fund House",w:232},{h:"Worth Today",w:110,align:"R"},{h:"% of Portfolio",w:85,align:"R"},{h:"No. of Funds",w:96,align:"C"}],
+      report.amcBreakdown.slice(0,10).map(a=>[a.name,fmtCur(a.value),fmtShr(summary.totalValue?a.value/summary.totalValue:0),`${report.fundDetails.filter(f=>f.amc===a.name).length}`]),
+      Y,1
     );
   }
 
@@ -879,64 +750,53 @@ export const generatePdfReport = async (params: {
   // PAGE 6 — ALL YOUR FUNDS
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    const [c, ctx] = mkCanvas(); pages.push(c);
-    drawChrome(ctx, 6, logo);
-    let Y = BODY_TOP;
+    const [c,ctx]=mk(); pages.push(c);
+    chrome(ctx,6,logo); let Y=TOP;
 
-    Y = sHead(ctx, "All Your Funds", "Complete Fund List with Performance", Y, C.inkSoft);
-    font(ctx,9); ctx.fillStyle=C.inkSoft;
-    ctx.fillText(`${report.holdingsCount} funds  ·  Sorted by value  ·  Annual Return shown where more than 1 year of data exists`, ML, Y); Y+=16*S;
+    Y=H(ctx,"All Your Funds","Complete Fund Performance List",Y,INK3);
+    F(ctx,8.5); ctx.fillStyle=INK3;
+    ctx.fillText(`${report.holdingsCount} funds  ·  Sorted by value  ·  "Annual Return" shown where 1+ year of history exists`,ML,Y); Y+=15*S;
 
-    const profitColor = (raw: string): string|null => {
-      if (raw.startsWith("+")) return C.green;
-      if (raw.startsWith("-")) return C.red;
-      return null;
-    };
-    const xirrColor = (raw: string): string|null => {
-      if (raw==="N/A") return C.inkFaint;
-      const n = parseFloat(raw);
-      if (isNaN(n)) return null;
-      return n<0?C.red:n>=12?C.green:C.inkMd;
-    };
+    const pC=(v: string): string|null=>v.startsWith("+")?GREEN_DK:v.startsWith("-")?RED_DK:null;
+    const rC=(v: string): string|null=>{if(v==="N/A")return INK4;const n=parseFloat(v);return isNaN(n)?null:n<0?RED_DK:n>=12?GREEN_DK:INK2;};
 
-    Y = drawTable(ctx,
-      [
-        {h:"Fund Name",     w:175},
-        {h:"Type",          w:60},
-        {h:"You Invested",  w:72, align:"R"},
-        {h:"Worth Today",   w:76, align:"R"},
-        {h:"Profit / Loss", w:74, align:"R", colorFn:profitColor},
-        {h:"Annual Return", w:66, align:"R", colorFn:xirrColor},
-      ],
-      report.fundDetails.map(f => {
-        const g=f.profit;
-        return [f.name, f.majorCategory, fmtCur(f.invested), fmtCur(f.currentValue), `${g>=0?"+":""}${fmtCur(g)}`, fmtPct(f.xirr,2)];
-      }),
-      Y, {maxLines:2}
-    );
+    Y=TBL(ctx,[
+      {h:"Fund Name",w:168},
+      {h:"Type",w:60},
+      {h:"You Invested",w:74,align:"R"},
+      {h:"Worth Today",w:76,align:"R"},
+      {h:"Profit / Loss",w:76,align:"R",col:pC},
+      {h:"Annual Return",col:rC,w:69,align:"R"},
+    ],report.fundDetails.map(f=>{const g=f.profit;return[f.name,f.majorCategory,fmtCur(f.invested),fmtCur(f.currentValue),`${g>=0?"+":""}${fmtCur(g)}`,fmtPct(f.xirr,2)];}),Y,2);
 
-    // Top 5 visual — full-width bars with proper scaling
-    if (Y + 30*S < BODY_BTM) {
-      ctx.strokeStyle=C.border; ctx.lineWidth=0.5*S;
-      ctx.beginPath(); ctx.moveTo(ML,Y); ctx.lineTo(ML+CW,Y); ctx.stroke(); Y+=12*S;
-      font(ctx,13,true); ctx.fillStyle=C.ink; ctx.fillText("Your 5 Largest Holdings", ML, Y); Y+=16*S;
-
-      report.topHoldings.forEach((h,i) => {
-        if (Y+32*S > BODY_BTM) return;
-        const pct = summary.totalValue ? h.value/summary.totalValue : 0;
-        Y = horizBar(ctx, h.name, pct, fmtCur(h.value), PALETTE[i%PALETTE.length], i+1, Y);
+    if(Y+28*S<BTM){
+      ctx.strokeStyle=BDR;ctx.lineWidth=0.5*S;ctx.beginPath();ctx.moveTo(ML,Y);ctx.lineTo(ML+CW,Y);ctx.stroke();Y+=11*S;
+      F(ctx,12,true); ctx.fillStyle=INK; ctx.fillText("Your 5 Largest Holdings",ML,Y); Y+=13*S;
+      report.topHoldings.forEach((h,i)=>{
+        if(Y+28*S>BTM) return;
+        const pct=summary.totalValue?h.value/summary.totalValue:0;
+        const BH=24*S;
+        fillR(ctx,ML,Y,CW,BH,4*S,SURF2);
+        const bw=Math.max(pct*CW,55*S);
+        fillR(ctx,ML,Y,bw,BH,4*S,PALETTE[i%PALETTE.length]);
+        F(ctx,9,true); ctx.fillStyle=pct>0.14?WHITE:INK;
+        ctx.fillText(`${i+1}.  ${clip(ctx,h.name,Math.max(bw-14*S,100*S))}`,ML+8*S,Y+BH*0.61);
+        const vs=`${fmtCur(h.value)}  (${(pct*100).toFixed(1)}%)`;
+        F(ctx,8.5,true); ctx.fillStyle=pct>0.5?WHITE:INK2;
+        ctx.fillText(vs,ML+CW-ctx.measureText(vs).width-8*S,Y+BH*0.61);
+        Y+=BH+5*S;
       });
     }
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ASSEMBLE PDF — PNG pages (no JPEG blur)
+  // ASSEMBLE — JPEG 0.93 quality = ~120KB per page = fast download
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const doc = new jsPDF({unit:"pt", format:"a4", compress:true});
-  pages.forEach((cv, i) => {
-    if (i > 0) doc.addPage();
-    const img = cv.toDataURL("image/png");
-    doc.addImage(img, "PNG", 0, 0, 595, 842);
+  const doc=new jsPDF({unit:"pt",format:"a4",compress:true});
+  pages.forEach((cv,i)=>{
+    if(i>0) doc.addPage();
+    const img=cv.toDataURL("image/jpeg",0.93);
+    doc.addImage(img,"JPEG",0,0,595,842);
   });
   doc.save("nivesify-portfolio-report.pdf");
 };
