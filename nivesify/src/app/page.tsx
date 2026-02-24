@@ -804,32 +804,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          PHILOSOPHY — quiet, human close
-      ══════════════════════════════════════════════════════════════════ */}
-      <section style={{ background: "var(--ink)", borderTop: "1px solid rgba(255,255,255,.06)", padding: "clamp(40px,6vw,72px) clamp(16px,4vw,48px)" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <SR>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 36 }}>
-              {/* Tagline + manifesto */}
-              <div style={{ maxWidth: 580 }}>
-                <h2 style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: "clamp(1.5rem,3.5vw,2.4rem)", fontWeight: 300, fontStyle: "italic", color: "rgba(255,255,255,.90)", lineHeight: 1.3, letterSpacing: "-.02em", margin: "0 0 16px" }}>
-                  "Thoughtful Money,<br />Better Life."
-                </h2>
-                <p style={{ fontSize: "clamp(13px,1.6vw,15px)", color: "rgba(255,255,255,.42)", lineHeight: 1.85, margin: "0 0 24px", maxWidth: 460 }}>
-                  Nivesify is not a broker. Not a fund platform. Not trying to sell you anything. It's a calm, honest space where you can finally understand your own money.
-                </p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-                  {["✅ No ads", "✅ No product push", "✅ No spam", "✅ No login needed"].map((t, i) => (
-                    <div key={i} style={{ background: "rgba(0,201,123,.10)", border: "1px solid rgba(0,201,123,.22)", borderRadius: 100, padding: "5px 13px", fontSize: 11.5, fontWeight: 700, color: "#00C97B" }}>{t}</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </SR>
-        </div>
-      </section>
-
     </main>
   );
 }

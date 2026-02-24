@@ -177,8 +177,8 @@ export default function Header() {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <div key={item.label} style={{ position: "relative" }}
-                  onMouseEnter={item.sub ? () => openDropdown(item.label) : undefined}
-                  onMouseLeave={item.sub ? () => scheduleClose() : undefined}>
+                  onMouseEnter={() => item.sub && openDropdown(item.label)}
+                  onMouseLeave={() => item.sub && scheduleClose()}>
 
                   {item.sub ? (
                     <button onClick={() => setActiveDropdown(activeDropdown === item.label ? null : item.label)}
@@ -254,7 +254,12 @@ export default function Header() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {user.picture && (
                     <img src={user.picture} alt="avatar"
-                      style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #E4E0D8", display: "block" }} />
+                      style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #E4E0D8", display: "block", flexShrink: 0 }} />
+                  )}
+                  {user.name && (
+                    <span style={{ fontFamily: "'DM Sans',system-ui", fontSize: 13, fontWeight: 600, color: "#0B0F1A", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                      {user.name.split(" ")[0]}
+                    </span>
                   )}
                   <a href="/api/auth/logout" className="sign-out-btn">Sign out</a>
                 </div>
@@ -308,9 +313,11 @@ export default function Header() {
             <div key={item.label}>
               {item.sub ? (
                 <>
-                  <div style={{ fontFamily: "'DM Sans',system-ui", fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: ".10em", textTransform: "uppercase", padding: "18px 0 6px", marginTop: 8 }}>
+                  {/* Same visual style as other top-level links */}
+                  <Link href={item.href} className="mob-link"
+                    onClick={() => setMobileOpen(false)}>
                     {item.label}
-                  </div>
+                  </Link>
                   {item.sub.map((s) => (
                     <Link key={s.href} href={s.href} className="mob-sub-link"
                       onClick={() => setMobileOpen(false)}>
