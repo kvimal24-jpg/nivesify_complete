@@ -110,6 +110,9 @@ const CSS = `
 
   .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); }
   @media(min-width:600px){ .stats-grid { grid-template-columns:repeat(4,1fr); } }
+
+  .combined-duo { display:grid; grid-template-columns:1fr; gap:24px; }
+  @media(min-width:860px){ .combined-duo { grid-template-columns:1fr 1fr; gap:24px; } }
 `;
 
 /* ── HELPERS ────────────────────────────────────────────────────────────── */
@@ -607,72 +610,59 @@ export default function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          SECTION 6 — 4 HARD STATS
-          Emotional beat. Cost of inaction. No CTA here.
+          SECTION 6 — STATS + FD vs MF (combined, compact)
+          4 stats left · wealth gap chart right. One tight section.
       ════════════════════════════════════════════════════════════════ */}
-      <section style={{ background:"var(--mist)", borderTop:"1px solid var(--border)", borderBottom:"1px solid var(--border)", padding:"clamp(36px,5vw,56px) clamp(16px,4vw,48px)" }}>
-        <div style={{ maxWidth:1200, margin:"0 auto" }}>
-          <SR style={{ marginBottom:28 }}>
-            <p style={{ fontSize:11, fontWeight:700, color:"var(--light)", letterSpacing:".10em", textTransform:"uppercase" as const, textAlign:"center" as const }}>Why this matters</p>
-          </SR>
-          <div className="stats-grid">
-            {[
-              { val:"9.1",  suf:"%",    label:"Average XIRR in underperforming funds",   note:"vs 14%+ in benchmark index funds", color:"#EF4444" },
-              { val:"15.8", suf:"L",    label:"Extra wealth from the right vehicle",      note:"over 10 yrs on ₹10k/mo SIP",       color:"#00C97B" },
-              { val:"73",   suf:"%",    label:"Investors holding funds without clarity",  note:"SIPs running on autopilot",         color:"#F59E0B" },
-              { val:"3",    suf:" min", label:"To see your full portfolio picture",       note:"upload CAS → instant analysis",     color:"#2563EB" },
-            ].map((s,i) => (
-              <SR key={i} delay={i*60}>
-                <div style={{ background:"white", padding:"clamp(20px,3vw,30px) clamp(16px,2.5vw,26px)" }}>
-                  <div style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(2rem,4.5vw,3.2rem)", fontWeight:900, color:s.color, lineHeight:1, marginBottom:7 }}>
-                    <Counter to={parseFloat(s.val)} suffix={s.suf} />
-                  </div>
-                  <div style={{ fontSize:"clamp(11.5px,1.5vw,13px)", fontWeight:700, color:"var(--ink)", marginBottom:3 }}>{s.label}</div>
-                  <div style={{ fontSize:"clamp(10px,1.2vw,11px)", color:"var(--light)" }}>{s.note}</div>
-                </div>
-              </SR>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════════════
-          SECTION 7 — FD vs MF WEALTH GAP
-          Proof that vehicle matters. For the fence-sitters.
-      ════════════════════════════════════════════════════════════════ */}
-      <section style={{ background:"white", padding:"clamp(52px,8vw,88px) clamp(16px,4vw,48px)" }}>
+      <section style={{ background:"var(--ink)", padding:"clamp(36px,5vw,56px) clamp(16px,4vw,48px)", borderTop:"1px solid rgba(255,255,255,.06)" }}>
         <div style={{ maxWidth:1200, margin:"0 auto" }}>
           <SR>
-            <div style={{ textAlign:"center" as const, marginBottom:44 }}>
-              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#FEF3C7", border:"1px solid #FDE68A", borderRadius:100, padding:"4px 13px", marginBottom:12 }}>
-                <span style={{ fontSize:10.5, fontWeight:700, color:"#92400E", letterSpacing:".08em", textTransform:"uppercase" as const }}>The cost of staying in FDs</span>
-              </div>
-              <h2 style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(1.6rem,4vw,2.8rem)", fontWeight:900, color:"var(--ink)", lineHeight:1.1, letterSpacing:"-.03em" }}>
-                ₹10 lakhs. 10 years.<br />
-                <span style={{ color:"#00A862" }}>One choice changed everything.</span>
-              </h2>
-            </div>
-          </SR>
-          <SR delay={80}>
-            <div style={{ maxWidth:860, margin:"0 auto", display:"grid", gap:20 }}>
-              <div className="grid-2">
+            <div className="combined-duo" style={{ alignItems:"start" }}>
+              {/* @media handled inline — on desktop: two columns */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1px", background:"rgba(255,255,255,.07)", borderRadius:16, overflow:"hidden", alignSelf:"start" as const }}>
                 {[
-                  { label:"Equity Mutual Fund", val:"₹34.6L", sub:"~14% CAGR · after tax", color:"#00A862", bg:"linear-gradient(135deg,#ECFDF5,#D1FAE5)", bd:"#A7F3D0", badge:"+₹15.8L more 🚀" },
-                  { label:"Fixed Deposit",       val:"₹18.8L", sub:"~5% real return · after tax", color:"#94A3B8", bg:"linear-gradient(135deg,#F8FAFC,#F1F5F9)", bd:"#E2E8F0", badge:null },
-                ].map((c,i) => (
-                  <div key={i} style={{ background:c.bg, border:`2px solid ${c.bd}`, borderRadius:18, padding:"clamp(18px,3vw,28px)", textAlign:"center" as const }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:c.color, textTransform:"uppercase" as const, letterSpacing:".09em", marginBottom:9 }}>{c.label}</div>
-                    <div style={{ fontFamily:"Fraunces,Georgia,serif", fontWeight:900, fontSize:"clamp(1.8rem,4vw,3rem)", color:c.color, lineHeight:1, marginBottom:6 }}>{c.val}</div>
-                    <div style={{ fontSize:11, color:"var(--slate)" }}>{c.sub}</div>
-                    {c.badge && <div style={{ marginTop:11, background:"#00A862", borderRadius:100, padding:"4px 14px", display:"inline-block", fontSize:11, fontWeight:800, color:"white" }}>{c.badge}</div>}
+                  { val:"9.1",  suf:"%",    label:"Avg XIRR in bad funds",        note:"vs 14%+ benchmark",        color:"#EF4444" },
+                  { val:"15.8", suf:"L",    label:"Extra wealth, right vehicle",   note:"10 yrs · ₹10k/mo SIP",     color:"#00C97B" },
+                  { val:"73",   suf:"%",    label:"Investors with no fund clarity", note:"SIPs on autopilot",        color:"#F59E0B" },
+                  { val:"3",    suf:" min", label:"To see your full picture",       note:"upload CAS → done",        color:"#2563EB" },
+                ].map((s,i) => (
+                  <div key={i} style={{ background:"rgba(255,255,255,.04)", padding:"clamp(16px,2.5vw,24px) clamp(14px,2vw,20px)" }}>
+                    <div style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(1.7rem,3.5vw,2.6rem)", fontWeight:900, color:s.color, lineHeight:1, marginBottom:5 }}>
+                      <Counter to={parseFloat(s.val)} suffix={s.suf} />
+                    </div>
+                    <div style={{ fontSize:"clamp(11px,1.3vw,12.5px)", fontWeight:700, color:"rgba(255,255,255,.75)", marginBottom:2 }}>{s.label}</div>
+                    <div style={{ fontSize:"clamp(9.5px,1.1vw,11px)", color:"rgba(255,255,255,.32)" }}>{s.note}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ background:"var(--mist)", borderRadius:18, padding:"clamp(18px,3vw,28px)", border:"1px solid var(--border)" }}>
+
+              {/* FD vs MF — compact horizontal card */}
+              <div style={{ background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.09)", borderRadius:16, padding:"clamp(18px,2.5vw,26px)", alignSelf:"start" as const }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, flexWrap:"wrap" as const, gap:8 }}>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,.32)", letterSpacing:".09em", textTransform:"uppercase" as const, marginBottom:4 }}>Cost of staying in FDs</div>
+                    <div style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(1.1rem,2.2vw,1.5rem)", fontWeight:900, color:"white", lineHeight:1.15 }}>
+                      ₹10L · 10 years · <span style={{ color:"#00C97B" }}>one choice.</span>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:10, flexShrink:0 }}>
+                    <div style={{ textAlign:"center" as const }}>
+                      <div style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(1.2rem,2vw,1.6rem)", fontWeight:900, color:"#00C97B" }}>₹34.6L</div>
+                      <div style={{ fontSize:9.5, fontWeight:700, color:"rgba(255,255,255,.40)", marginTop:2 }}>Equity MF</div>
+                    </div>
+                    <div style={{ width:1, background:"rgba(255,255,255,.10)", alignSelf:"stretch" as const }} />
+                    <div style={{ textAlign:"center" as const }}>
+                      <div style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(1.2rem,2vw,1.6rem)", fontWeight:900, color:"rgba(255,255,255,.40)" }}>₹18.8L</div>
+                      <div style={{ fontSize:9.5, fontWeight:700, color:"rgba(255,255,255,.28)", marginTop:2 }}>FD</div>
+                    </div>
+                    <div style={{ background:"rgba(0,201,123,.15)", border:"1px solid rgba(0,201,123,.28)", borderRadius:8, padding:"4px 10px", display:"flex", alignItems:"center" }}>
+                      <span style={{ fontSize:11, fontWeight:800, color:"#00C97B", whiteSpace:"nowrap" as const }}>+₹15.8L 🚀</span>
+                    </div>
+                  </div>
+                </div>
                 <WealthChart />
-              </div>
-              <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10, padding:"9px 14px", fontSize:11, color:"#991B1B", fontWeight:600, textAlign:"center" as const }}>
-                ⚠️ Past performance is illustrative only. Mutual fund investments are subject to market risk.
+                <div style={{ marginTop:10, fontSize:10, color:"rgba(255,255,255,.22)", fontWeight:500, textAlign:"center" as const }}>
+                  ⚠️ Past performance is illustrative only. Mutual fund investments are subject to market risk.
+                </div>
               </div>
             </div>
           </SR>
@@ -739,36 +729,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════════════════════
-          SECTION 9 — PHILOSOPHY CLOSER
-          Calm, human, mission-led. Final CTA is soft, not pushy.
-      ════════════════════════════════════════════════════════════════ */}
-      <section style={{ background:"var(--ink)", padding:"clamp(52px,8vw,96px) clamp(16px,4vw,48px)", position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", inset:0, backgroundImage:"linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px)", backgroundSize:"48px 48px", pointerEvents:"none" }} />
-        <div style={{ position:"absolute", top:-100, left:"50%", transform:"translateX(-50%)", width:700, height:700, background:"radial-gradient(circle,rgba(0,201,123,.07) 0%,transparent 65%)", pointerEvents:"none" }} />
-        <div style={{ maxWidth:720, margin:"0 auto", textAlign:"center" as const, position:"relative" }}>
-          <SR>
-            <div style={{ fontFamily:"Fraunces,Georgia,serif", fontSize:"clamp(1.9rem,5vw,3.5rem)", fontWeight:300, fontStyle:"italic", color:"rgba(255,255,255,.84)", lineHeight:1.36, letterSpacing:"-.02em", marginBottom:22 }}>
-              "Enough is not a number.<br />It is the moment money stops<br />interfering with life."
-            </div>
-            <p style={{ fontSize:"clamp(13px,1.7vw,15px)", color:"rgba(255,255,255,.34)", lineHeight:1.82, maxWidth:480, margin:"0 auto 36px" }}>
-              Nivesify is a calm, non-transactional space for Indian investors. No ads. No commissions. No sales calls. Just tools that help you understand your money and reach enough.
-            </p>
-            <div style={{ display:"flex", justifyContent:"center", gap:12, flexWrap:"wrap" as const }}>
-              <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration:"none" }}>
-                <button className="btn-green" style={{ background:"#00C97B", color:"var(--ink)", border:"none", borderRadius:13, padding:"13px 26px", fontSize:14, fontWeight:800, cursor:"pointer", boxShadow:"0 6px 24px rgba(0,201,123,.32)" }}>
-                  Get Started — Free 🏥
-                </button>
-              </Link>
-              <Link href="/about" style={{ textDecoration:"none" }}>
-                <button className="btn-ghost" style={{ background:"rgba(255,255,255,.07)", color:"rgba(255,255,255,.70)", border:"1.5px solid rgba(255,255,255,.14)", borderRadius:13, padding:"13px 22px", fontSize:14, fontWeight:600, cursor:"pointer" }}>
-                  Our Philosophy →
-                </button>
-              </Link>
-            </div>
-          </SR>
-        </div>
-      </section>
 
     </main>
   );
