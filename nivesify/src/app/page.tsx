@@ -66,6 +66,26 @@ const CSS = `
     .tool-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; }
   }
 
+  /* ── USER TYPE SELECTOR ── */
+  .user-type-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 640px) {
+    .user-type-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  }
+
+  /* ── JOURNEY STRIP ── */
+  .journey-strip {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  @media (min-width: 700px) {
+    .journey-strip { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  }
+
   /* ── STORY SECTIONS ── */
   .story-duo {
     display: grid;
@@ -93,6 +113,7 @@ const CSS = `
   .fade-up-3 { animation: fadeUp .7s ease both .4s; }
   .fade-up-4 { animation: fadeUp .7s ease both .55s; }
   .fade-up-5 { animation: fadeUp .7s ease both .70s; }
+  .fade-up-6 { animation: fadeUp .7s ease both .85s; }
 
   @keyframes pulseGreen {
     0%,100% { box-shadow: 0 0 0 0 rgba(0,201,123,.4); }
@@ -135,12 +156,30 @@ const CSS = `
     from { width: 0; }
   }
 
+  @keyframes stepPulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+  }
+
   /* ── HOVER EFFECTS ── */
   .tool-card {
     transition: transform .22s ease, box-shadow .22s ease;
     cursor: pointer;
   }
   .tool-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.12) !important; }
+
+  .user-type-btn {
+    transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+    cursor: pointer;
+  }
+  .user-type-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.18) !important; }
+  .user-type-btn.active { transform: translateY(-3px); }
+
+  .journey-card {
+    transition: transform .22s ease, box-shadow .22s ease;
+    cursor: pointer;
+  }
+  .journey-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.12) !important; }
 
   .story-card {
     transition: transform .25s ease, box-shadow .25s ease;
@@ -316,9 +355,9 @@ function WealthChart() {
 function CompoundViz() {
   const [year, setYear] = useState(0);
   const years = [0, 2, 5, 8, 10];
-  const sipVals = [0, 2.6, 8.2, 17.4, 26.2];   // MF SIP ₹10k/mo
-  const fdVals  = [0, 2.4, 6.2, 10.4, 14.0];    // FD
-  const totalSip = [0, 2.4, 6.0, 9.6, 12.0];    // invested
+  const sipVals = [0, 2.6, 8.2, 17.4, 26.2];
+  const fdVals  = [0, 2.4, 6.2, 10.4, 14.0];
+  const totalSip = [0, 2.4, 6.0, 9.6, 12.0];
 
   useEffect(() => {
     const t = setInterval(() => setYear(y => (y + 1) % years.length), 2000);
@@ -399,18 +438,67 @@ const FUNDS = [
 ═══════════════════════════════════════════════════════════════════════════ */
 export default function Home() {
   const [fundsVis, setFundsVis] = useState(false);
+  const [activeUserType, setActiveUserType] = useState<number | null>(null);
   const fundsRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const ob = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setFundsVis(true); ob.disconnect(); } }, { threshold: .08 });
     if (fundsRef.current) ob.observe(fundsRef.current);
     return () => ob.disconnect();
   }, []);
 
+  // User type routing config
+  const USER_TYPES = [
+    {
+      icon: "🌱",
+      label: "New to investing",
+      sub: "Just starting out",
+      href: "/why-mutual-fund",
+      color: "#00A862",
+      bg: "rgba(0,201,123,.10)",
+      border: "rgba(0,201,123,.30)",
+      activeBg: "rgba(0,201,123,.18)",
+      activeBorder: "#00C97B",
+      cta: "Start with the basics →",
+    },
+    {
+      icon: "📊",
+      label: "I have SIPs & MFs",
+      sub: "Check if they're working",
+      href: "/mutual-fund-health-check/dashboard",
+      color: "#2563EB",
+      bg: "rgba(37,99,235,.10)",
+      border: "rgba(37,99,235,.28)",
+      activeBg: "rgba(37,99,235,.18)",
+      activeBorder: "#2563EB",
+      cta: "Analyse my portfolio →",
+    },
+    {
+      icon: "🔥",
+      label: "Planning FIRE / goals",
+      sub: "Retirement, home, education",
+      href: "/dashboard/calculators",
+      color: "#F59E0B",
+      bg: "rgba(245,158,11,.10)",
+      border: "rgba(245,158,11,.28)",
+      activeBg: "rgba(245,158,11,.18)",
+      activeBorder: "#F59E0B",
+      cta: "Plan my future →",
+    },
+  ];
+
   const TOOLS = [
     { href: "/dashboard",                          icon: "📊", label: "Money Dashboard",  sub: "Net worth · all assets",    color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE", top: "linear-gradient(90deg,#2563EB,#7C3AED)" },
     { href: "/mutual-fund-health-check/dashboard", icon: "🏥", label: "Fund Health Check", sub: "XIRR · signals · alpha",   color: "#00A862", bg: "#ECFDF5", bd: "#A7F3D0", top: "linear-gradient(90deg,#00C97B,#0891B2)" },
     { href: "/mutual-fund-match",                  icon: "🗺️", label: "MF World",          sub: "Explore & compare funds",  color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE", top: "linear-gradient(90deg,#7C3AED,#2563EB)" },
     { href: "/dashboard/calculators",              icon: "🧮", label: "Life Calculators",  sub: "FIRE · goals · retirement",color: "#B45309", bg: "#FFFBEB", bd: "#FDE68A", top: "linear-gradient(90deg,#F59E0B,#EF4444)" },
+  ];
+
+  const JOURNEY_STEPS = [
+    { step: "01", icon: "📊", label: "See your full picture",   sub: "Add all your assets — MF, PF, FD, gold",  href: "/dashboard",                          color: "#2563EB", bg: "#EFF6FF", bd: "#BFDBFE" },
+    { step: "02", icon: "🏥", label: "Check if funds work",     sub: "Upload CAS, get real XIRR & signals",     href: "/mutual-fund-health-check/dashboard", color: "#00A862", bg: "#ECFDF5", bd: "#A7F3D0" },
+    { step: "03", icon: "🗺️", label: "Find better funds",       sub: "Explore 500+ funds by alpha & category",  href: "/mutual-fund-match",                  color: "#7C3AED", bg: "#F5F3FF", bd: "#DDD6FE" },
+    { step: "04", icon: "🔥", label: "Plan your future",        sub: "FIRE, retirement, home & child education", href: "/dashboard/calculators",              color: "#B45309", bg: "#FFFBEB", bd: "#FDE68A" },
   ];
 
   const TICKER = ["📊 Net Worth Tracker","🏥 True XIRR","⚡ Fund Health Check","🔥 FIRE Calculator","🗺️ MF Universe","🎯 Goal Planner","🔬 Fund Comparison","📈 SIP Tracker","🏖️ Retirement Planner","💡 Alpha Screener","📉 Benchmark vs Your Returns"];
@@ -420,8 +508,7 @@ export default function Home() {
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       {/* ══════════════════════════════════════════════════════════════════
-          HERO — dark, editorial, with animated compounding visualizer
-          Target emotion: "wait, this is free? I need this."
+          HERO — dark, editorial, with user-type selector + compounding viz
       ══════════════════════════════════════════════════════════════════ */}
       <section style={{ background: "var(--ink)", position: "relative", overflow: "hidden", padding: "clamp(48px,8vw,100px) clamp(16px,4vw,48px) clamp(56px,9vw,112px)" }}>
 
@@ -439,7 +526,7 @@ export default function Home() {
               {/* Live badge */}
               <div className="fade-up-1" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "rgba(0,201,123,.12)", border: "1px solid rgba(0,201,123,.28)", borderRadius: 100, padding: "6px 16px", marginBottom: 28 }}>
                 <span className="live-dot" style={{ width: 8, height: 8, background: "#00C97B", borderRadius: "50%", flexShrink: 0, display: "block" }} />
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: "#00C97B", letterSpacing: ".09em", textTransform: "uppercase" as const }}>Free · Built for Indian Investors</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: "#00C97B", letterSpacing: ".09em", textTransform: "uppercase" as const }}>Free · For salaried Indian investors with SIPs & FDs</span>
               </div>
 
               {/* BIG HEADLINE */}
@@ -458,8 +545,45 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* CTAs */}
-              <div className="fade-up-4" style={{ display: "flex", gap: 12, flexWrap: "wrap" as const, marginBottom: 40 }}>
+              {/* ── USER TYPE SELECTOR ── */}
+              <div className="fade-up-4" style={{ marginBottom: 32 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,.35)", letterSpacing: ".10em", textTransform: "uppercase" as const, marginBottom: 12 }}>
+                  Where do you start? Pick your path →
+                </div>
+                <div className="user-type-grid">
+                  {USER_TYPES.map((u, i) => (
+                    <Link key={i} href={u.href} style={{ textDecoration: "none" }}>
+                      <div
+                        className={`user-type-btn${activeUserType === i ? " active" : ""}`}
+                        onMouseEnter={() => setActiveUserType(i)}
+                        onMouseLeave={() => setActiveUserType(null)}
+                        style={{
+                          background: activeUserType === i ? u.activeBg : u.bg,
+                          border: `1.5px solid ${activeUserType === i ? u.activeBorder : u.border}`,
+                          borderRadius: 14,
+                          padding: "12px 14px",
+                          display: "flex",
+                          flexDirection: "column" as const,
+                          gap: 4,
+                          boxShadow: activeUserType === i ? `0 8px 24px rgba(0,0,0,.25)` : "none",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 18 }}>{u.icon}</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: "white", lineHeight: 1.2 }}>{u.label}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,.45)", fontWeight: 500, paddingLeft: 26 }}>{u.sub}</div>
+                        {activeUserType === i && (
+                          <div style={{ fontSize: 10.5, fontWeight: 700, color: u.color, paddingLeft: 26, marginTop: 2 }}>{u.cta}</div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* OR divider + original CTAs */}
+              <div className="fade-up-5" style={{ display: "flex", gap: 12, flexWrap: "wrap" as const, marginBottom: 40, alignItems: "center" }}>
                 <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration: "none" }}>
                   <button className="cta-main" style={{ background: "#00C97B", color: "#0B0F1A", border: "none", borderRadius: 14, padding: "14px 26px", fontSize: 15, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 6px 24px rgba(0,201,123,.35)", minHeight: 50, letterSpacing: "-.01em" }}>
                     Check My Funds — Free 🏥
@@ -473,7 +597,7 @@ export default function Home() {
               </div>
 
               {/* Social proof / trust row */}
-              <div className="fade-up-5" style={{ display: "flex", gap: 24, flexWrap: "wrap" as const, paddingTop: 28, borderTop: "1px solid rgba(255,255,255,.09)" }}>
+              <div className="fade-up-6" style={{ display: "flex", gap: 24, flexWrap: "wrap" as const, paddingTop: 28, borderTop: "1px solid rgba(255,255,255,.09)" }}>
                 {[
                   { num: "25+", label: "Free tools" },
                   { num: "0", label: "Ads. Ever." },
@@ -492,7 +616,6 @@ export default function Home() {
               <div className="float">
                 <CompoundViz />
               </div>
-              {/* Mini tagline below the card */}
               <div style={{ textAlign: "center" as const, padding: "8px 0" }}>
                 <span style={{ fontSize: 11.5, color: "rgba(255,255,255,.35)", fontStyle: "italic" }}>
                   Simulating ₹10,000/mo SIP · past returns, illustrative only
@@ -514,6 +637,51 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          JOURNEY STEPS — "Your 4-step path to financial clarity"
+          NEW SECTION: numbered steps as a guided flow
+      ══════════════════════════════════════════════════════════════════ */}
+      <section style={{ background: "var(--cream)", borderBottom: "1px solid var(--border)", padding: "clamp(32px,5vw,52px) clamp(16px,4vw,48px)" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <SR delay={0}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 12, marginBottom: 20 }}>
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "var(--light)", letterSpacing: ".10em", textTransform: "uppercase" as const, marginBottom: 6 }}>
+                  Your path to clarity
+                </p>
+                <h2 style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: "clamp(1.2rem,2.5vw,1.7rem)", fontWeight: 700, color: "var(--ink)", margin: 0, letterSpacing: "-.02em" }}>
+                  Not sure where to begin? Follow these 4 steps.
+                </h2>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--light)", fontWeight: 600, background: "white", border: "1px solid var(--border)", borderRadius: 100, padding: "5px 14px", whiteSpace: "nowrap" as const }}>
+                Takes under 5 minutes each
+              </div>
+            </div>
+          </SR>
+          <div className="journey-strip">
+            {JOURNEY_STEPS.map((s, i) => (
+              <SR key={i} delay={i * 70}>
+                <Link href={s.href} style={{ textDecoration: "none", display: "block" }}>
+                  <div className="journey-card" style={{ background: "white", border: `1.5px solid ${s.bd}`, borderRadius: 18, padding: "clamp(14px,2vw,20px)", position: "relative", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,.05)", height: "100%" }}>
+                    {/* Step number — large, top right watermark */}
+                    <div style={{ position: "absolute", top: 10, right: 14, fontFamily: "Fraunces, Georgia, serif", fontSize: 36, fontWeight: 900, color: s.bg, lineHeight: 1, userSelect: "none" as const, pointerEvents: "none" }}>
+                      {s.step}
+                    </div>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: s.bg, border: `1px solid ${s.bd}`, borderRadius: 100, padding: "3px 10px", marginBottom: 12 }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: s.color, letterSpacing: ".07em", textTransform: "uppercase" as const }}>Step {s.step}</span>
+                    </div>
+                    <div style={{ fontSize: "clamp(20px,2.5vw,24px)", marginBottom: 8 }}>{s.icon}</div>
+                    <div style={{ fontSize: "clamp(12px,1.6vw,14px)", fontWeight: 800, color: "var(--ink)", lineHeight: 1.25, marginBottom: 6 }}>{s.label}</div>
+                    <div style={{ fontSize: "clamp(10px,1.3vw,11.5px)", color: "var(--slate)", lineHeight: 1.5, marginBottom: 14 }}>{s.sub}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>Go →</div>
+                  </div>
+                </Link>
+              </SR>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ══════════════════════════════════════════════════════════════════
           STAT STRIP — 4 numbers that hit hard
@@ -538,7 +706,7 @@ export default function Home() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          4 TOOL CARDS — compact, scannable
+          4 TOOL CARDS — compact, scannable, with "I want to..." framing
       ══════════════════════════════════════════════════════════════════ */}
       <section style={{ background: "var(--mist)", borderBottom: "1px solid var(--border)", padding: "clamp(24px,4vw,36px) clamp(16px,4vw,48px)" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -567,7 +735,6 @@ export default function Home() {
 
       {/* ══════════════════════════════════════════════════════════════════
           STORY 1 — "Do you know your real net worth?"
-          BIG number left, donut card right
       ══════════════════════════════════════════════════════════════════ */}
       <section style={{ background: "white", padding: "clamp(48px,7vw,96px) clamp(16px,4vw,48px)" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -579,7 +746,6 @@ export default function Home() {
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", letterSpacing: ".08em", textTransform: "uppercase" as const }}>Start with clarity</span>
                 </div>
 
-                {/* Editorial big question */}
                 <h2 style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: "clamp(1.6rem,4vw,3rem)", fontWeight: 700, fontStyle: "italic", color: "var(--ink)", lineHeight: 1.12, letterSpacing: "-.03em", margin: "0 0 20px" }}>
                   Where exactly<br />is all your money?
                 </h2>
@@ -591,7 +757,6 @@ export default function Home() {
                   The Money Dashboard adds it all up — every rupee, every account, one real number. Finally.
                 </p>
 
-                {/* Mini feature list */}
                 {["All investments in one view","Annual growth tracked","Allocation breakdown with donut chart"].map((f, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#ECFDF5", border: "1.5px solid #A7F3D0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -611,7 +776,6 @@ export default function Home() {
               {/* Net worth card */}
               <div>
                 <div className="story-card" style={{ background: "white", borderRadius: 24, border: "1.5px solid var(--border)", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,.08)" }}>
-                  {/* Card header */}
                   <div style={{ height: 5, background: "linear-gradient(90deg,#2563EB,#7C3AED,#00C97B)" }} />
                   <div style={{ padding: "20px 22px 16px", background: "linear-gradient(135deg,#EFF6FF,#F5F3FF)" }}>
                     <div style={{ fontSize: 10.5, color: "var(--light)", fontWeight: 600, marginBottom: 5, textTransform: "uppercase" as const, letterSpacing: ".08em" }}>Total Net Worth</div>
@@ -705,7 +869,6 @@ export default function Home() {
                     🏥 Check My Portfolio — Upload CAS
                   </button>
                 </Link>
-                {/* Crisp 3-step process — inline, no separate section needed */}
                 <div style={{ marginTop: 20, display: "flex", flexDirection: "column" as const, gap: 8 }}>
                   {[
                     ["📤", "Upload CAS from CAMS / KFintech"],
@@ -743,7 +906,6 @@ export default function Home() {
 
           <SR delay={100}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 32, maxWidth: 900, margin: "0 auto" }}>
-              {/* Big visual comparison */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {[
                   { label: "Equity Mutual Fund", val: "₹34.6L", sub: "~14% CAGR · after tax", color: "#00A862", bg: "linear-gradient(135deg,#ECFDF5,#D1FAE5)", bd: "#A7F3D0", grow: true },
@@ -758,7 +920,6 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Chart */}
               <div style={{ background: "var(--mist)", borderRadius: 20, padding: "clamp(18px,3vw,28px)", border: "1px solid var(--border)" }}>
                 <WealthChart />
               </div>
