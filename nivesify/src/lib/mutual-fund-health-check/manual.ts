@@ -110,19 +110,26 @@ export const buildManualTransactions = (
     const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
 
     while (cursor <= end) {
-      const txn = buildManualTransaction(
-        {
-          schemeCode: plan.schemeCode,
-          schemeName: plan.schemeName || scheme?.schemeName || "",
-          amount: plan.monthlyAmount,
-          date: new Date(cursor),
-          source: "SIP",
-          scheme,
-        },
-        navMap
-      );
-      if (txn) results.push(txn);
-      cursor.setMonth(cursor.getMonth() + 1);
+      try {
+        const txn = buildManualTransaction(
+          {
+            schemeCode: plan.schemeCode,
+            schemeName: plan.schemeName || scheme?.schemeName || "",
+            amount: plan.monthlyAmount,
+            date: new Date(cursor),
+            source: "SIP",
+            scheme,
+          },
+          navMap
+        );
+        if (txn) results.push(txn);
+      } catch (error) {
+        console.error("Failed to build manual transaction for date", cursor, error);
+      }
+
+      const nextMonth = new Date(cursor);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      cursor.setTime(nextMonth.getTime());
     }
   });
 

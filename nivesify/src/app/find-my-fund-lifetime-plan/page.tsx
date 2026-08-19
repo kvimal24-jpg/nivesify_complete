@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { fetchCachedJson } from "@/lib/client-data";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HERO NAVIGATION — identical shell to quick-goal page
@@ -1377,7 +1378,6 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
           <div style={{ paddingBottom:'16px' }}>
             {phase.plan.blocks.map(block=>{
               const blockFunds=resolvedFunds.filter(f=>f.exposureBlock===block.type);
-              if(blockFunds.length===0) return null;
               return (
                 <div key={block.type} style={{ marginBottom:'16px' }}>
                   <div style={{ display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',padding:'8px 12px',background:block.bg,borderRadius:'10px',border:`1px solid ${block.border}` }}>
@@ -1385,10 +1385,15 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
                     <span style={{ fontSize:'13px',fontWeight:800,color:block.color }}>{block.type}</span>
                     <span style={{ fontSize:'11px',fontWeight:700,color:block.color,marginLeft:'auto' }}>{block.pct}% · ≈ ₹{Math.round(phase.totalSIP*block.pct/100/100)*100}/mo</span>
                   </div>
-                  <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'8px' }}>
-                    {blockFunds.map((slot,i)=>{
-                      const slotSIP=Math.round(phase.totalSIP*slot.cellAllocationPct/100/100)*100;
-                      return (
+                  {blockFunds.length===0 ? (
+                    <div style={{ padding:'12px 14px',background:'#F8FAFC',border:'1px dashed #CBD5E1',borderRadius:'10px',fontSize:'11px',color:'#64748B' }}>
+                      No funds recommended for this block at the current risk and horizon. The allocation remains visible so the reason is not hidden by data filters.
+                    </div>
+                  ) : (
+                    <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'8px' }}>
+                      {blockFunds.map((slot,i)=>{
+                        const slotSIP=Math.round(phase.totalSIP*slot.cellAllocationPct/100/100)*100;
+                        return (
                         <div key={i} style={{ background:'white',border:`1.5px solid ${slot.blockBorder}`,borderRadius:'12px',padding:'12px 14px' }}>
                           <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6px' }}>
                             <div style={{ flex:1,minWidth:0 }}>
@@ -1421,9 +1426,10 @@ function PhaseDetailPanel({ phase, resolvedFunds, onFundDetail }: {
                             Why this fund? →
                           </button>
                         </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1456,10 +1462,10 @@ export default function LifetimePlanPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/amfi-raw").then(r=>r.json()),
-      fetch("/api/funds").then(r=>r.json()),
-      fetch("/api/etfs").then(r=>r.json()),
-      fetch("/api/insights").then(r=>r.json()),
+      fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
+      fetchCachedJson<FundAnalytics[]>("/api/funds"),
+      fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
+      fetchCachedJson<InsightRow[]>("/api/insights"),
     ]).then(([amfi,funds,etfs,ins])=>{
       setAmfiRaw(amfi); setFundAnalytics(funds); setEtfAnalytics(etfs); setInsights(ins); setDataReady(true);
     }).catch(console.error);

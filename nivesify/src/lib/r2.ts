@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 const CACHE_HEADERS = {
   "Content-Type": "application/json",
-  "Cache-Control": "public, max-age=300",
+  "Cache-Control": "public, max-age=3600, s-maxage=86400",
 };
 
 export const getR2JsonResponse = async (key: string) => {
@@ -19,8 +19,7 @@ export const getR2JsonResponse = async (key: string) => {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  const text = await object.text();
-  return new NextResponse(text, { headers: CACHE_HEADERS });
+  return new Response(object.body, { headers: CACHE_HEADERS });
 };
 
 const extractDateTag = (key: string) => {
@@ -54,6 +53,5 @@ export const getLatestR2JsonResponse = async (prefix: string) => {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  const text = await object.text();
-  return new NextResponse(text, { headers: CACHE_HEADERS });
+  return new Response(object.body, { headers: CACHE_HEADERS });
 };

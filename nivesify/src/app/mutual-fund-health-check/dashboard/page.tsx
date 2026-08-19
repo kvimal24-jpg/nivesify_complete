@@ -859,37 +859,21 @@ export default function MutualFundHealthCheckDashboard() {
     );
   }
 
-  if (processing) {
-    return (
-      <div style={{ minHeight: "100vh", background: "linear-gradient(150deg,#0F172A,#1E3A5F)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui" }}>
-        <div style={{ textAlign: "center", maxWidth: 380, padding: "0 24px" }}>
-          <div style={{ width: 56, height: 56, border: "3px solid rgba(16,185,129,0.2)", borderTop: "3px solid #10B981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
-          <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 8 }}>Building your dashboard…</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
-            Downloading NAV history and rebuilding your portfolio. Large CAS files can take a few minutes.
-          </div>
-          {elapsedSeconds >= 30 && (
-            <div style={{ marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.35)" }}>
-              Still going — keep this tab open. Almost there.
-            </div>
-          )}
-          {elapsedSeconds > 0 && (
-            <div style={{ marginTop: 12, fontSize: 12, color: "rgba(16,185,129,0.7)", fontWeight: 700 }}>
-              {elapsedSeconds}s elapsed
-            </div>
-          )}
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </div>
-    );
-  }
-
   /* ═══════════════════════════════════════════════════════════════
      RENDER
   ═══════════════════════════════════════════════════════════════ */
   return (
-    <div className="dash-root" style={{ minHeight: "100vh", background: "#F8FAFC" }}>
+    <div className="dash-root" style={{ minHeight: "100vh", background: "#F8FAFC", position: "relative" }}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+
+      {processing && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.85)", backdropFilter: "blur(4px)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 48, height: 48, border: "3px solid #E2E8F0", borderTop: "3px solid #059669", borderRadius: "50%", animation: "spin 1s linear infinite", marginBottom: 16 }} />
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Recalculating portfolio...</div>
+          <div style={{ fontSize: 13, color: "#64748B", marginTop: 6 }}>Merging manual additions</div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
 
       {/* ── HERO HEADER ── */}
       <section style={{ background: "linear-gradient(155deg, #0F172A 0%, #1E3A5F 55%, #064E3B 100%)", position: "relative", overflow: "hidden" }}>

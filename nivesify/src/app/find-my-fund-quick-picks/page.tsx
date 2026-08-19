@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { fetchCachedJson } from "@/lib/client-data";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HERO NAVIGATION — identical shell to fund-match page
@@ -1136,10 +1137,10 @@ export default function QuickFundPicksPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/amfi-raw").then(r => r.json()),
-      fetch("/api/funds").then(r => r.json()),
-      fetch("/api/etfs").then(r => r.json()),
-      fetch("/api/insights").then(r => r.json()),
+      fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
+      fetchCachedJson<FundAnalytics[]>("/api/funds"),
+      fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
+      fetchCachedJson<InsightRow[]>("/api/insights"),
     ]).then(([amfi, funds, etfs, ins]) => {
       setAmfiRaw(amfi);
       setFundAnalytics(funds);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { fetchCachedJson } from "@/lib/client-data";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HERO NAVIGATION — identical shell used by all 3 planning pages
@@ -845,10 +846,10 @@ export default function FindMyFundPage() {
     async function load() {
       try {
         const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-          fetch("/api/amfi-raw").then(r => r.json()),
-          fetch("/api/funds").then(r => r.json()),
-          fetch("/api/etfs").then(r => r.json()),
-          fetch("/api/insights").then(r => r.json()),
+          fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
+          fetchCachedJson<FundAnalytics[]>("/api/funds"),
+          fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
+          fetchCachedJson<InsightRow[]>("/api/insights"),
         ]);
         if (amfiRaw.length > 0) setReportDate(amfiRaw[0].Report_Date);
 
@@ -954,10 +955,10 @@ function HybridMatrixSection({ reportDate }: { reportDate: string }) {
     async function load() {
       setLoading(true);
       const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-        fetch("/api/amfi-raw").then(r => r.json()),
-        fetch("/api/funds").then(r => r.json()),
-        fetch("/api/etfs").then(r => r.json()),
-        fetch("/api/insights").then(r => r.json()),
+        fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
+        fetchCachedJson<FundAnalytics[]>("/api/funds"),
+        fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
+        fetchCachedJson<InsightRow[]>("/api/insights"),
       ]);
       const hybridOrder = ["Aggressive Hybrid","Conservative Hybrid","Equity Savings","Arbitrage","Multi Asset Allocation","Balanced Advantage","Balanced Hybrid"];
       const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
@@ -1068,10 +1069,10 @@ function DebtMatrixSection({ reportDate }: { reportDate: string }) {
     async function load() {
       setLoading(true);
       const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-        fetch("/api/amfi-raw").then(r => r.json()),
-        fetch("/api/funds").then(r => r.json()),
-        fetch("/api/etfs").then(r => r.json()),
-        fetch("/api/insights").then(r => r.json()),
+        fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
+        fetchCachedJson<FundAnalytics[]>("/api/funds"),
+        fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
+        fetchCachedJson<InsightRow[]>("/api/insights"),
       ]);
       const cellMap: Record<string, [number, number][]> = {
         "Overnight": [[0,0]], "Liquid": [[0,0]], "Ultra Short Duration": [[0,0]], "Money Market": [[0,0]],
