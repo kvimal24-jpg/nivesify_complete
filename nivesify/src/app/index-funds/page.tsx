@@ -1,31 +1,13 @@
-import type { Metadata } from "next";
-import PassiveFundsContent from "@/components/PassiveFundsContent";
-import { getBaseUrl } from "@/lib/base-url";
-import type { ETFAnalytics, Manifest } from "@/lib/fund-types";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Passive / Index Funds | Nivesify",
-  description: "Compare index funds and ETFs by tracking difference, AUM, and benchmark fit. Find the tightest tracker for your index.",
-  alternates: { canonical: "https://nivesify.com/index-funds" },
-  openGraph: {
-    title: "Passive / Index Funds | Nivesify",
-    description: "Compare index funds and ETFs by tracking difference, AUM, and benchmark fit.",
-    url: "https://nivesify.com/index-funds",
-    siteName: "Nivesify",
-    locale: "en_US",
-    type: "website",
-  },
-};
+import { useEffect, useState } from "react";
+import PassiveFundsContent from "@/components/PassiveFundsContent";
+import type { ETFAnalytics, Manifest } from "@/lib/fund-types";
+import { fetchCachedJson } from "@/lib/client-data";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-const fetchJson = async <T,>(baseUrl: string, path: string): Promise<T> => {
-  const res = await fetch(`${baseUrl}${path}`, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error(`Failed to load ${path}`);
-  return res.json() as Promise<T>;
-};
 
 const fmt = (v: number | null | undefined, d = 2) => {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
@@ -41,12 +23,20 @@ const fmtPctPlain = fmtPct;
 // PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default async function IndexFundsPage() {
-  const baseUrl = getBaseUrl();
-  const [etfs, manifest] = await Promise.all([
-    fetchJson<ETFAnalytics[]>(baseUrl, "/api/etfs"),
-    fetchJson<Manifest>(baseUrl, "/api/manifest"),
-  ]);
+export default function IndexFundsPage() {
+  const [etfs, setEtfs] = useState<ETFAnalytics[]>([]);
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
+      fetchCachedJson<Manifest>("/api/manifest"),
+    ]).then(([nextEtfs, nextManifest]) => {
+      setEtfs(nextEtfs);
+      setManifest(nextManifest);
+    }).catch((error) => console.error("Failed to load passive fund data", error)).finally(() => setLoading(false));
+  }, []);
 
   // ── Derived numbers for static sections ──
   const totalPassiveAum = etfs.reduce((s, e) => s + (e.Fund_AUM ?? 0), 0);
@@ -401,12 +391,14 @@ export default async function IndexFundsPage() {
         </div>
 
         {/* Client component: benchmark table + top picks + screener */}
-        <PassiveFundsContent
-          etfs={etfs}
-          benchmarkStats={benchmarkStats}
-          benchmarkLeaders={benchmarkLeaders}
-          manifest={manifest}
-        />
+        {loading ? <div style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>Loading market data...</div> : (
+          <PassiveFundsContent
+            etfs={etfs}
+            benchmarkStats={benchmarkStats}
+            benchmarkLeaders={benchmarkLeaders}
+            manifest={manifest}
+          />
+        )}
       </section>
 
       {/* ═══════════════════════════════════════

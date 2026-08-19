@@ -1,32 +1,14 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import ActiveFundsContent from "@/components/ActiveFundsContent";
-import { getBaseUrl } from "@/lib/base-url";
 import { computeAmfiAggregates, type AmfiRawRecord } from "@/lib/amfi-aggregates";
 import type { CategoryInsights, FundAnalytics, Manifest } from "@/lib/fund-types";
-
-export const metadata: Metadata = {
-  title: "Active Mutual Funds | Nivesify",
-  description: "Find active mutual funds that consistently beat the market. Ranked by real skill — not just past returns.",
-  alternates: { canonical: "https://nivesify.com/active-funds" },
-  openGraph: {
-    title: "Active Mutual Funds | Nivesify",
-    description: "Find active mutual funds that consistently beat the market. Ranked by real skill — not just past returns.",
-    url: "https://nivesify.com/active-funds",
-    siteName: "Nivesify",
-    locale: "en_US",
-    type: "website",
-  },
-};
+import { fetchCachedJson } from "@/lib/client-data";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-const fetchJson = async <T,>(baseUrl: string, path: string): Promise<T> => {
-  const res = await fetch(`${baseUrl}${path}`, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error(`Failed to load ${path}`);
-  return res.json() as Promise<T>;
-};
 
 const fmt = (v: number | null | undefined, d = 2) => {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
@@ -45,14 +27,26 @@ const fmtPctPlain = (v: number | null | undefined, d = 1) => {
 // PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default async function ActiveFundsPage() {
-  const baseUrl = getBaseUrl();
-  const [funds, insights, manifest, amfiRaw] = await Promise.all([
-    fetchJson<FundAnalytics[]>(baseUrl, "/api/funds"),
-    fetchJson<CategoryInsights[]>(baseUrl, "/api/insights"),
-    fetchJson<Manifest>(baseUrl, "/api/manifest"),
-    fetchJson<AmfiRawRecord[]>(baseUrl, "/api/amfi-raw"),
-  ]);
+export default function ActiveFundsPage() {
+  const [funds, setFunds] = useState<FundAnalytics[]>([]);
+  const [insights, setInsights] = useState<CategoryInsights[]>([]);
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [amfiRaw, setAmfiRaw] = useState<AmfiRawRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetchCachedJson<FundAnalytics[]>("/api/funds"),
+      fetchCachedJson<CategoryInsights[]>("/api/insights"),
+      fetchCachedJson<Manifest>("/api/manifest"),
+      fetchCachedJson<AmfiRawRecord[]>("/api/amfi-raw"),
+    ]).then(([nextFunds, nextInsights, nextManifest, nextAmfiRaw]) => {
+      setFunds(nextFunds);
+      setInsights(nextInsights);
+      setManifest(nextManifest);
+      setAmfiRaw(nextAmfiRaw);
+    }).catch((error) => console.error("Failed to load active fund data", error)).finally(() => setLoading(false));
+  }, []);
 
   const industryInsight = insights.find((r) => r.Level === "Industry") ?? null;
   const categoryInsights = insights.filter((r) => r.Level === "Category");
@@ -568,13 +562,15 @@ export default async function ActiveFundsPage() {
         </div>
 
         {/* Interactive tables + shortlist picks — client component */}
-        <ActiveFundsContent
-          funds={funds}
-          categoryReturnStats={categoryReturnStats}
-          subCategoryReturnStats={subCategoryReturnStats}
-          shortlistGroups={shortlistGroups}
-          manifest={manifest}
-        />
+        {loading ? <div style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>Loading market data...</div> : (
+          <ActiveFundsContent
+            funds={funds}
+            categoryReturnStats={categoryReturnStats}
+            subCategoryReturnStats={subCategoryReturnStats}
+            shortlistGroups={shortlistGroups}
+            manifest={manifest}
+          />
+        )}
       </section>
 
       {/* ═══════════════════════════════════════

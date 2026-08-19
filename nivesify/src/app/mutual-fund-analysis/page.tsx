@@ -1,32 +1,14 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import { AnalysisFullInsightsTable, AnalysisInsightsTables } from "@/components/AnalysisTables";
-import { getBaseUrl } from "@/lib/base-url";
 import { computeAmfiAggregates, type AmfiRawRecord } from "@/lib/amfi-aggregates";
 import type { CategoryInsights, Manifest } from "@/lib/fund-types";
-
-export const metadata: Metadata = {
-  title: "MF Industry Analysis | Nivesify",
-  description: "Industry-wide insights, plain-language methodology, and guided paths for active and passive selection.",
-  alternates: { canonical: "https://nivesify.com/mutual-fund-analysis" },
-  openGraph: {
-    title: "MF Industry Analysis | Nivesify",
-    description: "Industry-wide insights, plain-language methodology, and guided paths for active and passive selection.",
-    url: "https://nivesify.com/mutual-fund-analysis",
-    siteName: "Nivesify",
-    locale: "en_US",
-    type: "website",
-  },
-};
+import { fetchCachedJson } from "@/lib/client-data";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-const fetchJson = async <T,>(baseUrl: string, path: string): Promise<T> => {
-  const res = await fetch(`${baseUrl}${path}`, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error(`Failed to load ${path}`);
-  return res.json() as Promise<T>;
-};
 
 const fmt = (v: number | null | undefined, d = 2) => {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
@@ -49,13 +31,23 @@ const palette = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444", "#0891B2
 // MAIN PAGE (server component)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default async function MutualFundAnalysisPage() {
-  const baseUrl = getBaseUrl();
-  const [insights, manifest, amfiRaw] = await Promise.all([
-    fetchJson<CategoryInsights[]>(baseUrl, "/api/insights"),
-    fetchJson<Manifest>(baseUrl, "/api/manifest"),
-    fetchJson<AmfiRawRecord[]>(baseUrl, "/api/amfi-raw"),
-  ]);
+export default function MutualFundAnalysisPage() {
+  const [insights, setInsights] = useState<CategoryInsights[]>([]);
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [amfiRaw, setAmfiRaw] = useState<AmfiRawRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetchCachedJson<CategoryInsights[]>("/api/insights"),
+      fetchCachedJson<Manifest>("/api/manifest"),
+      fetchCachedJson<AmfiRawRecord[]>("/api/amfi-raw"),
+    ]).then(([nextInsights, nextManifest, nextAmfiRaw]) => {
+      setInsights(nextInsights);
+      setManifest(nextManifest);
+      setAmfiRaw(nextAmfiRaw);
+    }).catch((error) => console.error("Failed to load industry analysis data", error)).finally(() => setLoading(false));
+  }, []);
 
   const industryInsight = insights.find((r) => r.Level === "Industry") ?? null;
   const categoryInsights = insights.filter((r) => r.Level === "Category");
@@ -522,10 +514,12 @@ export default async function MutualFundAnalysisPage() {
         </div>
 
         {/* Sub-category table from existing component */}
-        <AnalysisInsightsTables
-          categoryInsights={categoryInsights}
-          subCategoryInsights={subCategoryInsights}
-        />
+        {loading ? <div style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>Loading market data...</div> : (
+          <AnalysisInsightsTables
+            categoryInsights={categoryInsights}
+            subCategoryInsights={subCategoryInsights}
+          />
+        )}
       </section>
 
       {/* ═══════════════════════════════════════════════════════
@@ -559,7 +553,7 @@ export default async function MutualFundAnalysisPage() {
           </div>
         </div>
 
-        <AnalysisFullInsightsTable enrichedInsights={enrichedInsights} />
+        {!loading && <AnalysisFullInsightsTable enrichedInsights={enrichedInsights} />}
 
         {/* Disclaimer */}
         <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "14px 18px", marginTop: "32px", fontSize: "10.5px", color: "#94A3B8", lineHeight: 1.65, textAlign: "center" as const }}>
