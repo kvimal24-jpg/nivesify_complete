@@ -84,6 +84,7 @@ const performanceOptions = [
 ];
 
 const CUTOFFS = [{ key: "1D", days: 1 }, { key: "1W", days: 7 }, { key: "1M", days: 30 }, { key: "1Y", days: 365 }];
+const compactFundName = (value: string) => value.toLowerCase().replace(/\(.*?\)/g, "").replace(/direct|growth|regular|plan|option|fund/gi, "").replace(/[^a-z0-9]/g, "");
 const navOnOrBefore = (series: Record<string, string> | undefined, date: Date, lookback = 10): number | null => {
   if (!series) return null;
   for (let i = 0; i <= lookback; i++) {
@@ -92,6 +93,14 @@ const navOnOrBefore = (series: Record<string, string> | undefined, date: Date, l
     const v = series[key]; if (v) return Number(v);
   }
   return null;
+};
+const lastTwoNav = (series: Record<string, string> | undefined): [number, number] | null => {
+  if (!series) return null;
+  const toTime = (key: string) => { const [day, month, year] = key.split("-"); return +new Date(+year, +month - 1, +day); };
+  const values = Object.keys(series).map((key) => ({ time: toTime(key), value: Number(series[key]) })).filter((item) => Number.isFinite(item.value));
+  if (values.length < 2) return null;
+  values.sort((a, b) => a.time - b.time);
+  return [values[values.length - 2].value, values[values.length - 1].value];
 };
 const unitsAt = (txns: any[], date: Date) => txns.reduce((s, t) => s + (new Date(t.date) <= date ? (t.type === "Investment" ? t.units : -t.units) : 0), 0);
 
@@ -477,7 +486,7 @@ export default function MutualFundHealthCheckDashboard() {
           }
 
           const schemeName = record?.schemeName ? String(record.schemeName) : "";
-          const schemeKey = schemeName ? normalizeFundName(schemeName) : "";
+            const schemeKey = schemeName ? compactFundName(schemeName) : "";
           if (schemeKey) {
             const ef = fundMapNext.get(schemeKey);
             if (!ef || aum > (ef.aum ?? -1)) {
@@ -535,6 +544,15 @@ export default function MutualFundHealthCheckDashboard() {
   const lineHasData = useMemo(() => lineData.some((i) => i.valueOne !== 0 || i.valueTwo !== 0), [lineData]);
 
   const portfolioPerf = useMemo(() => CUTOFFS.map((c) => {
+    if (c.days === 1) {
+      let now = 0, prev = 0;
+      portfolio.forEach((row) => {
+        const two = lastTwoNav(navMap[row.schemeCode]);
+        if (!two || row.currentUnits <= 0) return;
+        prev += row.currentUnits * two[0]; now += row.currentUnits * two[1];
+      });
+      return { key: c.key, pct: prev > 0 ? ((now - prev) / prev) * 100 : null };
+    }
     const d = new Date(); d.setDate(d.getDate() - c.days);
     const past = portfolio.reduce((sum, row) => {
       const u = unitsAt(row.allTransactions, d); if (u <= 0) return sum;
@@ -588,6 +606,11 @@ export default function MutualFundHealthCheckDashboard() {
     });
     return m;
   }, [fundAnalytics, schemeList, analyticsMap]);
+  const schemeByIsin = useMemo(() => {
+    const m = new Map<string, any>();
+    schemeList.forEach((s: any) => { if (s?.isinGrowth && !m.has(s.isinGrowth)) m.set(s.isinGrowth, s); });
+    return m;
+  }, [schemeList]);
   const amfiByIsin = useMemo(() => {
     const m = new Map<string, { category: string; subCategory: string; benchmark: string | null; return3Y?: number; return10Y?: number; aum?: number }>();
     (amfiRaw as any[]).forEach((r) => {
@@ -633,10 +656,11 @@ export default function MutualFundHealthCheckDashboard() {
     const isin = row.allTransactions?.[0]?.isin || "";
     const analytics = getFundAnalyticsForHolding(row.mfName, isin);
     const normalized = normalizeFundName(row.mfName);
-    const amfi = amfiByIsin.get(isin) || amfiSchemeMap.get(normalized);
-    const benchmarkName = analytics?.Benchmark_Name || amfi?.benchmark || fundReturnMap.get(normalized)?.benchmarkName || "—";
+    const canonName = schemeByIsin.get(isin)?.schemeName || row.mfName;
+    const amfi = amfiByIsin.get(isin) || amfiSchemeMap.get(compactFundName(canonName)) || amfiSchemeMap.get(compactFundName(row.mfName)) || amfiSchemeMap.get(normalized);
+    const benchmarkName = analytics?.Benchmark_Name || amfi?.benchmark || fundReturnMap.get(compactFundName(canonName))?.benchmarkName || "—";
     return { name: row.mfName, value: row.currentValue || 0, analytics, amfi, benchmarkName, isin };
-  }), [uniquePortfolioFunds, analyticsByIsin, amfiByIsin, amfiSchemeMap, fundReturnMap]);
+  }), [uniquePortfolioFunds, analyticsByIsin, schemeByIsin, amfiByIsin, amfiSchemeMap, fundReturnMap]);
 
   const subCategoryInsightsMap = useMemo(() => { const m = new Map<string, CategoryInsights>(); categoryInsights.filter((r) => r.Level === "Sub-Category" && r.Sub_Category_Name).forEach((r) => m.set(r.Sub_Category_Name || "", r)); return m; }, [categoryInsights]);
   const categoryInsightsMap = useMemo(() => { const m = new Map<string, CategoryInsights>(); categoryInsights.filter((r) => r.Level === "Category" && r.Category_Name).forEach((r) => m.set(r.Category_Name || "", r)); return m; }, [categoryInsights]);
@@ -650,13 +674,13 @@ export default function MutualFundHealthCheckDashboard() {
     (amfiRaw as any[]).forEach((r) => {
       const b = (r?.benchmark || "").toLowerCase();
       if (!b.includes("nifty 50")) return;
-      const k = normalizeFundName(r?.schemeName || "");
+      const k = compactFundName(r?.schemeName || "");
       const aum = Number.isFinite(r?.dailyAUM) ? Number(r.dailyAUM) : 0;
       if (k && aum > (aumByName.get(k) ?? -1)) aumByName.set(k, aum);
     });
     let best: any = null, bestAum = -1;
     schemeList.forEach((s: any) => {
-      const n = normalizeFundName(s?.schemeName || "");
+      const n = compactFundName(s?.schemeName || "");
       if (!n.includes("nifty 50") || !n.includes("index")) return;
       const aum = aumByName.get(n) ?? 0;
       if (aum > bestAum) { bestAum = aum; best = s; }
@@ -672,6 +696,7 @@ export default function MutualFundHealthCheckDashboard() {
       const series = map[nifty50SchemeCode]; if (!series) return;
       const today = new Date(); const now = navOnOrBefore(series, today);
       setBenchPerf(CUTOFFS.map((c) => {
+        if (c.days === 1) { const two = lastTwoNav(series); return { key: c.key, pct: two && two[0] ? ((two[1] - two[0]) / two[0]) * 100 : null }; }
         const d = new Date(today); d.setDate(d.getDate() - c.days);
         const past = navOnOrBefore(series, d);
         return { key: c.key, pct: now && past ? ((now - past) / past) * 100 : null };
@@ -1065,50 +1090,40 @@ export default function MutualFundHealthCheckDashboard() {
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "clamp(24px,4vw,40px) clamp(16px,4vw,32px)" }}>
 
         {/* ════════════════════════════════════════════
-            KPI GRID — 8 metrics, 4+4 layout
+            AT A GLANCE — money, performance, structure
         ════════════════════════════════════════════ */}
         <div style={{ marginBottom: 40 }}>
           <SectionHeader label="At a glance" title="Portfolio metrics" color="#2563EB" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 8px 2px" }}>Money</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
             {[
               { title: "Total Value", value: formatCurrency(summary.totalValue), note: "Current portfolio worth", tooltip: tooltips.totalValue, accent: "#2563EB", trend: null },
-              { title: "Portfolio XIRR", value: xirrValue !== null ? formatPct(xirrValue * 100, 2) : "< 1Y data", note: "Annualized true return", tooltip: tooltips.xirr, accent: (xirrValue ?? 0) * 100 > (alphaHurdle ?? 10) ? "#059669" : "#D97706", trend: xirrValue !== null && alphaHurdle !== null ? (xirrValue * 100 > alphaHurdle ? "↑" : "↓") : null },
-              { title: "All-time Gain", value: formatCurrency(summary.allTimeProfit), note: "Total profit so far", tooltip: tooltips.allTimeReturns, accent: (summary.allTimeProfit || 0) > 0 ? "#059669" : "#DC2626", trend: null },
               { title: "Invested", value: formatCurrency(summary.invested), note: "Total capital deployed", tooltip: tooltips.invested, accent: "#475569", trend: null },
-              { title: "Funds Held", value: report ? `${report.holdingsCount}` : "—", note: "Active holdings", tooltip: tooltips.holdings, accent: "#7C3AED", trend: null },
-              { title: "Top Fund Weight", value: summary.totalValue && report ? `${(report.topOneShare * 100).toFixed(1)}%` : "—", note: "Concentration risk", tooltip: tooltips.topFund, accent: report && report.topOneShare > 0.4 ? "#D97706" : "#059669", trend: null },
-              { title: "Top 5 Weight", value: summary.totalValue && report ? `${(report.topFiveShare * 100).toFixed(1)}%` : "—", note: "Core concentration", tooltip: tooltips.topFive, accent: "#475569", trend: null },
-              { title: "Monthly Income Est.", value: formatCurrency(summary.totalValue / 25 / 12), note: "25× rule (withdraw rate)", tooltip: tooltips.monthlyIncome, accent: "#059669", trend: null },
+              { title: "All-time Gain", value: formatCurrency(summary.allTimeProfit), note: "Total profit so far", tooltip: tooltips.allTimeReturns, accent: (summary.allTimeProfit || 0) > 0 ? "#059669" : "#DC2626", trend: null },
+              { title: "Portfolio XIRR", value: xirrValue !== null ? formatPct(xirrValue * 100, 2) : "< 1Y data", note: "Annualized true return", tooltip: tooltips.xirr, accent: (xirrValue ?? 0) * 100 >= (alphaHurdle ?? 10) ? "#059669" : "#D97706", trend: xirrValue !== null && alphaHurdle !== null ? (xirrValue * 100 >= alphaHurdle ? "↑" : "↓") : null },
             ].map((card) => (
-              <div key={card.title} style={{ background: "white", border: `1.5px solid #E2E8F0`, borderRadius: 16, padding: "14px 14px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}>
+              <div key={card.title} style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: 16, padding: "14px 14px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: card.accent, borderRadius: "16px 16px 0 0" }} />
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1.3, maxWidth: "80%" }}>{card.title}</span>
-                  <InfoTip text={card.tooltip} />
-                </div>
-                <div style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: card.accent, lineHeight: 1, marginBottom: 4 }}>
-                  {card.trend && <span style={{ fontSize: 12, marginRight: 3 }}>{card.trend}</span>}
-                  {card.value}
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}><span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1.3 }}>{card.title}</span><InfoTip text={card.tooltip} /></div>
+                <div style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: card.accent, lineHeight: 1, marginBottom: 4 }}>{card.trend && <span style={{ fontSize: 12, marginRight: 3 }}>{card.trend}</span>}{card.value}</div>
                 <div style={{ fontSize: 10, color: "#94A3B8", lineHeight: 1.4 }}>{card.note}</div>
               </div>
             ))}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
-            {portfolioPerf.map((card) => {
-              const benchmark = benchPerf.find((item) => item.key === card.key)?.pct ?? null;
-              const accent = card.pct !== null && benchmark !== null ? (card.pct >= benchmark ? "#059669" : "#D97706") : "#94A3B8";
-              return (
-                <div key={card.key} style={{ background: "white", border: `1.5px solid #E2E8F0`, borderRadius: 16, padding: "14px 14px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: "16px 16px 0 0" }} />
-                  <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1.3, marginBottom: 8 }}>Last {card.key}</div>
-                  <div style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: accent, lineHeight: 1, marginBottom: 4 }}>
-                    {card.pct === null ? "—" : `${card.pct >= 0 ? "+" : ""}${card.pct.toFixed(2)}%`}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#94A3B8", lineHeight: 1.4 }}>Nifty 50: {benchmark === null ? "—" : `${benchmark >= 0 ? "+" : ""}${benchmark.toFixed(2)}%`}</div>
-                </div>
-              );
-            })}
+          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "18px 0 8px 2px" }}>Performance vs Nifty 50</div>
+          <div style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: 16, padding: "14px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#059669", borderRadius: "16px 16px 0 0" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, padding: "4px 0 8px", color: "#94A3B8", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}><span>Period</span><span>You</span><span>Nifty 50</span><span>Δ</span></div>
+            {portfolioPerf.map((card) => { const benchmark = benchPerf.find((item) => item.key === card.key)?.pct ?? null; const delta = card.pct !== null && benchmark !== null ? card.pct - benchmark : null; const value = (v: number | null) => v === null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`; return <div key={card.key} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, borderTop: "1px solid #F1F5F9", padding: "9px 0", fontSize: 12 }}><strong style={{ color: "#475569" }}>Last {card.key}</strong><span style={{ color: card.pct === null ? "#94A3B8" : card.pct >= 0 ? "#059669" : "#DC2626", fontWeight: 800 }}>{value(card.pct)}</span><span style={{ color: benchmark === null ? "#94A3B8" : benchmark >= 0 ? "#059669" : "#DC2626", fontWeight: 700 }}>{value(benchmark)}</span><span style={{ color: delta === null ? "#94A3B8" : delta >= 0 ? "#059669" : "#DC2626", fontWeight: 800 }}>{value(delta)}</span></div>; })}
+          </div>
+          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "18px 0 8px 2px" }}>Structure & risk</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
+            {[
+              { title: "Funds Held", value: report ? `${report.holdingsCount}` : "—", note: "Active holdings", tooltip: tooltips.holdings, accent: "#7C3AED" },
+              { title: "Top Fund Weight", value: summary.totalValue && report ? `${(report.topOneShare * 100).toFixed(1)}%` : "—", note: "Concentration risk", tooltip: tooltips.topFund, accent: report && report.topOneShare > 0.4 ? "#D97706" : "#059669" },
+              { title: "Top 5 Weight", value: summary.totalValue && report ? `${(report.topFiveShare * 100).toFixed(1)}%` : "—", note: "Core concentration", tooltip: tooltips.topFive, accent: "#475569" },
+              { title: "Monthly Income Est.", value: formatCurrency(summary.totalValue / 25 / 12), note: "25× rule (withdraw rate)", tooltip: tooltips.monthlyIncome, accent: "#059669" },
+            ].map((card) => <div key={card.title} style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: 16, padding: "14px 14px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: card.accent, borderRadius: "16px 16px 0 0" }} /><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}><span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1.3 }}>{card.title}</span><InfoTip text={card.tooltip} /></div><div style={{ fontSize: "clamp(16px,2.5vw,20px)", fontWeight: 900, color: card.accent, lineHeight: 1, marginBottom: 4 }}>{card.value}</div><div style={{ fontSize: 10, color: "#94A3B8", lineHeight: 1.4 }}>{card.note}</div></div>)}
           </div>
         </div>
 
