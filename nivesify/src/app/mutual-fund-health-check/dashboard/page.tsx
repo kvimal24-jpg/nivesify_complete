@@ -541,7 +541,16 @@ export default function MutualFundHealthCheckDashboard() {
   const getFundAnalytics = (name: string) => analyticsMap.get(normalizeFundName(name));
   const getFundAnalyticsForHolding = (name: string, isin?: string) => (isin ? analyticsByIsin.get(isin) : undefined) || getFundAnalytics(name);
 
-  const fundNameOptions = useMemo(() => { const u = new Set<string>(); fundAnalytics.forEach((f) => { if (f.Fund_Name) u.add(f.Fund_Name); }); return Array.from(u); }, [fundAnalytics]);
+  const fundNameOptions = useMemo(() => {
+    const u = new Set<string>();
+    fundAnalytics.forEach((f) => {
+      if (f.Fund_Name) u.add(f.Fund_Name);
+    });
+    etfAnalytics.forEach((e) => {
+      if (e.ETF_Name) u.add(e.ETF_Name);
+    });
+    return Array.from(u);
+  }, [fundAnalytics, etfAnalytics]);
   const schemeNameMap = useMemo(() => { const m = new Map<string, any>(); schemeList.forEach((s) => { const k = normalizeFundName(s.schemeName || ""); if (k && !m.has(k)) m.set(k, s); }); return m; }, [schemeList]);
   const findSchemeForName = (name: string) => { const n = normalizeFundName(name); if (!n) return null; const d = schemeNameMap.get(n); if (d) return d; const t = splitTokens(n); return schemeList.find((s) => matchesTokens(normalizeFundName(s.schemeName || ""), t)) || null; };
   const getFundSuggestions = (query: string) => { const t = query.trim(); if (t.length < 4) return []; const tok = splitTokens(t); return fundNameOptions.filter((n) => matchesTokens(normalizeFundName(n), tok)).slice(0, 8); };
