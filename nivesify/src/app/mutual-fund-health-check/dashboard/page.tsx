@@ -112,7 +112,12 @@ const axisDefaults = { tickLine: false, axisLine: false, width: 48, tickMargin: 
 const xAxisDefaults = { tickLine: false, axisLine: false, tickMargin: 8, tick: { fill: "#94A3B8", fontSize: 9, fontFamily: "DM Sans" }, minTickGap: 18 };
 
 const normalizeFundName = (value: string) =>
-  value.toLowerCase().replace(/direct|growth|regular|plan|option|fund/gi, "").replace(/[^a-z0-9]+/g, " ").trim();
+  value
+    .toLowerCase()
+    .replace(/\(.*?\)/g, "")   // strip "( Non Demat )", "(Demat)", "(IDCW)" etc.
+    .replace(/direct|growth|regular|plan|option|fund/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")  // collapses "- -", dashes, dots into single spaces
+    .trim();
 
 const splitTokens = (value: string) => normalizeFundName(value).split(" ").filter(Boolean);
 const matchesTokens = (name: string, tokens: string[]) => tokens.length > 0 && tokens.every((t) => name.includes(t));
