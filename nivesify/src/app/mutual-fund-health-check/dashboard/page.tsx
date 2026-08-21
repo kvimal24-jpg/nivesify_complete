@@ -537,7 +537,22 @@ export default function MutualFundHealthCheckDashboard() {
   };
 
   const analyticsMap = useMemo(() => { const m = new Map<string, FundAnalytics>(); fundAnalytics.forEach((f) => { const k = normalizeFundName(f.Fund_Name); if (!m.has(k)) m.set(k, f); }); return m; }, [fundAnalytics]);
-  const analyticsByIsin = useMemo(() => { const m = new Map<string, FundAnalytics>(); fundAnalytics.forEach((f) => { const isin = f.ISIN || f.ISIN_Code; if (isin) m.set(isin, f); }); return m; }, [fundAnalytics]);
+  const analyticsByIsin = useMemo(() => {
+    const m = new Map<string, FundAnalytics>();
+    // (a) direct ISIN if analytics ever carries one
+    fundAnalytics.forEach((f) => {
+      const isin = f.ISIN || f.ISIN_Code;
+      if (isin) m.set(isin, f);
+    });
+    // (b) join mfapi scheme ISINs (isinGrowth) to analytics via normalized scheme name
+    schemeList.forEach((s: any) => {
+      const isin = s?.isinGrowth;
+      if (!isin || m.has(isin)) return;
+      const a = analyticsMap.get(normalizeFundName(s?.schemeName || ""));
+      if (a) m.set(isin, a);
+    });
+    return m;
+  }, [fundAnalytics, schemeList, analyticsMap]);
   const getFundAnalytics = (name: string) => analyticsMap.get(normalizeFundName(name));
   const getFundAnalyticsForHolding = (name: string, isin?: string) => (isin ? analyticsByIsin.get(isin) : undefined) || getFundAnalytics(name);
 
