@@ -35,3 +35,22 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NEXT_PUBLIC_R2_BASE_URL: https://data.nivesify.com
+
+      - name: Ensure apex DNS points to production Worker
+        working-directory: .
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4"
+          auth=(-H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json")
+          zone_id=$(curl --fail-with-body -sS "${auth[@]}" "$api/zones?name=nivesify.com&status=active" | jq -r '.result[0].id')
+          test -n "$zone_id" && test "$zone_id" != "null"
+          record_id=$(curl --fail-with-body -sS "${auth[@]}" "$api/zones/$zone_id/dns_records?type=CNAME&name=nivesify.com" | jq -r '.result[0].id // empty')
+          payload='{"type":"CNAME","name":"nivesify.com","content":"nivesify.kvimal24.workers.dev","proxied":true,"ttl":1}'
+          if [ -n "$record_id" ]; then
+            curl --fail-with-body -sS -X PUT "${auth[@]}" "$api/zones/$zone_id/dns_records/$record_id" --data "$payload" >/dev/null
+          else
+            curl --fail-with-body -sS -X POST "${auth[@]}" "$api/zones/$zone_id/dns_records" --data "$payload" >/dev/null
+          fi
