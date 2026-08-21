@@ -282,7 +282,7 @@ function InsightCard({ priority, title, summary, detail, metric, metricLabel }: 
 /* ─────────────────────────────────────────────────────────────────
    AUDIT ROW CARD — mobile-friendly fund audit
 ───────────────────────────────────────────────────────────────── */
-function AuditFundRow({ name, benchmark, delta, alpha, ir3y, compositeScore, status, suggestion, extraDetails }: {
+function AuditFundRow({ name, benchmark, delta, alpha, ir3y, compositeScore, status, suggestion, reason, extraDetails }: {
   name: string;
   benchmark: string;
   delta: number | null;
@@ -291,6 +291,7 @@ function AuditFundRow({ name, benchmark, delta, alpha, ir3y, compositeScore, sta
   compositeScore?: number | null;
   status: string;
   suggestion?: string | null;
+  reason?: string | null;
   extraDetails?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -330,6 +331,7 @@ function AuditFundRow({ name, benchmark, delta, alpha, ir3y, compositeScore, sta
             </div>
           )}
         </div>
+        {reason && <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>{reason}</div>}
         {extraDetails && open && (
           <div style={{ marginTop: 10, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "10px 12px", fontSize: 11, color: "#475569", lineHeight: 1.7 }}>
             {extraDetails}
@@ -377,6 +379,7 @@ export default function MutualFundHealthCheckDashboard() {
   const [fundReturnMap, setFundReturnMap] = useState<Map<string, { benchmarkName?: string | null; return1Y?: number; return3Y?: number; return5Y?: number; return10Y?: number }>>(new Map());
   const [amfiSchemeMap, setAmfiSchemeMap] = useState<Map<string, { category: string; subCategory: string; benchmark: string | null; return10Y?: number; return3Y?: number; aum?: number }>>(new Map());
   const [niftyHurdle, setNiftyHurdle] = useState<number | null>(null);
+  const [niftySchemeName, setNiftySchemeName] = useState<string | null>(null);
   const [amfiRaw, setAmfiRaw] = useState<any[]>([]);
   const [navMap, setNavMap] = useState<Record<number, Record<string, string>>>({});
   const [benchPerf, setBenchPerf] = useState<{ key: string; pct: number | null }[]>([]);
@@ -455,12 +458,13 @@ export default function MutualFundHealthCheckDashboard() {
         const benchMarkMapNext = new Map<string, AumTracked>();
         const fundMapNext = new Map<string, { benchmarkName?: string | null; return1Y?: number; return3Y?: number; return5Y?: number; return10Y?: number; aum?: number }>();
         const schemeMapNext = new Map<string, { category: string; subCategory: string; benchmark: string | null; return10Y?: number; return3Y?: number; aum?: number }>();
-        let niftyCandidate: { return10Y: number; aum: number } | null = null;
+        let niftyCandidate: { return10Y: number; aum: number; name: string } | null = null;
 
         json.forEach((record: any) => {
           const benchmarkName = record?.benchmark ? String(record.benchmark) : "";
           const benchmarkKey = benchmarkName ? normalizeBenchmark(benchmarkName) : "";
           const aum = Number.isFinite(record?.dailyAUM) ? Number(record.dailyAUM) : 0;
+          const schemeName = record?.schemeName ? String(record.schemeName) : "";
 
           if (benchmarkKey) {
             const existing: AumTracked = benchMarkMapNext.get(benchmarkKey) || {};
@@ -482,11 +486,10 @@ export default function MutualFundHealthCheckDashboard() {
 
           if (benchmarkKey === normalizeBenchmark("nifty 50 tri") && Number.isFinite(record?.return10YearRegular)) {
             const r10 = Number(record.return10YearRegular);
-            if (!niftyCandidate || aum > niftyCandidate.aum) niftyCandidate = { return10Y: r10, aum };
+            if (!niftyCandidate || aum > niftyCandidate.aum) niftyCandidate = { return10Y: r10, aum, name: schemeName };
           }
 
-          const schemeName = record?.schemeName ? String(record.schemeName) : "";
-            const schemeKey = schemeName ? compactFundName(schemeName) : "";
+          const schemeKey = schemeName ? compactFundName(schemeName) : "";
           if (schemeKey) {
             const ef = fundMapNext.get(schemeKey);
             if (!ef || aum > (ef.aum ?? -1)) {
@@ -522,6 +525,7 @@ export default function MutualFundHealthCheckDashboard() {
         setFundReturnMap(compactFunds);
         setAmfiSchemeMap(schemeMapNext);
         setNiftyHurdle((niftyCandidate as any)?.return10Y ?? null);
+        setNiftySchemeName((niftyCandidate as any)?.name ?? null);
       } catch { /* silent */ }
     };
     load();
@@ -670,23 +674,11 @@ export default function MutualFundHealthCheckDashboard() {
   const alphaHurdle = useMemo(() => niftyHurdle, [niftyHurdle]);
 
   const nifty50SchemeCode = useMemo(() => {
-    const aumByName = new Map<string, number>();
-    (amfiRaw as any[]).forEach((r) => {
-      const b = (r?.benchmark || "").toLowerCase();
-      if (!b.includes("nifty 50")) return;
-      const k = compactFundName(r?.schemeName || "");
-      const aum = Number.isFinite(r?.dailyAUM) ? Number(r.dailyAUM) : 0;
-      if (k && aum > (aumByName.get(k) ?? -1)) aumByName.set(k, aum);
-    });
-    let best: any = null, bestAum = -1;
-    schemeList.forEach((s: any) => {
-      const n = compactFundName(s?.schemeName || "");
-      if (!n.includes("nifty 50") || !n.includes("index")) return;
-      const aum = aumByName.get(n) ?? 0;
-      if (aum > bestAum) { bestAum = aum; best = s; }
-    });
-    return best?.schemeCode ?? null;
-  }, [amfiRaw, schemeList]);
+    if (!niftySchemeName) return null;
+    const target = compactFundName(niftySchemeName);
+    const hit = schemeList.find((s: any) => compactFundName(s?.schemeName || "") === target);
+    return hit?.schemeCode ?? null;
+  }, [niftySchemeName, schemeList]);
 
   useEffect(() => {
     if (!nifty50SchemeCode) return;
@@ -803,17 +795,23 @@ export default function MutualFundHealthCheckDashboard() {
     const benchmarkKey = benchmarkName !== "—" ? normalizeBenchmark(benchmarkName) : "";
     const currentEtf = etfByName.get(normalizeFundName(row.name));
     const tracking = currentEtf?.Tracking_Diff_3Y ?? null;
-    const candidates = (etfByBenchmark.get(benchmarkKey) || []).filter((e: any) => normalizeFundName(e?.ETF_Name || "") !== normalizeFundName(row.name));
+    const candidates = (etfByBenchmark.get(benchmarkKey) || []).filter((e: any) => compactFundName(e?.ETF_Name || "") !== compactFundName(row.name));
     const bestEtf = candidates[0];
     const bestTracking = bestEtf?.Tracking_Diff_3Y ?? null;
     const fundReturn = row.analytics?.Fund_Return_3Y ?? row.amfi?.return3Y ?? null;
     const benchmarkReturn = benchmarkKey ? benchmarkMap.get(benchmarkKey)?.return3Y ?? null : null;
     const delta = fundReturn !== null && benchmarkReturn !== null ? fundReturn - benchmarkReturn : null;
-    const needsSwitch = (tracking !== null && bestTracking !== null ? tracking - bestTracking > 0.5 : false) || (delta !== null ? delta < 0 : false);
+    const LAG_TOLERANCE = -0.75;
+    const needsSwitch = (tracking !== null && bestTracking !== null ? tracking - bestTracking > 0.5 : false) || (delta !== null && delta < LAG_TOLERANCE);
     const hasData = delta !== null || tracking !== null;
     const status = !hasData ? "No data" : needsSwitch ? "Review" : "Continue";
     const canSuggest = bestEtf && (tracking == null || bestTracking != null && tracking - bestTracking > 0.5);
-    return { name: row.name, benchmarkName, fundReturn, benchmarkReturn, delta, tracking, bestTracking, status, suggestion: status === "Review" && canSuggest ? bestEtf.ETF_Name : null, bestEtfName: bestEtf?.ETF_Name ?? null };
+    const reason = status === "Review"
+      ? (delta !== null && delta < LAG_TOLERANCE
+        ? `Lagging its index by ${Math.abs(delta).toFixed(2)}% over 3Y — check expense ratio & tracking.`
+        : "A tighter tracker of the same index exists.")
+      : null;
+    return { name: row.name, benchmarkName, fundReturn, benchmarkReturn, delta, tracking, bestTracking, status, suggestion: status === "Review" && canSuggest ? bestEtf.ETF_Name : null, reason, bestEtfName: bestEtf?.ETF_Name ?? null };
   }), [passiveHoldings, benchmarkMap, etfByBenchmark, etfByName]);
 
   const activeReviewCount = useMemo(() => activeAudit.filter((r) => r.status === "Review").length, [activeAudit]);
@@ -1337,6 +1335,7 @@ export default function MutualFundHealthCheckDashboard() {
                     delta={row.delta}
                     status={row.status}
                     suggestion={row.suggestion}
+                    reason={row.reason}
                     extraDetails={
                       <div>
                         <div>Fund 3Y: {formatPct2(row.fundReturn)} · Benchmark 3Y: {formatPct2(row.benchmarkReturn)}</div>
