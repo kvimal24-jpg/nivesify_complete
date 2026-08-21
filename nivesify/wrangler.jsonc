@@ -11,6 +11,15 @@
 	"name": "nivesify",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2025-12-01",
+	"routes": [
+		{
+			"pattern": "nivesify.com/*",
+			"zone_name": "nivesify.com"
+		}
+	],
+	"vars": {
+		"NEXT_PUBLIC_R2_BASE_URL": "https://data.nivesify.com"
+	},
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
