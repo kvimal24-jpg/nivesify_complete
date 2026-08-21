@@ -1,19 +1,12 @@
+// src/lib/data-endpoints.ts
+// Using r2.dev subdomain which has built-in CORS support (no custom domain config needed)
 const IS_PROD = process.env.NODE_ENV === "production";
-
-const R2_BASE = "https://data.nivesify.com";
-
-function localPath(...segments: string[]): string {
-  return ["/api", ...segments].join("/");
-}
-
-function buildPath(filename: string, fallback: string): string {
-  return IS_PROD ? `${R2_BASE}/data/latest/${filename}` : fallback;
-}
+const R2_BASE = "https://pub-260c05cf57d44671bf81cc305a2e6856.r2.dev";
 
 export const DATA_ENDPOINTS = {
-  amfiRaw: buildPath("amfi_raw.json", localPath("amfi-raw")),
-  funds: buildPath("fund-analytics.json", localPath("funds")),
-  etfs: buildPath("etf-analytics.json", localPath("etfs")),
-  insights: buildPath("industry-and-category-insights.json", localPath("insights")),
-  manifest: buildPath("manifest.json", localPath("manifest")),
+  amfiRaw:  IS_PROD ? `${R2_BASE}/data/latest/amfi_raw.json`                       : "/api/amfi-raw",
+  funds:    IS_PROD ? `${R2_BASE}/data/latest/fund-analytics.json`                 : "/api/funds",
+  etfs:     IS_PROD ? `${R2_BASE}/data/latest/etf-analytics.json`                  : "/api/etfs",
+  insights: IS_PROD ? `${R2_BASE}/data/latest/industry-and-category-insights.json` : "/api/insights",
+  manifest: IS_PROD ? `${R2_BASE}/data/latest/manifest.json`                       : "/api/manifest",
 };
