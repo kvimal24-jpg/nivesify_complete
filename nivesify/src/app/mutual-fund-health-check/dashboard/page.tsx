@@ -24,6 +24,7 @@ import { xirr } from "@/lib/mutual-fund-health-check/xirr";
 import { formatCurrency } from "@/lib/mutual-fund-health-check/format";
 import { buildManualTransactions } from "@/lib/mutual-fund-health-check/manual";
 import { buildReportData, generatePdfReport, tooltips } from "@/lib/mutual-fund-health-check/report";
+import { fetchCachedJson } from "@/lib/client-data";
 import type { FundAnalytics, ETFAnalytics, CategoryInsights } from "@/lib/fund-types";
 
 /* ─────────────────────────────────────────────────────────────────
@@ -74,10 +75,6 @@ const CSS = `
   /* Chart tooltip */
   .recharts-tooltip-wrapper { font-family: 'DM Sans', system-ui !important; }
 `;
-
-/* ─────────────────────────────────────────────────────────────────
-   CONSTANTS & HELPERS (unchanged from original — logic preserved)
-───────────────────────────────────────────────────────────────── */
 const performanceOptions = [
   { label: "1Y", value: "1" },
   { label: "5Y", value: "5" },
@@ -410,16 +407,14 @@ export default function MutualFundHealthCheckDashboard() {
     return () => { cancelled = true; };
   }, [data]);
 
-  useEffect(() => { fetch("/api/funds").then(r => r.json()).then(j => setFundAnalytics(j || [])).catch(() => setFundAnalytics([])); }, []);
-  useEffect(() => { fetch("/api/etfs").then(r => r.json()).then(j => setEtfAnalytics(j || [])).catch(() => setEtfAnalytics([])); }, []);
-  useEffect(() => { fetch("/api/insights").then(r => r.json()).then(j => setCategoryInsights(j || [])).catch(() => setCategoryInsights([])); }, []);
+  useEffect(() => { fetchCachedJson<FundAnalytics[]>("funds").then(j => setFundAnalytics(j || [])).catch(() => setFundAnalytics([])); }, []);
+  useEffect(() => { fetchCachedJson<ETFAnalytics[]>("etfs").then(j => setEtfAnalytics(j || [])).catch(() => setEtfAnalytics([])); }, []);
+  useEffect(() => { fetchCachedJson<CategoryInsights[]>("insights").then(j => setCategoryInsights(j || [])).catch(() => setCategoryInsights([])); }, []);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("/api/amfi-raw");
-        if (!res.ok) return;
-        const json = await res.json();
+        const json = await fetchCachedJson<unknown>("amfiRaw");
         if (!Array.isArray(json)) return;
 
         type AumTracked = { return1Y?: number; return3Y?: number; return5Y?: number; return10Y?: number; aum1Y?: number; aum3Y?: number; aum5Y?: number; aum10Y?: number };
