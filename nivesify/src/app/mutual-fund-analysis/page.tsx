@@ -39,9 +39,9 @@ export default function MutualFundAnalysisPage() {
 
   useEffect(() => {
     Promise.all([
-      fetchCachedJson<CategoryInsights[]>("/api/insights"),
-      fetchCachedJson<Manifest>("/api/manifest"),
-      fetchCachedJson<AmfiRawRecord[]>("/api/amfi-raw"),
+      fetchCachedJson<CategoryInsights[]>("insights"),
+      fetchCachedJson<Manifest>("manifest"),
+      fetchCachedJson<AmfiRawRecord[]>("amfiRaw"),
     ]).then(([nextInsights, nextManifest, nextAmfiRaw]) => {
       setInsights(nextInsights);
       setManifest(nextManifest);

@@ -30,8 +30,8 @@ export default function IndexFundsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
-      fetchCachedJson<Manifest>("/api/manifest"),
+      fetchCachedJson<ETFAnalytics[]>("etfs"),
+      fetchCachedJson<Manifest>("manifest"),
     ]).then(([nextEtfs, nextManifest]) => {
       setEtfs(nextEtfs);
       setManifest(nextManifest);

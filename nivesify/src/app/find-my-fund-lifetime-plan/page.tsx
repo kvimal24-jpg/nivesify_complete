@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { fetchCachedJson } from "@/lib/client-data";
+import { selectFundsForGoal } from "@/lib/fund-selection-engine";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HERO NAVIGATION — identical shell to quick-goal page
@@ -424,6 +425,8 @@ function buildBox(
   row: number, col: number, cellFunds: AMFIFund[],
   fundAnalytics: FundAnalytics[], etfAnalytics: ETFAnalytics[], insights: InsightRow[]
 ): BoxResult {
+  return selectFundsForGoal(row, col, cellFunds, fundAnalytics, etfAnalytics, insights);
+
   if (cellFunds.length === 0) return { empty: true, leadingSubCategory: null, allConsideredSubCategories: [], candidateSubCategories: [] };
   const allConsideredSubCategories = new Set<string>();
   const subCategoryGroups: Record<string, AMFIFund[]> = {};
@@ -1462,10 +1465,10 @@ export default function LifetimePlanPage() {
 
   useEffect(() => {
     Promise.all([
-      fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
-      fetchCachedJson<FundAnalytics[]>("/api/funds"),
-      fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
-      fetchCachedJson<InsightRow[]>("/api/insights"),
+      fetchCachedJson<AMFIFund[]>("amfiRaw"),
+      fetchCachedJson<FundAnalytics[]>("funds"),
+      fetchCachedJson<ETFAnalytics[]>("etfs"),
+      fetchCachedJson<InsightRow[]>("insights"),
     ]).then(([amfi,funds,etfs,ins])=>{
       setAmfiRaw(amfi); setFundAnalytics(funds); setEtfAnalytics(etfs); setInsights(ins); setDataReady(true);
     }).catch(console.error);

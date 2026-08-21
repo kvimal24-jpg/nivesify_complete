@@ -36,10 +36,10 @@ export default function ActiveFundsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetchCachedJson<FundAnalytics[]>("/api/funds"),
-      fetchCachedJson<CategoryInsights[]>("/api/insights"),
-      fetchCachedJson<Manifest>("/api/manifest"),
-      fetchCachedJson<AmfiRawRecord[]>("/api/amfi-raw"),
+      fetchCachedJson<FundAnalytics[]>("funds"),
+      fetchCachedJson<CategoryInsights[]>("insights"),
+      fetchCachedJson<Manifest>("manifest"),
+      fetchCachedJson<AmfiRawRecord[]>("amfiRaw"),
     ]).then(([nextFunds, nextInsights, nextManifest, nextAmfiRaw]) => {
       setFunds(nextFunds);
       setInsights(nextInsights);

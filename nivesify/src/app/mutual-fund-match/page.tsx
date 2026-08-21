@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { fetchCachedJson } from "@/lib/client-data";
+import { selectFundsForGoal } from "@/lib/fund-selection-engine";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HERO NAVIGATION — identical shell used by all 3 planning pages
@@ -225,6 +226,8 @@ function buildBox(
   row: number, col: number, cellFunds: AMFIFund[],
   fundAnalytics: FundAnalytics[], etfAnalytics: ETFAnalytics[], insights: InsightRow[]
 ): BoxResult {
+  return selectFundsForGoal(row, col, cellFunds, fundAnalytics, etfAnalytics, insights);
+
   if (cellFunds.length === 0) return { empty: true, leadingSubCategory: null, allConsideredSubCategories: [], candidateSubCategories: [] };
 
   const allConsideredSubCategories = new Set<string>();
@@ -846,10 +849,10 @@ export default function FindMyFundPage() {
     async function load() {
       try {
         const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-          fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
-          fetchCachedJson<FundAnalytics[]>("/api/funds"),
-          fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
-          fetchCachedJson<InsightRow[]>("/api/insights"),
+          fetchCachedJson<AMFIFund[]>("amfiRaw"),
+          fetchCachedJson<FundAnalytics[]>("funds"),
+          fetchCachedJson<ETFAnalytics[]>("etfs"),
+          fetchCachedJson<InsightRow[]>("insights"),
         ]);
         if (amfiRaw.length > 0) setReportDate(amfiRaw[0].Report_Date);
 
@@ -955,10 +958,10 @@ function HybridMatrixSection({ reportDate }: { reportDate: string }) {
     async function load() {
       setLoading(true);
       const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-        fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
-        fetchCachedJson<FundAnalytics[]>("/api/funds"),
-        fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
-        fetchCachedJson<InsightRow[]>("/api/insights"),
+        fetchCachedJson<AMFIFund[]>("amfiRaw"),
+        fetchCachedJson<FundAnalytics[]>("funds"),
+        fetchCachedJson<ETFAnalytics[]>("etfs"),
+        fetchCachedJson<InsightRow[]>("insights"),
       ]);
       const hybridOrder = ["Aggressive Hybrid","Conservative Hybrid","Equity Savings","Arbitrage","Multi Asset Allocation","Balanced Advantage","Balanced Hybrid"];
       const hybridFunds = amfiRaw.filter((f: AMFIFund) => f.Category === "Hybrid");
@@ -1069,10 +1072,10 @@ function DebtMatrixSection({ reportDate }: { reportDate: string }) {
     async function load() {
       setLoading(true);
       const [amfiRaw, fundAnalytics, etfAnalytics, insights] = await Promise.all([
-        fetchCachedJson<AMFIFund[]>("/api/amfi-raw"),
-        fetchCachedJson<FundAnalytics[]>("/api/funds"),
-        fetchCachedJson<ETFAnalytics[]>("/api/etfs"),
-        fetchCachedJson<InsightRow[]>("/api/insights"),
+        fetchCachedJson<AMFIFund[]>("amfiRaw"),
+        fetchCachedJson<FundAnalytics[]>("funds"),
+        fetchCachedJson<ETFAnalytics[]>("etfs"),
+        fetchCachedJson<InsightRow[]>("insights"),
       ]);
       const cellMap: Record<string, [number, number][]> = {
         "Overnight": [[0,0]], "Liquid": [[0,0]], "Ultra Short Duration": [[0,0]], "Money Market": [[0,0]],
