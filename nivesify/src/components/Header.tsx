@@ -162,7 +162,7 @@ export default function Header() {
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,3vw,40px)", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
 
           {/* ── LOGO ── */}
-          <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0, zIndex: 10 }}>
+          <Link href="/" prefetch={false} style={{ display: "flex", alignItems: "center", flexShrink: 0, zIndex: 10 }}>
             <img src="/logo.png" alt="Nivesify" style={{ height: 36, width: "auto", objectFit: "contain" }} />
           </Link>
 
@@ -190,7 +190,7 @@ export default function Header() {
                       </svg>
                     </button>
                   ) : (
-                    <Link href={item.href} className={`hdr-link ${isActive ? "active" : ""}`}>
+                    <Link href={item.href} prefetch={false} className={`hdr-link ${isActive ? "active" : ""}`}>
                       {item.label}
                     </Link>
                   )}
@@ -231,7 +231,7 @@ export default function Header() {
                       `}</style>
                       <div className="drop-arrow" style={{ position: "relative" }} />
                       {item.sub.map((s) => (
-                        <Link key={s.href} href={s.href} className="drop-item"
+                        <Link key={s.href} href={s.href} prefetch={false} className="drop-item"
                           onClick={() => setActiveDropdown(null)}>
                           <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1 }}>{s.icon}</span>
                           <div>
@@ -314,12 +314,12 @@ export default function Header() {
               {item.sub ? (
                 <>
                   {/* Same visual style as other top-level links */}
-                  <Link href={item.href} className="mob-link"
+                  <Link href={item.href} prefetch={false} className="mob-link"
                     onClick={() => setMobileOpen(false)}>
                     {item.label}
                   </Link>
                   {item.sub.map((s) => (
-                    <Link key={s.href} href={s.href} className="mob-sub-link"
+                    <Link key={s.href} href={s.href} prefetch={false} className="mob-sub-link"
                       onClick={() => setMobileOpen(false)}>
                       <span style={{ fontSize: 16 }}>{s.icon}</span>
                       {s.label}
@@ -327,7 +327,7 @@ export default function Header() {
                   ))}
                 </>
               ) : (
-                <Link href={item.href} className="mob-link"
+                <Link href={item.href} prefetch={false} className="mob-link"
                   onClick={() => setMobileOpen(false)}>
                   {item.label}
                 </Link>

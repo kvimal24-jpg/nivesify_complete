@@ -119,7 +119,7 @@ export default function Footer() {
                 <p className="ft-col-head">{col.heading}</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {col.links.map((l) => (
-                    <Link key={l.href} href={l.href} className="ft-link">{l.label}</Link>
+                    <Link key={l.href} href={l.href} prefetch={false} className="ft-link">{l.label}</Link>
                   ))}
                 </div>
               </div>
@@ -145,7 +145,7 @@ export default function Footer() {
               { label: "Privacy Policy", href: "/privacy" },
               { label: "About", href: "/about" },
             ].map((l) => (
-              <Link key={l.href} href={l.href} className="ft-link">{l.label}</Link>
+              <Link key={l.href} href={l.href} prefetch={false} className="ft-link">{l.label}</Link>
             ))}
           </div>
           <p style={{ fontSize: 12, fontStyle: "italic", color: "rgba(255,255,255,.20)", fontFamily: "'Fraunces',Georgia,serif" }}>
