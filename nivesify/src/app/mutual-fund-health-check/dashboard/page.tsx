@@ -127,6 +127,8 @@ const formatPct2 = (value: number | null | undefined) => {
   return `${value.toFixed(2)}%`;
 };
 
+const fmtCompactINR = (v: number) => "₹" + new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(v);
+
 const BRAND_COLORS = ["#2563EB", "#059669", "#7C3AED", "#D97706", "#DC2626", "#0891B2", "#BE185D", "#65A30D", "#9333EA"];
 
 const chartMargin = { top: 8, right: 8, left: -8, bottom: 0 };
@@ -383,6 +385,8 @@ export default function MutualFundHealthCheckDashboard() {
   const [amfiRaw, setAmfiRaw] = useState<any[]>([]);
   const [navMap, setNavMap] = useState<Record<number, Record<string, string>>>({});
   const [benchPerf, setBenchPerf] = useState<{ key: string; pct: number | null }[]>([]);
+  const [benchFundName, setBenchFundName] = useState<string | null>(null);
+  const [selPeriod, setSelPeriod] = useState("1Y");
 
   const disclaimerText = "All financial decisions involve risk and past performance is no guarantee of future results. Consult a SEBI-registered investment advisor before acting on this information.";
 
@@ -555,7 +559,8 @@ export default function MutualFundHealthCheckDashboard() {
         if (!two || row.currentUnits <= 0) return;
         prev += row.currentUnits * two[0]; now += row.currentUnits * two[1];
       });
-      return { key: c.key, pct: prev > 0 ? ((now - prev) / prev) * 100 : null };
+      const abs = now - prev;
+      return { key: c.key, pct: prev > 0 ? ((now - prev) / prev) * 100 : null, abs };
     }
     const d = new Date(); d.setDate(d.getDate() - c.days);
     const past = portfolio.reduce((sum, row) => {
@@ -563,7 +568,8 @@ export default function MutualFundHealthCheckDashboard() {
       const nav = navOnOrBefore(navMap[row.schemeCode], d); return sum + (nav ? u * nav : 0);
     }, 0);
     const cur = summary.totalValue;
-    return { key: c.key, pct: past > 0 ? ((cur - past) / past) * 100 : null };
+    const abs = past > 0 ? summary.totalValue - past : null;
+    return { key: c.key, pct: past > 0 ? ((cur - past) / past) * 100 : null, abs };
   }), [portfolio, navMap, summary.totalValue]);
 
   const saveData = async (nextData: InvestmentsData) => {
@@ -673,28 +679,52 @@ export default function MutualFundHealthCheckDashboard() {
   const passiveHoldings = useMemo(() => holdings.filter((r) => classifyFundType(r.name, r.analytics, r.amfi?.subCategory) === "passive"), [holdings]);
   const alphaHurdle = useMemo(() => niftyHurdle, [niftyHurdle]);
 
-  const nifty50SchemeCode = useMemo(() => {
-    if (!niftySchemeName) return null;
-    const target = compactFundName(niftySchemeName);
-    const hit = schemeList.find((s: any) => compactFundName(s?.schemeName || "") === target);
-    return hit?.schemeCode ?? null;
-  }, [niftySchemeName, schemeList]);
-
   useEffect(() => {
-    if (!nifty50SchemeCode) return;
+    if (!niftySchemeName) {
+      setBenchFundName(null);
+      setBenchPerf([]);
+      return;
+    }
+
     (async () => {
-      await fetchNavHistoryForSchemes([nifty50SchemeCode]);
-      const map = await getNavHistoryMap([nifty50SchemeCode]);
-      const series = map[nifty50SchemeCode]; if (!series) return;
-      const today = new Date(); const now = navOnOrBefore(series, today);
-      setBenchPerf(CUTOFFS.map((c) => {
-        if (c.days === 1) { const two = lastTwoNav(series); return { key: c.key, pct: two && two[0] ? ((two[1] - two[0]) / two[0]) * 100 : null }; }
-        const d = new Date(today); d.setDate(d.getDate() - c.days);
-        const past = navOnOrBefore(series, d);
-        return { key: c.key, pct: now && past ? ((now - past) / past) * 100 : null };
-      }));
+      const target = compactFundName(niftySchemeName);
+      const matches = schemeList.filter((s: any) => compactFundName(s?.schemeName || "") === target);
+      if (!matches.length) return;
+
+      const pref = (s: any) => {
+        const n = String(s?.schemeName || "").toLowerCase();
+        return (n.includes("direct") ? 2 : 0) + (n.includes("growth") ? 1 : 0);
+      };
+
+      const cands = [...matches].sort((a, b) => pref(b) - pref(a)).slice(0, 3);
+      const src = (amfiRaw as any[]).find((x) => compactFundName(x?.schemeName || "") === target);
+      const amfi1Y = src && Number.isFinite(src?.return1YearDirect) ? Number(src.return1YearDirect) : NaN;
+
+      for (let i = 0; i < cands.length; i++) {
+        const cand = cands[i];
+        await fetchNavHistoryForSchemes([cand.schemeCode]);
+        const map = await getNavHistoryMap([cand.schemeCode]);
+        const series = map[cand.schemeCode]; if (!series) continue;
+        const now = navOnOrBefore(series, new Date());
+        const rows = CUTOFFS.map((c) => {
+          if (c.days === 1) {
+            const two = lastTwoNav(series);
+            return { key: c.key, pct: two && two[0] ? ((two[1] - two[0]) / two[0]) * 100 : null };
+          }
+          const d = new Date(); d.setDate(d.getDate() - c.days);
+          const past = navOnOrBefore(series, d);
+          return { key: c.key, pct: now && past ? ((now - past) / past) * 100 : null };
+        });
+        const y = rows.find((r) => r.key === "1Y")?.pct;
+        const valid = y == null || !Number.isFinite(amfi1Y) || Math.abs(y - amfi1Y) <= 2;
+        if (valid || i === cands.length - 1) {
+          setBenchFundName(cand.schemeName || "");
+          setBenchPerf(rows);
+          return;
+        }
+      }
     })();
-  }, [nifty50SchemeCode]);
+  }, [niftySchemeName, schemeList, amfiRaw]);
 
   const activeHitRate = useMemo(() => {
     const total = activeHoldings.reduce((s, r) => s + r.value, 0);
@@ -952,7 +982,6 @@ export default function MutualFundHealthCheckDashboard() {
 
   const pdfInsights = useMemo(() => {
     const metrics = [
-      { title: "Market hurdle (Nifty 50 TRI 10Y)", value: formatPct2(alphaHurdle), note: "Long-term index reference" },
       { title: "Active winners", value: activeHitRate !== null ? formatPct2(activeHitRate * 100) : "—", note: "Active money beating benchmark" },
       { title: "Consistency check", value: consistencyScore.total ? `${consistencyScore.winners}/${consistencyScore.total}` : "—", note: "Funds above category average" },
       { title: "Low-ranked funds", value: formatCurrency(yieldTrapValue), note: "Bottom 25% of peers" },
@@ -1108,11 +1137,56 @@ export default function MutualFundHealthCheckDashboard() {
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "18px 0 8px 2px" }}>Performance vs Nifty 50</div>
-          <div style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: 16, padding: "14px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#059669", borderRadius: "16px 16px 0 0" }} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, padding: "4px 0 8px", color: "#94A3B8", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}><span>Period</span><span>You</span><span>Nifty 50</span><span>Δ</span></div>
-            {portfolioPerf.map((card) => { const benchmark = benchPerf.find((item) => item.key === card.key)?.pct ?? null; const delta = card.pct !== null && benchmark !== null ? card.pct - benchmark : null; const value = (v: number | null) => v === null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`; return <div key={card.key} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, borderTop: "1px solid #F1F5F9", padding: "9px 0", fontSize: 12 }}><strong style={{ color: "#475569" }}>Last {card.key}</strong><span style={{ color: card.pct === null ? "#94A3B8" : card.pct >= 0 ? "#059669" : "#DC2626", fontWeight: 800 }}>{value(card.pct)}</span><span style={{ color: benchmark === null ? "#94A3B8" : benchmark >= 0 ? "#059669" : "#DC2626", fontWeight: 700 }}>{value(benchmark)}</span><span style={{ color: delta === null ? "#94A3B8" : delta >= 0 ? "#059669" : "#DC2626", fontWeight: 800 }}>{value(delta)}</span></div>; })}
+          <div style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden", marginBottom: 10 }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#059669" }} />
+            <div style={{ padding: "14px 16px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>Performance vs Nifty 50</div>
+                  <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>Benchmark: {benchFundName || "loading…"}</div>
+                </div>
+                <div style={{ display: "flex", gap: 4, background: "#F1F5F9", borderRadius: 100, padding: 3 }}>
+                  {CUTOFFS.map((c) => (
+                    <button key={c.key} onClick={() => setSelPeriod(c.key)} style={{ border: "none", cursor: "pointer", fontFamily: "inherit", borderRadius: 100, padding: "5px 12px", fontSize: 11, fontWeight: 700, background: selPeriod === c.key ? "#0F172A" : "transparent", color: selPeriod === c.key ? "#fff" : "#64748B", transition: "all .15s" }}>{c.key}</button>
+                  ))}
+                </div>
+              </div>
+              {(() => {
+                const sel = portfolioPerf.find((p) => p.key === selPeriod) ?? null;
+                const selB = benchPerf.find((p) => p.key === selPeriod) ?? null;
+                const delta = sel?.pct != null && selB?.pct != null ? sel.pct - selB.pct : null;
+                const maxAbs = Math.max(Math.abs(sel?.pct ?? 0), Math.abs(selB?.pct ?? 0), 0.0001);
+                return (<>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>You</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: (sel?.pct ?? 0) >= 0 ? "#059669" : "#DC2626", lineHeight: 1 }}>{sel?.pct != null ? `${sel.pct >= 0 ? "+" : ""}${sel.pct.toFixed(2)}%` : "—"}</div>
+                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>{sel?.abs != null ? `${sel.abs >= 0 ? "+" : "−"}${fmtCompactINR(Math.abs(sel.abs))} added` : " "}</div>
+                    </div>
+                    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Nifty 50</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: (selB?.pct ?? 0) >= 0 ? "#059669" : "#DC2626", lineHeight: 1 }}>{selB?.pct != null ? `${selB.pct >= 0 ? "+" : ""}${selB.pct.toFixed(2)}%` : "—"}</div>
+                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>Index return</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                    {[{ label: "You", v: sel?.pct, color: "#059669" }, { label: "Nifty 50", v: selB?.pct, color: "#3B82F6" }].map((b) => (
+                      <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 64, fontSize: 10, color: "#64748B", fontWeight: 600 }}>{b.label}</div>
+                        <div style={{ flex: 1, height: 8, background: "#F1F5F9", borderRadius: 100, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, (Math.abs(b.v ?? 0) / maxAbs) * 100)}%`, background: (b.v ?? 0) >= 0 ? b.color : "#DC2626", borderRadius: 100 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {delta != null && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 100, fontSize: 11, fontWeight: 800, background: delta >= 0 ? "#ECFDF5" : "#FEF2F2", border: `1px solid ${delta >= 0 ? "#A7F3D0" : "#FECACA"}`, color: delta >= 0 ? "#059669" : "#DC2626" }}>
+                      {delta >= 0 ? "▲" : "▼"} {delta >= 0 ? "Beating" : "Trailing"} Nifty 50 by {Math.abs(delta).toFixed(2)} pts
+                    </div>
+                  )}
+                </>);
+              })()}
+            </div>
           </div>
           <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "18px 0 8px 2px" }}>Structure & risk</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
@@ -1224,7 +1298,6 @@ export default function MutualFundHealthCheckDashboard() {
           <SectionHeader label="Deep diagnostics" title="Portfolio health metrics" color="#7C3AED" />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
             {[
-              { label: "Market Hurdle (Nifty 50 TRI 10Y)", value: formatPct2(alphaHurdle), sub: `Your XIRR: ${formatPct2(executivePulse.xirrPct)}`, color: executivePulse.direction === "beating" ? "#059669" : "#D97706" },
               { label: "Active Winners", value: activeHitRate !== null ? formatPct2(activeHitRate * 100) : "—", sub: "Share of active money beating benchmark", color: (activeHitRate ?? 0) > 0.5 ? "#059669" : "#D97706" },
               { label: "Consistency Check", value: consistencyScore.total ? `${consistencyScore.winners}/${consistencyScore.total}` : "—", sub: "Funds above category IR average", color: "#2563EB" },
               { label: "Bottom-Quartile Exposure", value: formatCurrency(yieldTrapValue), sub: "Funds in bottom 25% of peers", color: yieldTrapValue > 100000 ? "#DC2626" : "#059669" },
@@ -1243,7 +1316,6 @@ export default function MutualFundHealthCheckDashboard() {
           <details style={{ marginTop: 12 }}>
             <summary style={{ fontSize: 11, color: "#94A3B8", cursor: "pointer", userSelect: "none" }}>How are these calculated? ▼</summary>
             <div style={{ marginTop: 8, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px", fontSize: 11, color: "#64748B", lineHeight: 1.8 }}>
-              <div><strong>Market hurdle:</strong> 10-year return of a large, long-running Nifty 50 TRI benchmark fund from AMFI data.</div>
               <div><strong>Active winners:</strong> Share of active fund money with positive 3Y alpha above benchmark.</div>
               <div><strong>Consistency check:</strong> Funds whose 3Y Information Ratio exceeds their sub-category average.</div>
               <div><strong>Bottom-quartile:</strong> Funds with Percentile rank below 25 in their sub-category.</div>
