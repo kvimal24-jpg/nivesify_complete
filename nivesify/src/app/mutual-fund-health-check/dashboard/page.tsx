@@ -552,6 +552,17 @@ export default function MutualFundHealthCheckDashboard() {
   const lineHasData = useMemo(() => lineData.some((i) => i.valueOne !== 0 || i.valueTwo !== 0), [lineData]);
 
   const portfolioPerf = useMemo(() => CUTOFFS.map((c) => {
+    if (c.days === 1) {
+      let now = 0, prev = 0;
+      portfolio.forEach((row) => {
+        const two = lastTwoNav(navMap[row.schemeCode]);
+        if (!two || row.currentUnits <= 0) return;
+        prev += row.currentUnits * two[0];
+        now  += row.currentUnits * two[1];
+      });
+      return { key: c.key, pct: prev > 0 ? ((now - prev) / prev) * 100 : null, abs: now - prev, invested: 0 };
+    }
+
     const end = new Date();
     const start = new Date(); start.setDate(start.getDate() - c.days);
     const T = c.days;
@@ -1216,6 +1227,9 @@ export default function MutualFundHealthCheckDashboard() {
                       {delta >= 0 ? "▲" : "▼"} {delta >= 0 ? "Beating" : "Trailing"} Nifty 50 by {Math.abs(delta).toFixed(2)} pts
                     </div>
                   )}
+                  <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 10, lineHeight: 1.5 }}>
+                    You = your money-weighted (XIRR) return, net of SIPs & redemptions. Nifty 50 = index return (an index has no cash flows, so point-to-point is its true return). 1D compares the last two published NAVs.
+                  </div>
                 </>);
               })()}
             </div>
