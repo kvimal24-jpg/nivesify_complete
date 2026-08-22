@@ -693,7 +693,11 @@ export default function MutualFundHealthCheckDashboard() {
 
       const pref = (s: any) => {
         const n = String(s?.schemeName || "").toLowerCase();
-        return (n.includes("direct") ? 2 : 0) + (n.includes("growth") ? 1 : 0);
+        let score = 0;
+        if (!n.includes("etf")) score += 4;
+        if (n.includes("direct")) score += 2;
+        if (n.includes("growth")) score += 1;
+        return score;
       };
 
       const cands = [...matches].sort((a, b) => pref(b) - pref(a)).slice(0, 3);
@@ -715,6 +719,8 @@ export default function MutualFundHealthCheckDashboard() {
           const past = navOnOrBefore(series, d);
           return { key: c.key, pct: now && past ? ((now - past) / past) * 100 : null };
         });
+        const pub = benchmarkMap.get(normalizeBenchmark("Nifty 50 TRI"));
+        rows.forEach((r) => { if (r.key === "1Y" && pub?.return1Y != null && Number.isFinite(pub.return1Y)) r.pct = pub.return1Y; });
         const y = rows.find((r) => r.key === "1Y")?.pct;
         const valid = y == null || !Number.isFinite(amfi1Y) || Math.abs(y - amfi1Y) <= 2;
         if (valid || i === cands.length - 1) {
@@ -724,7 +730,7 @@ export default function MutualFundHealthCheckDashboard() {
         }
       }
     })();
-  }, [niftySchemeName, schemeList, amfiRaw]);
+  }, [niftySchemeName, schemeList, amfiRaw, benchmarkMap]);
 
   const activeHitRate = useMemo(() => {
     const total = activeHoldings.reduce((s, r) => s + r.value, 0);
