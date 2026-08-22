@@ -552,24 +552,47 @@ export default function MutualFundHealthCheckDashboard() {
   const lineHasData = useMemo(() => lineData.some((i) => i.valueOne !== 0 || i.valueTwo !== 0), [lineData]);
 
   const portfolioPerf = useMemo(() => CUTOFFS.map((c) => {
-    if (c.days === 1) {
-      let now = 0, prev = 0;
-      portfolio.forEach((row) => {
-        const two = lastTwoNav(navMap[row.schemeCode]);
-        if (!two || row.currentUnits <= 0) return;
-        prev += row.currentUnits * two[0]; now += row.currentUnits * two[1];
-      });
-      const abs = now - prev;
-      return { key: c.key, pct: prev > 0 ? ((now - prev) / prev) * 100 : null, abs };
+    const end = new Date();
+    const start = new Date(); start.setDate(start.getDate() - c.days);
+    const T = c.days;
+
+    let vStart = 0;
+    portfolio.forEach((row) => {
+      const u = unitsAt(row.allTransactions, start); if (u <= 0) return;
+      const nav = navOnOrBefore(navMap[row.schemeCode], start); if (nav) vStart += u * nav;
+    });
+
+    let cfSum = 0;
+    portfolio.forEach((row) => row.allTransactions.forEach((t: any) => {
+      const td = new Date(t.date);
+      if (td <= start || td > end) return;
+      cfSum += t.type === "Investment" ? t.amount : -t.amount;
+    }));
+
+    const vEnd = summary.totalValue;
+    const growth = vEnd - vStart - cfSum;
+
+    let pct: number | null = null;
+    if (vStart > 0) {
+      const txns: any[] = [{ amount: vStart, date: start, type: "buy" }];
+      portfolio.forEach((row) => row.allTransactions.forEach((t: any) => {
+        const td = new Date(t.date);
+        if (td <= start || td > end) return;
+        txns.push({ amount: t.amount, date: td, type: t.type === "Investment" ? "buy" : "sell" });
+      }));
+      const cashflows = buildCashflows(txns, vEnd, end, true);
+      if (cashflows.length >= 2) {
+        const r = xirr(cashflows);
+        if (r !== null && Number.isFinite(r) && r > -0.99) {
+          pct = (Math.pow(1 + r, T / 365) - 1) * 100;
+        }
+      }
     }
-    const d = new Date(); d.setDate(d.getDate() - c.days);
-    const past = portfolio.reduce((sum, row) => {
-      const u = unitsAt(row.allTransactions, d); if (u <= 0) return sum;
-      const nav = navOnOrBefore(navMap[row.schemeCode], d); return sum + (nav ? u * nav : 0);
-    }, 0);
-    const cur = summary.totalValue;
-    const abs = past > 0 ? summary.totalValue - past : null;
-    return { key: c.key, pct: past > 0 ? ((cur - past) / past) * 100 : null, abs };
+    if (pct === null) {
+      const denom = vStart + cfSum / 2;
+      pct = denom > 0 ? (growth / denom) * 100 : null;
+    }
+    return { key: c.key, pct, abs: growth, invested: cfSum };
   }), [portfolio, navMap, summary.totalValue]);
 
   const saveData = async (nextData: InvestmentsData) => {
@@ -1167,7 +1190,10 @@ export default function MutualFundHealthCheckDashboard() {
                     <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
                       <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>You</div>
                       <div style={{ fontSize: 24, fontWeight: 900, color: (sel?.pct ?? 0) >= 0 ? "#059669" : "#DC2626", lineHeight: 1 }}>{sel?.pct != null ? `${sel.pct >= 0 ? "+" : ""}${sel.pct.toFixed(2)}%` : "—"}</div>
-                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>{sel?.abs != null ? `${sel.abs >= 0 ? "+" : "−"}${fmtCompactINR(Math.abs(sel.abs))} added` : " "}</div>
+                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>
+                        {sel?.abs != null ? `${sel.abs >= 0 ? "+" : "−"}${fmtCompactINR(Math.abs(sel.abs))} real growth` : " "}
+                        {sel?.invested ? ` · ${fmtCompactINR(sel.invested)} invested` : ""}
+                      </div>
                     </div>
                     <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
                       <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Nifty 50</div>
