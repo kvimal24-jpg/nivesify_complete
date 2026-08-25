@@ -215,13 +215,13 @@ const CSS = `
 /* ── TYPES ──────────────────────────────────────────────────────────────── */
 type LiveFund = {
   Fund_Name: string;
-  Category: string;
-  Sub_Category: string;
-  Fund_Return_3Y: number;
-  Alpha_3Y: number;
-  Current_AUM: number;
-  Percentile_in_SubCategory: number;
-  Composite_Score: number;
+  Category: string | null;
+  Sub_Category: string | null;
+  Fund_Return_3Y: number | null;
+  Alpha_3Y: number | null;
+  Current_AUM: number | null;
+  Percentile_in_SubCategory: number | null;
+  Composite_Score: number | null;
 };
 type Manifest = { dateTag: string; reportDate: string; counts: { raw: number; funds: number; etfs: number } };
 
@@ -284,6 +284,8 @@ function Counter({ to, suffix = "", duration = 1800 }: { to: number; suffix?: st
 const fmtL = (n: number) => n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : `₹${(n / 1e5).toFixed(1)} L`;
 const fmtAUM = (cr: number) => cr >= 100000 ? `₹${(cr / 100000).toFixed(1)}L Cr` : `₹${Math.round(cr).toLocaleString("en-IN")} Cr`;
 const shortName = (n: string) => n.replace(/ Fund$/, "").replace(/ Fund /g, " ");
+const num = (v: number | null | undefined, d = 0): number => typeof v === "number" && Number.isFinite(v) ? v : d;
+const hasNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 /* ── SPARKLINE ──────────────────────────────────────────────────────────── */
 function Spark({ pts, color, w = 50, h = 20 }: { pts: number[]; color: string; w?: number; h?: number }) {
@@ -395,11 +397,19 @@ function useLiveData() {
 
   const manifest = state.manifest ?? FALLBACK_MANIFEST;
   const topByCategory = (sub: string): LiveFund[] => {
-    const live = state.funds?.filter(f => f.Sub_Category === sub).sort((a, b) => b.Composite_Score - a.Composite_Score).slice(0, 3);
+    const live = state.funds
+      ?.filter(f => f.Sub_Category === sub && hasNum(f.Fund_Return_3Y) && hasNum(f.Alpha_3Y) && hasNum(f.Percentile_in_SubCategory))
+      .sort((a, b) => num(b.Composite_Score) - num(a.Composite_Score))
+      .slice(0, 3);
     return live && live.length >= 3 ? live : FALLBACK_FUNDS[sub] ?? [];
   };
   const tickerFunds = (() => {
-    const live = state.funds ? [...state.funds].sort((a, b) => b.Composite_Score - a.Composite_Score).slice(0, 12).map(f => ({ name: shortName(f.Fund_Name), alpha: f.Alpha_3Y })) : null;
+    const live = state.funds
+      ? state.funds.filter((f): f is LiveFund & { Alpha_3Y: number } => hasNum(f.Alpha_3Y) && !!f.Fund_Name)
+        .sort((a, b) => num(b.Composite_Score) - num(a.Composite_Score))
+        .slice(0, 12)
+        .map(f => ({ name: shortName(f.Fund_Name), alpha: f.Alpha_3Y }))
+      : null;
     return live && live.length >= 8 ? live : TICKER_FALLBACK;
   })();
 
@@ -586,7 +596,7 @@ function HallOfFame({ topByCategory, loaded, manifest }: { topByCategory: (s: st
                     <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ink)", lineHeight: 1.3 }}>{shortName(f.Fund_Name)}</div>
                   </div>
                   <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
-                    <div style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: 23, fontWeight: 900, color: "var(--ink)", lineHeight: 1 }}>{f.Fund_Return_3Y.toFixed(1)}%</div>
+                    <div style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: 23, fontWeight: 900, color: "var(--ink)", lineHeight: 1 }}>{num(f.Fund_Return_3Y).toFixed(1)}%</div>
                     <div style={{ fontSize: 9.5, fontWeight: 700, color: "var(--slate)", marginTop: 3 }}>3Y CAGR</div>
                   </div>
                 </div>
@@ -594,17 +604,17 @@ function HallOfFame({ topByCategory, loaded, manifest }: { topByCategory: (s: st
                 <div style={{ display: "flex", gap: 7, flexWrap: "wrap" as const }}>
                   <span style={{
                     fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: "4px 10px",
-                    color: f.Alpha_3Y >= 0 ? "#00A862" : "#DC2626",
-                    background: f.Alpha_3Y >= 0 ? "rgba(0,201,123,.10)" : "rgba(239,68,68,.09)",
-                    border: `1px solid ${f.Alpha_3Y >= 0 ? "rgba(0,201,123,.28)" : "rgba(239,68,68,.28)"}`,
+                    color: num(f.Alpha_3Y) >= 0 ? "#00A862" : "#DC2626",
+                    background: num(f.Alpha_3Y) >= 0 ? "rgba(0,201,123,.10)" : "rgba(239,68,68,.09)",
+                    border: `1px solid ${num(f.Alpha_3Y) >= 0 ? "rgba(0,201,123,.28)" : "rgba(239,68,68,.28)"}`,
                   }}>
-                    {f.Alpha_3Y >= 0 ? "+" : ""}{f.Alpha_3Y.toFixed(1)}% alpha
+                    {num(f.Alpha_3Y) >= 0 ? "+" : ""}{num(f.Alpha_3Y).toFixed(1)}% alpha
                   </span>
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--slate)", background: "rgba(10,14,28,.045)", border: "1px solid rgba(10,14,28,.08)", borderRadius: 100, padding: "4px 10px" }}>
-                    AUM {fmtAUM(f.Current_AUM)}
+                    AUM {fmtAUM(num(f.Current_AUM))}
                   </span>
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: "#4F46E5", background: "rgba(99,102,241,.09)", border: "1px solid rgba(99,102,241,.26)", borderRadius: 100, padding: "4px 10px" }}>
-                    beats {f.Percentile_in_SubCategory.toFixed(0)}% peers
+                    beats {num(f.Percentile_in_SubCategory).toFixed(0)}% peers
                   </span>
                 </div>
               </div>
