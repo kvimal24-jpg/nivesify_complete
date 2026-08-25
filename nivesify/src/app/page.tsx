@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
 import { fetchCachedJson } from "@/lib/client-data";
+import { Sprout, ChartLine, Goal as GoalIcon, Crosshair, TrendingUp, Wallet, Sunrise } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────────────────
    DESIGN SYSTEM — One world: deep-navy canvas, liquid glass surfaces,
@@ -40,6 +42,19 @@ const CSS = `
   @keyframes auroraA { 0%,100% { transform:translate(0,0) scale(1); } 33% { transform:translate(70px,-50px) scale(1.14); } 66% { transform:translate(-50px,35px) scale(.93); } }
   @keyframes auroraB { 0%,100% { transform:translate(0,0) scale(1); } 50% { transform:translate(-80px,-60px) scale(1.2); } }
   @keyframes glowRing { 0%,100% { filter:drop-shadow(0 0 5px rgba(0,201,123,.35)); } 50% { filter:drop-shadow(0 0 13px rgba(0,201,123,.6)); } }
+  @keyframes twinkle { 0%,100% { opacity:.12; } 50% { opacity:.85; } }
+  @keyframes zrise { 0% { transform:translateY(4px); opacity:0; } 30% { opacity:.9; } 100% { transform:translateY(-12px); opacity:0; } }
+  @keyframes dreamBob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3.5px); } }
+  @keyframes sway { 0%,100% { transform:rotate(-2.5deg); } 50% { transform:rotate(2.5deg); } }
+
+  .doodle-band { max-width:440px; }
+  .doodle-band svg { display:block; width:100%; height:auto; }
+  .doodle-band .dream:focus-visible circle { stroke:#00E8A2; stroke-width:2; }
+  @media(max-width:759px){ .doodle-band { max-width:330px; } }
+  .doodle-band .tw { animation:twinkle 3.2s ease-in-out infinite; }
+  .doodle-band .zz { animation:zrise 2.6s ease-out infinite; transform-box:fill-box; transform-origin:center; }
+  .doodle-band .dream { animation:dreamBob 3.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  .doodle-band .plant { animation:sway 4.5s ease-in-out infinite; transform-box:fill-box; transform-origin:bottom center; }
 
   .f1 { animation: fadeUp .6s ease both .05s; }
   .f2 { animation: fadeUp .6s ease both .16s; }
@@ -139,6 +154,16 @@ const CSS = `
   .grid-3 { display:grid; grid-template-columns:1fr; gap:14px; }
   @media(min-width:700px){ .grid-3 { grid-template-columns:repeat(3,1fr); } }
 
+  .journey-card { border-radius:24px; padding:21px 19px; }
+  @media(min-width:700px){ .journey-card { padding:26px 24px; } }
+
+  .calc-strip { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .calc-card { border-radius:17px; padding:15px 13px; height:100%; }
+  @media(min-width:760px){
+    .calc-strip { grid-template-columns:repeat(4,1fr); gap:12px; }
+    .calc-card { border-radius:20px; padding:20px 19px; }
+  }
+
   .grid-4 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   @media(min-width:760px){ .grid-4 { grid-template-columns:repeat(4,1fr); } }
 
@@ -162,11 +187,6 @@ const CSS = `
 
   .hof-grid { display:grid; grid-template-columns:1fr; gap:16px; }
   @media(min-width:700px){ .hof-grid { grid-template-columns:repeat(3,1fr); gap:18px; } }
-
-  .calc-strip { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; padding-bottom:6px; }
-  .calc-strip::-webkit-scrollbar { display:none; }
-  .calc-tile { flex:0 0 min(78vw,300px); scroll-snap-align:start; }
-  @media(min-width:760px){ .calc-strip { display:grid; grid-template-columns:repeat(4,1fr); overflow:visible; } .calc-tile { flex:auto; } }
 
   .sticky-cta {
     position:fixed; left:12px; right:12px; bottom:12px; z-index:60;
@@ -447,6 +467,84 @@ function Spark({ pts, color, w = 40, h = 17 }: { pts: number[]; color: string; w
   );
 }
 
+/* ── SLEEP DOODLE — "plan once, sleep sound" hero scene ─────────────────── */
+function SleepDoodle() {
+  const router = useRouter();
+  const stroke = { fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const dreams = [
+    { cx: 420, cy: 38, href: "/dashboard/calculators#calc-sip-goal", tip: "Price the wedding · the home · the degree" },
+    { cx: 474, cy: 66, href: "/dashboard/calculators#calc-sip-fv", tip: "What today's SIP becomes tomorrow" },
+    { cx: 512, cy: 34, href: "/dashboard/calculators#calc-retirement", tip: "Retire on your own terms" },
+  ];
+  return (
+    <div className="doodle-band">
+      <svg viewBox="0 0 560 132" role="img" aria-label="Doodle: after one honest portfolio review, you sleep soundly while your money grows toward your dreams">
+        {/* moon + stars */}
+        <path d="M56 16a15 15 0 1 0 9.5 26.5A12.5 12.5 0 1 1 56 16Z" fill="rgba(165,180,252,.30)" stroke="rgba(165,180,252,.55)" strokeWidth="1.4" />
+        <circle className="tw" cx="112" cy="24" r="1.7" fill="#fff" style={{ animationDelay: "0s" }} />
+        <circle className="tw" cx="330" cy="14" r="1.5" fill="#fff" style={{ animationDelay: ".8s" }} />
+        <circle className="tw" cx="452" cy="22" r="1.8" fill="#fff" style={{ animationDelay: "1.6s" }} />
+        <circle className="tw" cx="520" cy="60" r="1.4" fill="#fff" style={{ animationDelay: ".4s" }} />
+        <circle className="tw" cx="286" cy="34" r="1.3" fill="#fff" style={{ animationDelay: "2.2s" }} />
+
+        {/* dream bubbles: home · degree · ring — tap to plan */}
+        {dreams.map((d, i) => (
+          <g key={i} className="dream" role="link" tabIndex={0} aria-label={d.tip}
+            style={{ animationDelay: `${i * 1.05}s`, cursor: "pointer" }}
+            onClick={() => router.push(d.href)}
+            onKeyDown={e => { if (e.key === "Enter") router.push(d.href); }}>
+            <title>{d.tip}</title>
+            {i === 0 && <>
+              <circle cx="420" cy="38" r="19" fill="rgba(245,158,11,.07)" stroke="rgba(251,191,36,.55)" strokeDasharray="3.5 4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} />
+              <path d="M413 41v-7l7-6 7 6v7h-5v-5h-4v5Z" stroke="#FBBF24" strokeWidth="1.6" {...stroke} />
+            </>}
+            {i === 1 && <>
+              <circle cx="474" cy="66" r="15" fill="rgba(99,102,241,.08)" stroke="rgba(165,180,252,.5)" strokeWidth={1.3} strokeDasharray="3 4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M467 64l7-4 7 4-7 4Zm7 4v5" stroke="#A5B4FC" strokeWidth="1.6" {...stroke} />
+            </>}
+            {i === 2 && <>
+              <circle cx="512" cy="34" r="11.5" fill="rgba(0,201,123,.07)" stroke="rgba(0,232,162,.5)" strokeWidth={1.3} strokeDasharray="3 3.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="512" cy="37" r="4" stroke="#00E8A2" strokeWidth="1.5" {...stroke} />
+              <path d="M510 31l2-3 2 3-2 2Z" stroke="#00E8A2" strokeWidth="1.4" {...stroke} />
+            </>}
+          </g>
+        ))}
+
+        {/* ground */}
+        <path d="M10 114q270-18 540-4" stroke="rgba(255,255,255,.14)" strokeWidth="1.6" {...stroke} />
+
+        {/* plant */}
+        <g className="plant">
+          <path d="M84 113h20l-3 9h-14Z" stroke="#00C97B" strokeWidth="1.5" fill="rgba(0,201,123,.08)" strokeLinejoin="round" />
+          <path d="M94 112v-12" stroke="#00E8A2" strokeWidth="1.6" {...stroke} />
+          <path d="M94 104c-7-1-9-6-9-9 6 0 9 3 9 9Zm0-5c7-1 8-5 8-8-5 0-8 3-8 8Z" stroke="#00E8A2" strokeWidth="1.4" {...stroke} />
+        </g>
+
+        {/* coin-stack pillow */}
+        <ellipse cx="168" cy="106" rx="40" ry="9" fill="rgba(0,201,123,.06)" stroke="rgba(0,201,123,.35)" strokeWidth="1.3" />
+        <ellipse cx="168" cy="97" rx="40" ry="9" fill="rgba(0,201,123,.10)" stroke="rgba(0,201,123,.45)" strokeWidth="1.3" />
+        <ellipse cx="168" cy="88" rx="40" ry="9" fill="rgba(0,201,123,.14)" stroke="rgba(0,201,123,.6)" strokeWidth="1.3" />
+        <text x="160" y="92" fontSize="11" fontWeight="800" fill="#00E8A2">₹</text>
+
+        {/* sleeper */}
+        <circle cx="228" cy="80" r="11" fill="#10162B" stroke="rgba(255,255,255,.65)" strokeWidth="1.6" />
+        <path d="M222.5 79q2 2.4 4 0M230.5 79q2 2.4 4 0" stroke="rgba(255,255,255,.75)" strokeWidth="1.4" {...stroke} />
+        <path d="M225 85.5q3 2.6 6 0" stroke="rgba(255,255,255,.6)" strokeWidth="1.3" {...stroke} />
+        {/* blanket body */}
+        <path d="M237 82q52-14 108-2 16 4 12 18l-116 3q-9-8-4-19Z" fill="rgba(99,102,241,.13)" stroke="rgba(165,180,252,.5)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M262 84v14M290 81v17M318 82v16" stroke="rgba(165,180,252,.28)" strokeWidth="1.2" {...stroke} />
+        {/* feet out of blanket */}
+        <path d="M357 96h9m-9 6h7" stroke="rgba(255,255,255,.55)" strokeWidth="2" {...stroke} />
+
+        {/* rising zzz */}
+        <text className="zz" x="243" y="62" fontSize="11" fontWeight="800" fill="#00E8A2" style={{ animationDelay: "0s" }}>z</text>
+        <text className="zz" x="256" y="52" fontSize="14" fontWeight="800" fill="#00E8A2" style={{ animationDelay: ".85s" }}>z</text>
+        <text className="zz" x="272" y="42" fontSize="17" fontWeight="800" fill="#00E8A2" style={{ animationDelay: "1.7s" }}>z</text>
+      </svg>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    HALL OF FAME — immersive proof section. Live leaderboard + market pulse.
 ══════════════════════════════════════════════════════════════════════════ */
@@ -697,6 +795,15 @@ export default function Home() {
   const totalSchemes = manifest?.counts.raw ?? 0;
 
   const [showCta, setShowCta] = useState(false);
+
+  useEffect(() => {
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type === "reload") {
+      window.history.scrollRestoration = "manual";
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+    }
+    return () => { window.history.scrollRestoration = "auto"; };
+  }, []);
   useEffect(() => {
     const onScroll = () => {
       const pastHero = window.scrollY > 700;
@@ -713,7 +820,7 @@ export default function Home() {
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       {/* ════ 1 · HOOK — hero + live SIP studio ════ */}
-      <header style={{ position: "relative", overflow: "hidden", padding: "clamp(56px,9vw,110px) clamp(16px,4vw,48px) clamp(48px,7vw,88px)", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+      <header style={{ position: "relative", overflow: "hidden", padding: "clamp(34px,6vw,96px) clamp(16px,4vw,48px) clamp(48px,7vw,88px)", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
         <div style={{ position: "absolute", top: "-240px", left: "-140px", width: 760, height: 760, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,201,123,.15) 0%,transparent 62%)", filter: "blur(32px)", animation: "auroraA 26s ease-in-out infinite", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "-260px", right: "-160px", width: 860, height: 860, borderRadius: "50%", background: "radial-gradient(circle,rgba(99,102,241,.14) 0%,transparent 60%)", filter: "blur(38px)", animation: "auroraB 30s ease-in-out infinite", pointerEvents: "none" }} />
         <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px)", backgroundSize: "52px 52px", pointerEvents: "none" }} />
@@ -721,7 +828,12 @@ export default function Home() {
         <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative" }}>
           <div className="hero-cols">
             <div>
-              <div className="f1" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "rgba(0,201,123,.09)", border: "1px solid rgba(0,201,123,.26)", borderRadius: 100, padding: "6px 15px", marginBottom: 26 }}>
+              <div style={{ marginBottom: 14 }}>
+                <SleepDoodle />
+                <p style={{ margin: "2px 0 0", fontSize: 10.5, color: "var(--txt-lo)", fontStyle: "italic", textAlign: "right" as const }}>you, after one honest portfolio review</p>
+              </div>
+
+              <div className="f1" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "rgba(0,201,123,.09)", border: "1px solid rgba(0,201,123,.26)", borderRadius: 100, padding: "6px 15px", marginBottom: 20 }}>
                 <span className="live-dot" style={{ width: 7, height: 7, background: "#00C97B", borderRadius: "50%" }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#00E8A2", letterSpacing: ".07em", textTransform: "uppercase" as const }}>
                   {loaded ? `${totalSchemes.toLocaleString("en-IN")} funds · updated ${manifest?.reportDate ?? ""} · free forever` : "connecting to live data…"}
@@ -729,14 +841,14 @@ export default function Home() {
               </div>
 
               <h1 className="f2" style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: "clamp(2.6rem,6.8vw,5rem)", fontWeight: 900, lineHeight: 1.02, letterSpacing: "-.04em", color: "var(--txt-hi)", marginBottom: 22 }}>
-                Stop guessing.<br />Start <span className="shimmer-green">knowing.</span>
+                Plan once.<br />Sleep sound <span className="shimmer-green">forever.</span>
               </h1>
 
-              <p className="f3" style={{ fontSize: "clamp(15px,1.9vw,17.5px)", color: "var(--txt-md)", lineHeight: 1.8, maxWidth: 470, marginBottom: 34 }}>
-                Nivesify tells you what your investments actually earned, which funds are quietly losing to the market, and exactly how much to invest for the life you want.
+              <p className="f3" style={{ fontSize: "clamp(15px,1.9vw,17.5px)", color: "var(--txt-md)", lineHeight: 1.8, maxWidth: 470, marginBottom: 28 }}>
+                Nivesify does the worrying math — what your funds really earned, whether you&apos;re actually winning, and the exact monthly plan for every dream — so you can close the laptop and get on with your life.
               </p>
 
-              <div className="f4" style={{ display: "flex", flexWrap: "wrap" as const, gap: 12, alignItems: "center", marginBottom: 34 }}>
+              <div className="f4" style={{ display: "flex", flexWrap: "wrap" as const, gap: 12, alignItems: "center", marginBottom: 28 }}>
                 <Link href="/mutual-fund-health-check/dashboard" style={{ textDecoration: "none" }}>
                   <button className="btn-primary" style={{ borderRadius: 15, padding: "17px 32px", fontSize: 16 }}>
                     🏥 Audit my portfolio — free
@@ -745,10 +857,10 @@ export default function Home() {
                 <span style={{ fontSize: 12.5, color: "var(--txt-lo)", fontWeight: 600 }}>3 minutes · no signup</span>
               </div>
 
-              <div className="f5" style={{ display: "flex", gap: 26, flexWrap: "wrap" as const, paddingTop: 22, borderTop: "1px solid rgba(255,255,255,.08)" }}>
+              <div className="f5" style={{ display: "flex", gap: "20px 28px", flexWrap: "wrap" as const, paddingTop: 22, borderTop: "1px solid rgba(255,255,255,.08)" }}>
                 {[
                   { v: loaded && totalSchemes > 0 ? <Counter to={totalSchemes} /> : null, l: "funds scored live" },
-                  { v: <>₹84.9L Cr</>, l: "market money analysed", skip: true },
+                  { v: loaded && hasNum(industry?.Total_AUM) ? <>₹{fmtAUMcr(industry.Total_AUM)}</> : null, l: "market money analysed", skip: true },
                 ].map((s, i) => (
                   <div key={i}>
                     <div style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: "clamp(1.4rem,2.4vw,2rem)", fontWeight: 900, color: "var(--txt-hi)", lineHeight: 1, minHeight: 24 }}>
@@ -789,28 +901,34 @@ export default function Home() {
       <section style={{ padding: "clamp(44px,6vw,76px) clamp(16px,4vw,48px)", borderTop: "1px solid rgba(255,255,255,.05)" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <SR>
+            <p style={{ fontSize: 11, fontWeight: 800, color: "#00E8A2", letterSpacing: ".12em", textTransform: "uppercase" as const, textAlign: "center" as const, marginBottom: 8 }}>Start · Audit · Plan</p>
             <h2 style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: "clamp(1.6rem,3.4vw,2.4rem)", fontWeight: 900, color: "var(--txt-hi)", letterSpacing: "-.03em", textAlign: "center" as const, lineHeight: 1.12, marginBottom: 10 }}>
               Where are you on the journey?
             </h2>
             <p style={{ textAlign: "center" as const, fontSize: 13.5, color: "var(--txt-md)", marginBottom: 28 }}>
-              Each door leads straight to the tool that fits.
+              Every investor walks the same three steps — pick the door that sounds like you.
             </p>
           </SR>
           <SR delay={70}>
             <div className="grid-3">
               {[
-                { q: "\"I want to start, but where do I begin?\"", a: "Before your first ₹500 goes in, understand what you're buying: NAV, expense ratios, direct vs regular plans — and the traps that eat returns silently.", cta: "Teach me the basics", href: "/why-mutual-fund", icon: "🌱", glow: "rgba(0,201,123,.12)" },
-                { q: "\"I've been investing… but am I winning?\"", a: `Years of SIPs deserve an honest report card. Upload one PDF and see every fund's real XIRR against its benchmark${hasNum(industry?.Pct_Funds_Beating_Benchmark_3Y) ? ` — remember, only ${Math.round(industry.Pct_Funds_Beating_Benchmark_3Y)}% of funds actually win` : ""}.`, cta: "Get my honest report card", href: "/mutual-fund-health-check/dashboard", icon: "📊", glow: "rgba(99,102,241,.13)" },
-                { q: "\"I have dreams. What will they cost?\"", a: "Retiring at 45? A wedding next year? Your kid's degree in 2038? Get the exact monthly number between you and each goal — then the plan to hit it.", cta: "Price my goals", href: "/dashboard/calculators", icon: "🎯", glow: "rgba(245,158,11,.12)" },
+                { step: "Step 1 · Understand", q: "\"I want to start, but where do I begin?\"", a: "Before your first ₹500 goes in, learn what you're actually buying — NAV, expense ratios, direct vs regular plans — and the traps that quietly eat returns.", cta: "Learn the basics", href: "/why-mutual-fund", Icon: Sprout, glow: "rgba(0,201,123,.12)", ink: "#00E8A2" },
+                { step: "Step 2 · Find out", q: "\"I've been investing… but am I winning?\"", a: `Years of SIPs deserve an honest report card. Upload one PDF and see every fund's real XIRR against its benchmark${hasNum(industry?.Pct_Funds_Beating_Benchmark_3Y) ? ` — remember, only ${Math.round(industry.Pct_Funds_Beating_Benchmark_3Y)}% of funds actually win` : ""}.`, cta: "Get my report card", href: "/mutual-fund-health-check/dashboard", Icon: ChartLine, glow: "rgba(99,102,241,.13)", ink: "#A5B4FC" },
+                { step: "Step 3 · Move ahead", q: "\"I have dreams. What will they cost?\"", a: "Retiring at 45? A wedding next year? Your kid's degree in 2038? Get the exact monthly number between you and each goal — then the plan to hit it.", cta: "Price my goals", href: "/dashboard/calculators", Icon: GoalIcon, glow: "rgba(245,158,11,.12)", ink: "#FBBF24" },
               ].map((p, i) => (
                 <Link key={i} href={p.href} style={{ textDecoration: "none" }}>
-                  <div className="glass-deep lift" style={{ borderRadius: 24, padding: "26px 24px", height: "100%", display: "flex", flexDirection: "column" as const, position: "relative", overflow: "hidden" }}>
+                  <div className="glass-deep lift journey-card" style={{ height: "100%", display: "flex", flexDirection: "column" as const, position: "relative", overflow: "hidden" }}>
                     <div style={{ position: "absolute", top: -40, right: -40, width: 130, height: 130, borderRadius: "50%", background: `radial-gradient(circle, ${p.glow}, transparent 68%)`, pointerEvents: "none" }} />
-                    <div style={{ fontSize: 26, marginBottom: 14 }}>{p.icon}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 13, background: p.glow, border: "1px solid rgba(255,255,255,.08)" }}>
+                        <p.Icon size={21} strokeWidth={2} color={p.ink} />
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: p.ink, opacity: .75 }}>{p.step}</span>
+                    </div>
                     <div style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: 16.5, fontWeight: 700, fontStyle: "italic", color: "var(--txt-hi)", lineHeight: 1.35, marginBottom: 12 }}>{p.q}</div>
                     <div style={{ fontSize: 12.5, color: "var(--txt-md)", lineHeight: 1.72, flex: 1, marginBottom: 18 }}>{p.a}</div>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: "#00E8A2" }}>{p.cta}
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#00E8A2" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: p.ink }}>{p.cta}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke={p.ink} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </div>
                   </div>
                 </Link>
@@ -827,10 +945,13 @@ export default function Home() {
           <SR>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap" as const, gap: 10, marginBottom: 22 }}>
               <div>
-                <p style={{ fontSize: 11, fontWeight: 800, color: "#A5B4FC", letterSpacing: ".12em", textTransform: "uppercase" as const, marginBottom: 8 }}>Do the math once, sleep better forever</p>
+                <p style={{ fontSize: 11, fontWeight: 800, color: "#A5B4FC", letterSpacing: ".12em", textTransform: "uppercase" as const, marginBottom: 8 }}>The calm-money toolkit</p>
                 <h2 style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: "clamp(1.5rem,3.2vw,2.2rem)", fontWeight: 900, color: "var(--txt-hi)", letterSpacing: "-.03em" }}>
                   Four numbers worth knowing.
                 </h2>
+                <p style={{ fontSize: 13.5, color: "var(--txt-md)", marginTop: 10 }}>
+                  What will it cost? What will I have? Can I live off it? When can I stop?
+                </p>
               </div>
               <Link href="/dashboard/calculators" style={{ textDecoration: "none", fontSize: 12.5, fontWeight: 700, color: "var(--txt-md)" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "#00E8A2")}
@@ -842,17 +963,21 @@ export default function Home() {
           <SR delay={70}>
             <div className="calc-strip">
               {[
-                { id: "calc-sip-goal", icon: "🎯", t: "The goal number", d: "Wedding, home, degree — get the exact monthly SIP that gets you there." },
-                { id: "calc-sip-fv", icon: "📈", t: "Your future corpus", d: "What today's ₹10k/month looks like in 10, 20, 25 years." },
-                { id: "calc-swp", icon: "💸", t: "Safe withdrawal", d: "How much your corpus can pay you monthly without running dry." },
-                { id: "calc-retirement", icon: "🏖️", t: "Retirement reality", d: "Corpus needed, inflation adjusted, with a full year-by-year plan." },
+                { id: "calc-sip-goal", Icon: Crosshair, ink: "#FBBF24", chip: "rgba(245,158,11,.14)", t: "The goal number", d: "Wedding, home, degree — get the exact monthly SIP that gets you there." },
+                { id: "calc-sip-fv", Icon: TrendingUp, ink: "#00E8A2", chip: "rgba(0,201,123,.13)", t: "Your future corpus", d: "What today's ₹10k/month looks like in 10, 20, 25 years." },
+                { id: "calc-swp", Icon: Wallet, ink: "#A5B4FC", chip: "rgba(99,102,241,.15)", t: "Safe withdrawal", d: "How much your corpus can pay you monthly without running dry." },
+                { id: "calc-retirement", Icon: Sunrise, ink: "#FB923C", chip: "rgba(251,146,60,.14)", t: "Retirement reality", d: "Corpus needed, inflation adjusted, with a full year-by-year plan." },
               ].map(c => (
                 <Link key={c.id} href={`/dashboard/calculators#${c.id}`} className="calc-tile" style={{ textDecoration: "none", display: "block", height: "100%" }}>
-                  <div className="glass lift" style={{ borderRadius: 20, padding: "20px 19px", height: "100%" }}>
-                    <div style={{ fontSize: 22, marginBottom: 10 }}>{c.icon}</div>
+                  <div className="glass lift calc-card">
+                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: 11, background: c.chip, border: "1px solid rgba(255,255,255,.08)", marginBottom: 12 }}>
+                      <c.Icon size={18} strokeWidth={2} color={c.ink} />
+                    </span>
                     <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--txt-hi)", marginBottom: 7 }}>{c.t}</div>
                     <div style={{ fontSize: 11.5, color: "var(--txt-md)", lineHeight: 1.65, marginBottom: 12 }}>{c.d}</div>
-                    <span style={{ fontSize: 11.5, fontWeight: 800, color: "#A5B4FC" }}>Calculate →</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: c.ink }}>Calculate
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 5, verticalAlign: "-1px" }}><path d="M5 12h14M13 6l6 6-6 6" stroke={c.ink} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </span>
                   </div>
                 </Link>
               ))}
