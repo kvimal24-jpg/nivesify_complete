@@ -10,3 +10,11 @@ export const DATA_ENDPOINTS = {
   insights: IS_PROD ? `${R2_BASE}/data/latest/industry-and-category-insights.json` : "/api/insights",
   manifest: IS_PROD ? `${R2_BASE}/data/latest/manifest.json`                       : "/api/manifest",
 };
+
+/* Direct public URLs — readable from the server (RSC) in every environment,
+   unlike the relative /api paths above. */
+export const SERVER_DATA_URLS = {
+  funds: `${R2_BASE}/data/latest/fund-analytics.json`,
+  insights: `${R2_BASE}/data/latest/industry-and-category-insights.json`,
+  manifest: `${R2_BASE}/data/latest/manifest.json`,
+};

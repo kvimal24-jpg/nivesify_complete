@@ -6,8 +6,22 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=3600, s-maxage=86400",
 };
 
-export const getR2JsonResponse = async (key: string) => {
-  const { env } = getCloudflareContext();
+/* Server-side read: binding first (fast, on Workers), null when unavailable
+   (local dev / build) so callers can fall back to the public URLs. */
+export const getR2Json = async <T,>(key: string): Promise<T | null> => {
+  try {
+    const { env } = getCloudflareContext();
+    const bucket = env.MF_DATA_BUCKET;
+    if (!bucket) return null;
+    const object = await bucket.get(key);
+    if (!object) return null;
+    return (await object.json()) as T;
+  } catch {
+    return null;
+  }
+};
+
+export const getR2JsonResponse = async (key: string) => {  const { env } = getCloudflareContext();
   const bucket = env.MF_DATA_BUCKET;
 
   if (!bucket) {
