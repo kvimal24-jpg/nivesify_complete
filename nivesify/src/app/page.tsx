@@ -44,17 +44,19 @@ const CSS = `
   @keyframes glowRing { 0%,100% { filter:drop-shadow(0 0 5px rgba(0,201,123,.35)); } 50% { filter:drop-shadow(0 0 13px rgba(0,201,123,.6)); } }
   @keyframes twinkle { 0%,100% { opacity:.12; } 50% { opacity:.85; } }
   @keyframes zrise { 0% { transform:translateY(4px); opacity:0; } 30% { opacity:.9; } 100% { transform:translateY(-12px); opacity:0; } }
-  @keyframes dreamBob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3.5px); } }
-  @keyframes sway { 0%,100% { transform:rotate(-2.5deg); } 50% { transform:rotate(2.5deg); } }
+  @keyframes cloudBob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3.5px); } }
+  @keyframes breathe { 0%,100% { transform:scaleY(1); } 50% { transform:scaleY(1.035); } }
+  @keyframes lampPulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
 
   .doodle-band { max-width:440px; }
   .doodle-band svg { display:block; width:100%; height:auto; }
-  .doodle-band .dream:focus-visible circle { stroke:#00E8A2; stroke-width:2; }
-  @media(max-width:759px){ .doodle-band { max-width:330px; } }
   .doodle-band .tw { animation:twinkle 3.2s ease-in-out infinite; }
   .doodle-band .zz { animation:zrise 2.6s ease-out infinite; transform-box:fill-box; transform-origin:center; }
-  .doodle-band .dream { animation:dreamBob 3.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
-  .doodle-band .plant { animation:sway 4.5s ease-in-out infinite; transform-box:fill-box; transform-origin:bottom center; }
+  .doodle-band .dreamcloud { animation:cloudBob 4.4s ease-in-out infinite; transform-box:fill-box; transform-origin:center; cursor:pointer; }
+  .doodle-band .dreamcloud:focus-visible path { stroke:#00E8A2; stroke-width:2; }
+  .doodle-band .duvet { animation:breathe 4.2s ease-in-out infinite; transform-box:fill-box; transform-origin:bottom center; }
+  .doodle-band .lampglow { animation:lampPulse 5s ease-in-out infinite; }
+  @media(max-width:759px){ .doodle-band { max-width:330px; } }
 
   .f1 { animation: fadeUp .6s ease both .05s; }
   .f2 { animation: fadeUp .6s ease both .16s; }
@@ -467,79 +469,112 @@ function Spark({ pts, color, w = 40, h = 17 }: { pts: number[]; color: string; w
   );
 }
 
-/* ── SLEEP DOODLE — "plan once, sleep sound" hero scene ─────────────────── */
+/* ── SLEEP DOODLE — thoughtful money, better life: a good night's sleep ─── */
 function SleepDoodle() {
   const router = useRouter();
-  const stroke = { fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const dreams = [
-    { cx: 420, cy: 38, href: "/dashboard/calculators#calc-sip-goal", tip: "Price the wedding · the home · the degree" },
-    { cx: 474, cy: 66, href: "/dashboard/calculators#calc-sip-fv", tip: "What today's SIP becomes tomorrow" },
-    { cx: 512, cy: 34, href: "/dashboard/calculators#calc-retirement", tip: "Retire on your own terms" },
-  ];
+  const ln = { fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const wood = { stroke: "rgba(196,154,108,.55)", strokeWidth: 1.5 };
   return (
     <div className="doodle-band">
-      <svg viewBox="0 0 560 132" role="img" aria-label="Doodle: after one honest portfolio review, you sleep soundly while your money grows toward your dreams">
-        {/* moon + stars */}
-        <path d="M56 16a15 15 0 1 0 9.5 26.5A12.5 12.5 0 1 1 56 16Z" fill="rgba(165,180,252,.30)" stroke="rgba(165,180,252,.55)" strokeWidth="1.4" />
-        <circle className="tw" cx="112" cy="24" r="1.7" fill="#fff" style={{ animationDelay: "0s" }} />
-        <circle className="tw" cx="330" cy="14" r="1.5" fill="#fff" style={{ animationDelay: ".8s" }} />
-        <circle className="tw" cx="452" cy="22" r="1.8" fill="#fff" style={{ animationDelay: "1.6s" }} />
-        <circle className="tw" cx="520" cy="60" r="1.4" fill="#fff" style={{ animationDelay: ".4s" }} />
-        <circle className="tw" cx="286" cy="34" r="1.3" fill="#fff" style={{ animationDelay: "2.2s" }} />
+      <svg viewBox="0 0 560 160" role="img" aria-label="Illustration: after one honest portfolio review, you sleep soundly while your money quietly grows toward your dreams">
+        <defs>
+          <linearGradient id="duvetGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(129,140,248,.32)" />
+            <stop offset="100%" stopColor="rgba(79,70,229,.14)" />
+          </linearGradient>
+          <radialGradient id="moonGlow">
+            <stop offset="0%" stopColor="rgba(165,180,252,.28)" />
+            <stop offset="100%" stopColor="rgba(165,180,252,0)" />
+          </radialGradient>
+          <radialGradient id="lampHalo">
+            <stop offset="0%" stopColor="rgba(255,196,107,.30)" />
+            <stop offset="100%" stopColor="rgba(255,196,107,0)" />
+          </radialGradient>
+        </defs>
 
-        {/* dream bubbles: home · degree · ring — tap to plan */}
-        {dreams.map((d, i) => (
-          <g key={i} className="dream" role="link" tabIndex={0} aria-label={d.tip}
-            style={{ animationDelay: `${i * 1.05}s`, cursor: "pointer" }}
-            onClick={() => router.push(d.href)}
-            onKeyDown={e => { if (e.key === "Enter") router.push(d.href); }}>
-            <title>{d.tip}</title>
-            {i === 0 && <>
-              <circle cx="420" cy="38" r="19" fill="rgba(245,158,11,.07)" stroke="rgba(251,191,36,.55)" strokeDasharray="3.5 4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} />
-              <path d="M413 41v-7l7-6 7 6v7h-5v-5h-4v5Z" stroke="#FBBF24" strokeWidth="1.6" {...stroke} />
-            </>}
-            {i === 1 && <>
-              <circle cx="474" cy="66" r="15" fill="rgba(99,102,241,.08)" stroke="rgba(165,180,252,.5)" strokeWidth={1.3} strokeDasharray="3 4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M467 64l7-4 7 4-7 4Zm7 4v5" stroke="#A5B4FC" strokeWidth="1.6" {...stroke} />
-            </>}
-            {i === 2 && <>
-              <circle cx="512" cy="34" r="11.5" fill="rgba(0,201,123,.07)" stroke="rgba(0,232,162,.5)" strokeWidth={1.3} strokeDasharray="3 3.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="512" cy="37" r="4" stroke="#00E8A2" strokeWidth="1.5" {...stroke} />
-              <path d="M510 31l2-3 2 3-2 2Z" stroke="#00E8A2" strokeWidth="1.4" {...stroke} />
-            </>}
-          </g>
-        ))}
+        {/* night sky */}
+        <circle cx="54" cy="32" r="26" fill="url(#moonGlow)" />
+        <path d="M62 18a15 15 0 1 0 9.5 26.5A12.5 12.5 0 1 1 62 18Z" fill="rgba(165,180,252,.35)" stroke="rgba(199,210,254,.6)" strokeWidth="1.3" />
+        <circle className="tw" cx="122" cy="20" r="1.7" fill="#fff" style={{ animationDelay: "0s" }} />
+        <circle className="tw" cx="205" cy="40" r="1.4" fill="#fff" style={{ animationDelay: ".8s" }} />
+        <circle className="tw" cx="300" cy="16" r="1.6" fill="#fff" style={{ animationDelay: "1.6s" }} />
+        <circle className="tw" cx="352" cy="52" r="1.3" fill="#fff" style={{ animationDelay: ".4s" }} />
+        <circle className="tw" cx="158" cy="64" r="1.3" fill="#fff" style={{ animationDelay: "2.2s" }} />
+        <path className="tw" d="M330 34l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z" fill="#fff" opacity=".7" style={{ animationDelay: "1.1s" }} />
 
-        {/* ground */}
-        <path d="M10 114q270-18 540-4" stroke="rgba(255,255,255,.14)" strokeWidth="1.6" {...stroke} />
+        {/* floor */}
+        <path d="M18 152q272-10 524-4" stroke="rgba(255,255,255,.10)" strokeWidth="1.5" {...ln} />
 
-        {/* plant */}
-        <g className="plant">
-          <path d="M84 113h20l-3 9h-14Z" stroke="#00C97B" strokeWidth="1.5" fill="rgba(0,201,123,.08)" strokeLinejoin="round" />
-          <path d="M94 112v-12" stroke="#00E8A2" strokeWidth="1.6" {...stroke} />
-          <path d="M94 104c-7-1-9-6-9-9 6 0 9 3 9 9Zm0-5c7-1 8-5 8-8-5 0-8 3-8 8Z" stroke="#00E8A2" strokeWidth="1.4" {...stroke} />
+        {/* nightstand */}
+        <rect x="26" y="96" width="66" height="8" rx="3.5" fill="rgba(196,154,108,.13)" {...wood} />
+        <rect x="32" y="104" width="54" height="23" rx="5" fill="rgba(196,154,108,.07)" {...wood} strokeWidth={1.3} />
+        <circle cx="59" cy="115.5" r="2.2" fill="rgba(196,154,108,.65)" />
+        <path d="M36 127l-3.5 17M82 127l3.5 17" stroke="rgba(196,154,108,.45)" strokeWidth={1.6} strokeLinecap="round" />
+
+        {/* lamp, switched off for the night */}
+        <ellipse className="lampglow" cx="46" cy="76" rx="19" ry="12" fill="url(#lampHalo)" />
+        <path d="M38 68h16l-4 11h-8Z" fill="rgba(255,196,107,.28)" stroke="rgba(255,196,107,.7)" strokeWidth={1.3} strokeLinejoin="round" />
+        <path d="M46 79v15" stroke="rgba(255,196,107,.55)" strokeWidth={1.6} strokeLinecap="round" />
+        <ellipse cx="46" cy="95" rx="6.5" ry="2" fill="rgba(255,196,107,.20)" stroke="rgba(255,196,107,.55)" strokeWidth={1.2} />
+
+        {/* phone face-down — no notifications tonight */}
+        <g transform="rotate(-8 78 92)">
+          <rect x="70" y="88" width="17" height="9.5" rx="2.5" fill="rgba(148,163,184,.16)" stroke="rgba(203,213,225,.55)" strokeWidth={1.2} />
+          <circle cx="74.5" cy="91" r="1.1" fill="rgba(203,213,225,.7)" />
         </g>
 
-        {/* coin-stack pillow */}
-        <ellipse cx="168" cy="106" rx="40" ry="9" fill="rgba(0,201,123,.06)" stroke="rgba(0,201,123,.35)" strokeWidth="1.3" />
-        <ellipse cx="168" cy="97" rx="40" ry="9" fill="rgba(0,201,123,.10)" stroke="rgba(0,201,123,.45)" strokeWidth="1.3" />
-        <ellipse cx="168" cy="88" rx="40" ry="9" fill="rgba(0,201,123,.14)" stroke="rgba(0,201,123,.6)" strokeWidth="1.3" />
-        <text x="160" y="92" fontSize="11" fontWeight="800" fill="#00E8A2">₹</text>
+        {/* bed frame + headboard */}
+        <rect x="484" y="66" width="21" height="72" rx="9" fill="rgba(196,154,108,.15)" {...wood} />
+        <rect x="126" y="124" width="380" height="8" rx="4" fill="rgba(196,154,108,.12)" {...wood} strokeWidth={1.4} />
+        <path d="M140 132l-4.5 18M492 132l4.5 18" stroke="rgba(196,154,108,.45)" strokeWidth={1.7} strokeLinecap="round" />
 
-        {/* sleeper */}
-        <circle cx="228" cy="80" r="11" fill="#10162B" stroke="rgba(255,255,255,.65)" strokeWidth="1.6" />
-        <path d="M222.5 79q2 2.4 4 0M230.5 79q2 2.4 4 0" stroke="rgba(255,255,255,.75)" strokeWidth="1.4" {...stroke} />
-        <path d="M225 85.5q3 2.6 6 0" stroke="rgba(255,255,255,.6)" strokeWidth="1.3" {...stroke} />
-        {/* blanket body */}
-        <path d="M237 82q52-14 108-2 16 4 12 18l-116 3q-9-8-4-19Z" fill="rgba(99,102,241,.13)" stroke="rgba(165,180,252,.5)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M262 84v14M290 81v17M318 82v16" stroke="rgba(165,180,252,.28)" strokeWidth="1.2" {...stroke} />
-        {/* feet out of blanket */}
-        <path d="M357 96h9m-9 6h7" stroke="rgba(255,255,255,.55)" strokeWidth="2" {...stroke} />
+        {/* mattress + pillow */}
+        <rect x="134" y="106" width="356" height="18" rx="8.5" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.25)" strokeWidth={1.3} />
+        <g transform="rotate(-6 461 102)">
+          <rect x="430" y="93" width="62" height="17" rx="8.5" fill="rgba(255,255,255,.17)" stroke="rgba(255,255,255,.38)" strokeWidth={1.3} />
+        </g>
+
+        {/* sleeper — peaceful, finally */}
+        <g>
+          <circle cx="455" cy="93" r="11.5" fill="#F0BE90" stroke="rgba(122,74,42,.6)" strokeWidth={1.4} />
+          <path d="M443.5 90Q444 78.5 455 78.5T466.5 90L462.5 88.5Q455 83 447.5 89Z" fill="#6B4A2F" />
+          <path d="M448 94q2.5 2.6 5 0M456.5 94q2.5 2.6 5 0" stroke="rgba(96,58,30,.8)" strokeWidth={1.3} {...ln} />
+          <path d="M451.5 100.5q3.5 2.8 7 0" stroke="rgba(122,74,42,.75)" strokeWidth={1.2} {...ln} />
+          <circle cx="447" cy="98" r="1.9" fill="rgba(240,130,90,.28)" />
+          <circle cx="464" cy="98" r="1.9" fill="rgba(240,130,90,.28)" />
+        </g>
+        {/* arm resting over the duvet */}
+        <path d="M437 107q-15 5-23 11.5" stroke="#F0BE90" strokeWidth={6.5} strokeLinecap="round" fill="none" />
+        <circle cx="412.5" cy="120" r="4" fill="#F0BE90" stroke="rgba(122,74,42,.45)" strokeWidth={1.1} />
+
+        {/* duvet — gently breathing */}
+        <path className="duvet" d="M441 101C430 113 400 99 368 105 338 111 320 98 290 104 256 110 232 99 202 105 182 108.5 164 110.5 152 113 145 114.5 143 117 143 121L448 121C452.5 112.5 448.5 105.5 441 101Z"
+          fill="url(#duvetGrad)" stroke="rgba(165,180,252,.55)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M300 111.5q10 3 20 1M250 113.5q9 2.5 18 .5M200 115.5q8 2 16 .5" stroke="rgba(199,210,254,.30)" strokeWidth={1.2} {...ln} />
 
         {/* rising zzz */}
-        <text className="zz" x="243" y="62" fontSize="11" fontWeight="800" fill="#00E8A2" style={{ animationDelay: "0s" }}>z</text>
-        <text className="zz" x="256" y="52" fontSize="14" fontWeight="800" fill="#00E8A2" style={{ animationDelay: ".85s" }}>z</text>
-        <text className="zz" x="272" y="42" fontSize="17" fontWeight="800" fill="#00E8A2" style={{ animationDelay: "1.7s" }}>z</text>
+        <text className="zz" x="470" y="80" fontSize="11" fontWeight="800" fill="#00E8A2" style={{ animationDelay: "0s" }}>z</text>
+        <text className="zz" x="482" y="68" fontSize="14" fontWeight="800" fill="#00E8A2" style={{ animationDelay: ".85s" }}>z</text>
+        <text className="zz" x="496" y="57" fontSize="17" fontWeight="800" fill="#A5B4FC" style={{ animationDelay: "1.7s" }}>z</text>
+
+        {/* the dream — one cloud, three goals; tap to plan */}
+        <g className="dreamcloud" role="link" tabIndex={0} aria-label="Every dream has a monthly number — plan yours"
+          style={{ cursor: "pointer" }}
+          onClick={() => router.push("/dashboard/calculators#calc-sip-goal")}
+          onKeyDown={e => { if (e.key === "Enter") router.push("/dashboard/calculators#calc-sip-goal"); }}>
+          <title>Every dream has a monthly number — find yours</title>
+          <circle cx="468" cy="72" r="2.2" fill="rgba(165,180,252,.45)" />
+          <circle cx="477" cy="60" r="3" fill="rgba(165,180,252,.45)" />
+          <path className="cloudbob" d="M466 44q-3-12 11-13 3-12 18-9 8-9 21-3 14-4 17 9 12 4 6 15 1 9-11 9H478q-11 0-12-8Z"
+            fill="rgba(99,102,241,.09)" stroke="rgba(165,180,252,.55)" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+          {/* home */}
+          <path d="M481 39v-5.5l5.5-5 5.5 5V39h-4v-3.6h-3V39Z" stroke="#FBBF24" strokeWidth={1.5} {...ln} />
+          {/* degree */}
+          <path d="M502 31.5l7.5-3.8 7.5 3.8-7.5 3.8Zm7.5 3.8v4.2m-4.5-6.3v3.4q4.5 2.2 9 0v-3.4" stroke="#A5B4FC" strokeWidth={1.4} {...ln} />
+          {/* ring */}
+          <circle cx="533" cy="36.5" r="3.8" stroke="#00E8A2" strokeWidth={1.5} {...ln} />
+          <path d="M530.4 31.2l2.6-3.2 2.6 3.2-2.6 2.2Z" stroke="#00E8A2" strokeWidth={1.3} {...ln} />
+        </g>
       </svg>
     </div>
   );
@@ -841,11 +876,11 @@ export default function Home() {
               </div>
 
               <h1 className="f2" style={{ fontFamily: "Fraunces,Georgia,serif", fontSize: "clamp(2.6rem,6.8vw,5rem)", fontWeight: 900, lineHeight: 1.02, letterSpacing: "-.04em", color: "var(--txt-hi)", marginBottom: 22 }}>
-                Plan once.<br />Sleep sound <span className="shimmer-green">forever.</span>
+                Thoughtful money.<br /><span className="shimmer-green">Better life.</span>
               </h1>
 
               <p className="f3" style={{ fontSize: "clamp(15px,1.9vw,17.5px)", color: "var(--txt-md)", lineHeight: 1.8, maxWidth: 470, marginBottom: 28 }}>
-                Nivesify does the worrying math — what your funds really earned, whether you&apos;re actually winning, and the exact monthly plan for every dream — so you can close the laptop and get on with your life.
+                Nivesify does the worrying math — what your funds really earned, whether you&apos;re actually winning, and the exact monthly plan for each dream — so tonight you sleep, not scroll.
               </p>
 
               <div className="f4" style={{ display: "flex", flexWrap: "wrap" as const, gap: 12, alignItems: "center", marginBottom: 28 }}>
