@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Building2, GitCompareArrows, LoaderCircle, ScanSearch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Portfolio } from "@/lib/mutual-fund-health-check/portfolio";
-import { calculateOverlap, type FundPortfolio, type SchemeMatch } from "@/lib/holdings/rupeevest";
+import { calculateOverlap, normalizeSecurityName, type FundPortfolio, type SchemeMatch } from "@/lib/holdings/rupeevest";
 
 type LookThroughItem = {
   fundName: string;
@@ -59,16 +59,22 @@ export default function PortfolioLookThrough({ portfolio }: { portfolio: Portfol
   const coverage = totalValue > 0 ? matchedValue / totalValue * 100 : 0;
 
   const companyExposures = useMemo(() => {
-    const exposures = new Map<string, number>();
+    const exposures = new Map<string, { name: string; exposure: number }>();
     if (totalValue <= 0) return [];
     items.forEach((item) => {
       const fundWeight = item.currentValue / totalValue;
       item.portfolio?.months[0]?.holdings.forEach((holding) => {
         if (holding.percentAum <= 0) return;
-        exposures.set(holding.securityName, (exposures.get(holding.securityName) ?? 0) + fundWeight * holding.percentAum);
+        const key = normalizeSecurityName(holding.securityName);
+        if (!key) return;
+        const existing = exposures.get(key);
+        exposures.set(key, {
+          name: !existing || holding.securityName.length > existing.name.length ? holding.securityName : existing.name,
+          exposure: (existing?.exposure ?? 0) + fundWeight * holding.percentAum,
+        });
       });
     });
-    return [...exposures.entries()].map(([name, exposure]) => ({ name, exposure })).sort((a, b) => b.exposure - a.exposure);
+    return [...exposures.values()].sort((a, b) => b.exposure - a.exposure);
   }, [items, totalValue]);
 
   const overlaps = useMemo(() => {

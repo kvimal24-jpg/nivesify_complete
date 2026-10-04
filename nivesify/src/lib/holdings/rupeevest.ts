@@ -63,6 +63,45 @@ const toNumber = (value: unknown): number | null => {
 
 const toString = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 
+const CORPORATE_TOKEN_ALIASES: Record<string, string> = {
+  co: "company",
+  corp: "corporation",
+  inc: "incorporated",
+  ltd: "limited",
+  pvt: "private",
+};
+
+const TRAILING_CORPORATE_TOKENS = new Set([
+  "incorporated",
+  "limited",
+  "llp",
+  "plc",
+  "private",
+]);
+
+export function cleanSecurityName(name: string): string {
+  return name
+    .normalize("NFKC")
+    .replace(/[\u00a3\u00a0\ufffd]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function normalizeSecurityName(name: string): string {
+  const tokens = cleanSecurityName(name)
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => CORPORATE_TOKEN_ALIASES[token] ?? token);
+
+  while (tokens.length > 1 && TRAILING_CORPORATE_TOKENS.has(tokens.at(-1) ?? "")) {
+    tokens.pop();
+  }
+  return tokens.join(" ");
+}
+
 export function normalizeSchemeName(name: string): string {
   return name
     .toLowerCase()
@@ -156,7 +195,7 @@ export function parsePortfolio(payload: unknown, schemeCode: number): FundPortfo
         if (!securityCode || percentAum === null) continue;
         holdings.push({
           securityCode,
-          securityName: toString(mapping[securityCode]) || `Security ${securityCode}`,
+          securityName: cleanSecurityName(toString(mapping[securityCode])) || `Security ${securityCode}`,
           percentAum,
           shares: toNumber(row.noshares),
           date: toString(row.invdate) || null,
@@ -193,15 +232,26 @@ export function portfolioAllocation(holdings: FundHolding[]) {
 }
 
 export function calculateOverlap(left: FundHolding[], right: FundHolding[]) {
-  const rightWeights = new Map(
-    right.filter((holding) => holding.percentAum > 0).map((holding) => [holding.securityName.toLowerCase(), holding.percentAum]),
-  );
-  const common = left.filter(
-    (holding) => holding.percentAum > 0 && rightWeights.has(holding.securityName.toLowerCase()),
-  );
-  const overlap = common.reduce(
-    (total, holding) => total + Math.min(holding.percentAum, rightWeights.get(holding.securityName.toLowerCase()) ?? 0),
-    0,
-  );
-  return { overlap, commonCount: common.length };
+  const aggregateWeights = (holdings: FundHolding[]) => {
+    const weights = new Map<string, number>();
+    holdings.forEach((holding) => {
+      if (holding.percentAum <= 0) return;
+      const key = normalizeSecurityName(holding.securityName);
+      if (!key) return;
+      weights.set(key, (weights.get(key) ?? 0) + holding.percentAum);
+    });
+    return weights;
+  };
+
+  const leftWeights = aggregateWeights(left);
+  const rightWeights = aggregateWeights(right);
+  let overlap = 0;
+  let commonCount = 0;
+  leftWeights.forEach((leftWeight, key) => {
+    const rightWeight = rightWeights.get(key);
+    if (rightWeight == null) return;
+    overlap += Math.min(leftWeight, rightWeight);
+    commonCount += 1;
+  });
+  return { overlap, commonCount };
 }

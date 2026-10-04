@@ -7,6 +7,7 @@ import AnalysisTabs from "@/components/AnalysisTabs";
 import { EmptyState, MetricCard, PageHero, PageShell, PageStack } from "@/components/ui";
 import {
   calculateOverlap,
+  normalizeSecurityName,
   portfolioAllocation,
   type FundPortfolio,
   type RupeeVestScheme,
@@ -117,13 +118,15 @@ export default function MutualFundHoldingsPage() {
   const activeMonths = loadedPortfolios.map((portfolio) => portfolio.months[Math.min(monthIndex, portfolio.months.length - 1)]);
 
   const holdingRows = useMemo(() => {
-    const rows = new Map<string, { name: string; type: string; weights: Record<number, number> }>();
+    const rows = new Map<string, { key: string; name: string; type: string; weights: Record<number, number> }>();
     loadedPortfolios.forEach((portfolio) => {
       const month = portfolio.months[Math.min(monthIndex, portfolio.months.length - 1)];
       month?.holdings.forEach((holding) => {
-        const key = holding.securityName.toLowerCase();
-        const row = rows.get(key) ?? { name: holding.securityName, type: holding.assetType, weights: {} };
-        row.weights[portfolio.schemeCode] = holding.percentAum;
+        const key = normalizeSecurityName(holding.securityName);
+        if (!key) return;
+        const row = rows.get(key) ?? { key, name: holding.securityName, type: holding.assetType, weights: {} };
+        if (holding.securityName.length > row.name.length) row.name = holding.securityName;
+        row.weights[portfolio.schemeCode] = (row.weights[portfolio.schemeCode] ?? 0) + holding.percentAum;
         rows.set(key, row);
       });
     });
@@ -272,7 +275,7 @@ export default function MutualFundHoldingsPage() {
                 <div className="table-scroll">
                   <table>
                     <thead><tr><th>Company / security</th><th>Type</th>{loadedPortfolios.map((portfolio) => <th key={portfolio.schemeCode}>{portfolio.fundName}</th>)}</tr></thead>
-                    <tbody>{holdingRows.map((row) => <tr key={row.name}><td><strong style={{ color: "var(--ink)" }}>{row.name}</strong></td><td><span className="pill">{row.type}</span></td>{loadedPortfolios.map((portfolio) => <td key={portfolio.schemeCode}>{row.weights[portfolio.schemeCode] == null ? "—" : fmtPct(row.weights[portfolio.schemeCode])}</td>)}</tr>)}</tbody>
+                    <tbody>{holdingRows.map((row) => <tr key={row.key}><td><strong style={{ color: "var(--ink)" }}>{row.name}</strong></td><td><span className="pill">{row.type}</span></td>{loadedPortfolios.map((portfolio) => <td key={portfolio.schemeCode}>{row.weights[portfolio.schemeCode] == null ? "—" : fmtPct(row.weights[portfolio.schemeCode])}</td>)}</tr>)}</tbody>
                   </table>
                 </div>
                 <div className="table-footer"><span>{holdingRows.length} disclosed securities</span><span>Weights are percentages of each fund&apos;s AUM</span></div>
