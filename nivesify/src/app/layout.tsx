@@ -46,7 +46,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#F5F8FF] text-[#1F2937] antialiased flex flex-col min-h-screen">
+      <body>
         {/* Global Header */}
         <Header />
 
@@ -54,7 +54,7 @@ export default function RootLayout({
             pt-20: Adds padding so the fixed header doesn't cover content.
             flex-grow: Pushes the footer to the bottom even on short pages.
         */}
-        <main className="flex-grow pt-16">
+        <main id="main-content" className="site-main">
           {children}
         </main>
 

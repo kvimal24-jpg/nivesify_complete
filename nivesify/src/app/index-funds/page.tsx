@@ -5,6 +5,8 @@ import PassiveFundsContent from "@/components/PassiveFundsContent";
 import type { ETFAnalytics, Manifest } from "@/lib/fund-types";
 import { fetchCachedJson } from "@/lib/client-data";
 
+type PassiveView = "verdict" | "learn" | "explore";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,6 +29,7 @@ export default function IndexFundsPage() {
   const [etfs, setEtfs] = useState<ETFAnalytics[]>([]);
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<PassiveView>("verdict");
 
   useEffect(() => {
     Promise.all([
@@ -187,16 +190,14 @@ export default function IndexFundsPage() {
             <p style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: "10px" }}>Jump to a section</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px" }}>
               {[
-                { label: "📘 Passive vs Active", href: "#passive-vs-active", desc: "Why indexing works" },
-                { label: "📉 Where to Look",     href: "#where-to-look",    desc: "What makes a good tracker" },
-                { label: "📊 Benchmark Table",   href: "#scoreboard",       desc: "All indices compared" },
-                { label: "🏆 Top Picks",         href: "#top-picks",        desc: "Tightest trackers" },
-                { label: "🧮 Fund Screener",     href: "#screener",         desc: "Filter every fund" },
-              ].map((a) => (
-                <a key={a.href} href={a.href} style={{ textDecoration: "none", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: "12px", padding: "10px 12px", display: "flex", flexDirection: "column" as const, gap: "2px", minHeight: "52px", justifyContent: "center" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>{a.label}</span>
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>{a.desc}</span>
-                </a>
+                { label: "📉 The Verdict", key: "verdict" as const, desc: "Which index to choose" },
+                { label: "📘 Learn", key: "learn" as const, desc: "Passive vs active" },
+                { label: "🔍 Explore Funds", key: "explore" as const, desc: "Picks, data & screener" },
+              ].map((item) => (
+                <button key={item.key} type="button" onClick={() => setView(item.key)} aria-pressed={view === item.key} style={{ textAlign: "left", textDecoration: "none", background: view === item.key ? "rgba(56,189,248,0.18)" : "rgba(255,255,255,0.07)", border: view === item.key ? "1px solid rgba(125,211,252,0.55)" : "1px solid rgba(255,255,255,0.14)", borderRadius: "12px", padding: "10px 12px", display: "flex", flexDirection: "column" as const, gap: "2px", minHeight: "52px", justifyContent: "center" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>{item.label}</span>
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>{item.desc}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -221,7 +222,7 @@ export default function IndexFundsPage() {
       {/* ═══════════════════════════════════════
           SECTION 1 — PASSIVE vs ACTIVE
       ═══════════════════════════════════════ */}
-      <section id="passive-vs-active" style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(32px,5vw,56px) clamp(16px,4vw,28px) 0" }}>
+      {view === "learn" && <section id="passive-vs-active" style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(32px,5vw,56px) clamp(16px,4vw,28px) 0" }}>
 
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#0891B2", letterSpacing: "0.09em", textTransform: "uppercase" as const }}>Section 1 · Passive vs Active</span>
@@ -287,12 +288,12 @@ export default function IndexFundsPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════
           SECTION 2 — WHERE TO LOOK
       ═══════════════════════════════════════ */}
-      <section id="where-to-look" style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,5vw,64px) clamp(16px,4vw,28px) 0" }}>
+      {view === "verdict" && <section id="where-to-look" style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,5vw,64px) clamp(16px,4vw,28px) 0" }}>
 
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#6366F1", letterSpacing: "0.09em", textTransform: "uppercase" as const }}>Section 2 · Where to Look</span>
@@ -357,12 +358,12 @@ export default function IndexFundsPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════
           SECTION 3 — BENCHMARK SCOREBOARD
       ═══════════════════════════════════════ */}
-      <section id="scoreboard" style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,5vw,64px) clamp(16px,4vw,28px) 0" }}>
+      {view === "explore" && <section id="scoreboard" style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,5vw,64px) clamp(16px,4vw,28px) 0" }}>
 
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", letterSpacing: "0.09em", textTransform: "uppercase" as const }}>Section 3 · Benchmark Scoreboard</span>
@@ -399,7 +400,7 @@ export default function IndexFundsPage() {
             manifest={manifest}
           />
         )}
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════
           FOOTER

@@ -7,6 +7,5 @@ export function getDb() {
   const { env } = getCloudflareContext();
 
   // We connect using the binding name 'nivesify_db' you created earlier
-  // @ts-ignore
   return drizzle(env.nivesify_db, { schema });
 }

@@ -228,6 +228,9 @@ function buildBox(
 ): BoxResult {
   return selectFundsForGoal(row, col, cellFunds, fundAnalytics, etfAnalytics, insights);
 
+  /* Legacy inlined implementation retained temporarily for reference. The shared
+     fund-selection engine above is the only executable implementation.
+
   if (cellFunds.length === 0) return { empty: true, leadingSubCategory: null, allConsideredSubCategories: [], candidateSubCategories: [] };
 
   const allConsideredSubCategories = new Set<string>();
@@ -298,7 +301,7 @@ function buildBox(
     aum: 'Current_AUM' in bestFund ? (bestFund as FundAnalytics).Current_AUM : (bestFund as ETFAnalytics).Fund_AUM
   } : undefined;
 
-  return { empty: false, leadingSubCategory: leadingSubCat.subCategoryName, allConsideredSubCategories: Array.from(allConsideredSubCategories), candidateSubCategories: subCategoryPerformances, decision, selectedFund: bestFund, fundStats };
+  return { empty: false, leadingSubCategory: leadingSubCat.subCategoryName, allConsideredSubCategories: Array.from(allConsideredSubCategories), candidateSubCategories: subCategoryPerformances, decision, selectedFund: bestFund, fundStats }; */
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -734,13 +737,13 @@ function HowItWorksStrip() {
         <div style={{ fontSize: '10px', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: '16px' }}>
           How it works — 3 simple steps
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+        <div aria-label="How the finder works" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: '12px', overflowX:'auto', scrollSnapType:'x mandatory', paddingBottom:'4px' }}>
           {[
             { step: '01', icon: '🗂️', title: 'Sort every fund', desc: 'All mutual funds in India sorted by what they invest in — company size and investment style.', tags: ['Shares', 'Balanced', 'Bonds'], c: '#2563EB', bg: '#EFF6FF', bd: '#BFDBFE' },
             { step: '02', icon: '📊', title: 'Find who performs best', desc: 'Compare fund types on how much extra return above the market — real numbers, not opinions.', tags: ['Real returns', 'Vs market', 'No guesswork'], c: '#7C3AED', bg: '#F5F3FF', bd: '#DDD6FE' },
             { step: '03', icon: '🏆', title: 'Surface the #1 fund', desc: 'Top-ranked fund in the winning category becomes your pick. Tap any slot for full transparency.', tags: ['Top ranked', 'Full audit', 'Live data'], c: '#059669', bg: '#ECFDF5', bd: '#A7F3D0' },
           ].map((s, i) => (
-            <div key={i} style={{ paddingRight: i < 2 ? 'clamp(0px, 2vw, 20px)' : '0', borderRight: i < 2 ? '1px dashed #E2E8F0' : 'none' }}>
+            <div key={i} style={{ padding:'14px', border:`1px solid ${s.bd}`, borderRadius:'14px', background:s.bg, scrollSnapAlign:'start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: s.bg, border: `1px solid ${s.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>{s.icon}</div>
                 <span style={{ fontSize: '10px', fontWeight: 800, color: s.c, letterSpacing: '0.1em' }}>STEP {s.step}</span>
@@ -844,6 +847,7 @@ export default function FindMyFundPage() {
   const [equityBoxes, setEquityBoxes] = useState<BoxResult[][]>([]);
   const [modalBox, setModalBox]       = useState<BoxResult | null>(null);
   const [reportDate, setReportDate]   = useState<string>("");
+  const [assetView, setAssetView]     = useState<"equity" | "hybrid" | "debt">("equity");
 
   useEffect(() => {
     async function load() {
@@ -894,7 +898,22 @@ export default function FindMyFundPage() {
         <PlanningToolsCTA />
       </div>
 
+      <div style={{ maxWidth:'1240px', margin:'0 auto', padding:'clamp(18px,3vw,28px) clamp(12px,3vw,24px) 0' }}>
+        <div className="segmented-nav" role="tablist" aria-label="Fund universe" style={{ width:'100%' }}>
+          {[
+            { key:'equity', label:'📈 Share funds', hint:'Growth' },
+            { key:'hybrid', label:'⚖️ Balanced funds', hint:'Growth + stability' },
+            { key:'debt', label:'🛡️ Bond funds', hint:'Income + safety' },
+          ].map(item=>(
+            <button key={item.key} type="button" role="tab" aria-selected={assetView===item.key} className={assetView===item.key?'is-active':undefined} onClick={()=>setAssetView(item.key as typeof assetView)} style={{ flex:'1 0 auto' }}>
+              {item.label}<span style={{ marginLeft:'5px', opacity:.65, fontSize:'10px' }}>· {item.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── SHARE FUNDS (Equity) ── */}
+      <div hidden={assetView!=="equity"}>
       <section style={{ padding: 'clamp(16px, 4vw, 28px) clamp(12px, 3vw, 24px)' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
           <div style={{ background: 'white', borderRadius: '20px', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0', padding: 'clamp(16px, 3vw, 28px) clamp(14px, 3vw, 28px)' }}>
@@ -921,9 +940,14 @@ export default function FindMyFundPage() {
       </section>
 
       {modalBox && <DetailModal box={modalBox} onClose={() => setModalBox(null)} />}
+      </div>
 
+      <div hidden={assetView!=="hybrid"}>
       <HybridMatrixSection reportDate={reportDate} />
+      </div>
+      <div hidden={assetView!=="debt"}>
       <DebtMatrixSection reportDate={reportDate} />
+      </div>
 
       {/* Disclaimer */}
       <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 clamp(12px, 3vw, 24px) clamp(32px, 5vw, 56px)' }}>

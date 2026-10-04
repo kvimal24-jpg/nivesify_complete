@@ -15,6 +15,7 @@ const COLUMNS = [
       { label: "MF Industry Analysis",   href: "/mutual-fund-analysis" },
       { label: "Active Funds Explorer",  href: "/active-funds" },
       { label: "Index Funds Explorer",   href: "/index-funds" },
+      { label: "Fund Holdings",          href: "/mutual-fund-holdings" },
       { label: "Quick Fund Picks",       href: "/find-my-fund-quick-picks" },
       { label: "Lifetime Plan",          href: "/find-my-fund-lifetime-plan" },
     ],

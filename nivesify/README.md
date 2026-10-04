@@ -11,6 +11,7 @@ Nivesify is a Next.js app deployed on Cloudflare Workers (via OpenNext). It incl
 - Why Mutual Fund: educational hub for mutual fund benefits.
 - Quick Picks: curated fund recommendations for easy selection.
 - Lifetime Plan: long-term planning and projections.
+- Fund Holdings: company-level disclosures, multi-fund comparison, overlap, and portfolio look-through.
 
 ---
 
@@ -46,6 +47,7 @@ IS_PROD ? https://pub-260c05cf57d44671bf81cc305a2e6856.r2.dev/data/latest/<file>
 - Dev proxy routes: `/api/amfi-raw`, `/api/funds`, `/api/etfs`, `/api/insights`, `/api/manifest` — one-liners calling `getR2JsonResponse("data/latest/…")` from `src/lib/r2.ts` (streams from `env.MF_DATA_BUCKET.get()` with `Cache-Control: public, max-age=3600, s-maxage=86400`).
 - Client-side caching: `fetchCachedJson()` in `src/lib/client-data.ts` — module-level Map memoization + browser HTTP cache. Failed promises evict from the map.
 - All heavy pages (active-funds, index-funds, mutual-fund-analysis, mutual-fund-match, quick-picks, lifetime-plan, MFHC dashboard) are client components that load these datasets in the browser and compute analytics there. This was deliberate ("Move heavy fund data loading to clients") to keep Worker request counts low.
+- This direct browser download behavior is intentional. UI loading states may appear before the large files finish; do not move these R2 reads back into request-time rendering without an explicit architecture decision.
 - `getLatestR2JsonResponse()` in `r2.ts` supports date-tagged keys (`data/YYYY-MM-DD/…`) but is currently dead code — everything pins literal `data/latest/*`.
 
 ## 3. Derived computations (client-side)
@@ -69,6 +71,7 @@ Migrations live duplicated in `drizzle/` and `migrations/`; applied manually wit
 4. Parsed JSON POSTs to `/api/mutual-fund-health-check` → upserted as one JSON blob per user in D1 table `mutual_fund_health_check`.
 5. Dashboard (`mutual-fund-health-check/dashboard/page.tsx`) loads the stored blob + the four R2 datasets + NAV histories from `https://api.mfapi.in/mf/{schemeCode}` (concurrency-limited, once-per-day freshness, cached in browser IndexedDB via `idb`: DB `mfhc`, store `nav-history` — see `src/lib/mutual-fund-health-check/nav.ts` and `nav-db.ts`).
 6. Analytics computed fully client-side: FIFO lot matching + realised gains (`portfolio.ts`), XIRR via Newton-Raphson (`xirr.ts`, `cashflows.ts`), charts (`chart-data.ts`), insights (`report.ts`). Manual investments/SIP plans are saved back into the same D1 blob and synthesized as pseudo-transactions (`manual.ts`). PDF report generated in-browser with jsPDF + html2canvas.
+7. Portfolio look-through matches held-fund names to RupeeVest scheme codes, fetches the latest disclosed portfolios through cached server adapters, and calculates company exposure and pairwise overlap in the browser. Match confidence is shown explicitly.
 
 ## 6. Onboarding flow
 Six-step wizard (`dashboard/onboarding/page.tsx`) loads prior state via `GET /api/onboarding` and saves the whole form object via `POST /api/onboarding` (upsert into D1 `onboarding.data`). The dashboard hydrates its simulation inputs from that blob.
@@ -118,6 +121,8 @@ This ensures consistency, transparency, and no human bias across all fund recomm
 - src/app/mutual-fund-analysis - Mutual Fund Analysis hub
 - src/app/active-funds - Active Funds selector
 - src/app/index-funds - Passive Funds selector
+- src/app/mutual-fund-holdings - Holdings, company exposure, fund comparison, and overlap explorer
+- src/app/api/holdings - Cached RupeeVest search, identity-match, and portfolio adapters
 - src/app/api - API routes: auth (Google OAuth), amfi-raw, funds, etfs, insights, manifest (dev-only R2 proxies), me, calculators, mutual-fund-health-check (incl. live AMFI scheme-list endpoint), onboarding
 - src/lib - shared logic, calculators, MFHC utilities, data access (r2.ts, client-data.ts, data-endpoints.ts, db.ts, fund-selection-engine.ts, amfi-aggregates.ts, fund-types.ts)
 - src/db/schema.ts - Drizzle D1 schema
@@ -129,6 +134,7 @@ This ensures consistency, transparency, and no human bias across all fund recomm
 ```bash
 npm install
 npm run dev
+npm run check
 ```
 
 Open http://localhost:3000 to view the app. In dev mode, market datasets are proxied through `/api/*` routes backed by the real R2 bucket (requires Cloudflare context; use `npm run preview` for a full local Workers simulation).
@@ -162,6 +168,7 @@ npx wrangler d1 execute nivesify-db --remote --command "..."   # query directly
 - docs/quick-picks.md
 - docs/lifetime-plan.md
 - docs/why-mutual-fund.md
+- docs/holdings-and-overlap.md
 
 ## Notes
 - Uses Cloudflare D1 for auth, onboarding data, and MFHC storage (one JSON blob per user per table).

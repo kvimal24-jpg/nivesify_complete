@@ -204,8 +204,9 @@ export const getTransactions = async (lines: string[], mfDataInput?: CasScheme[]
     mfData = json.data || [];
   }
 
+  const schemes = mfData ?? [];
   const schemeByIsin = new Map<string, CasScheme>();
-  mfData.forEach((scheme) => {
+  schemes.forEach((scheme) => {
     if (scheme.isinGrowth) schemeByIsin.set(scheme.isinGrowth, scheme);
     if (scheme.isinDivReinvestment) schemeByIsin.set(scheme.isinDivReinvestment, scheme);
   });
@@ -318,10 +319,11 @@ export const getTransactions = async (lines: string[], mfDataInput?: CasScheme[]
     }
   });
 
-  filteredLines = filteredLines.filter((line) => typeof line !== "string") as Transaction[];
-  filteredLines = filteredLines.filter((line) => !Number.isNaN(line.amount));
+  const transactions = filteredLines
+    .filter((line): line is Transaction => typeof line !== "string")
+    .filter((line) => !Number.isNaN(line.amount));
 
-  return filteredLines;
+  return transactions;
 };
 
 export const getSummary = (lines: string[]) => {

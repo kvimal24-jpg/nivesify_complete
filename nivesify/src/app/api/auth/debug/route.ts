@@ -18,7 +18,7 @@ export async function GET() {
     client_secret_set: env.GOOGLE_CLIENT_SECRET ? "YES" : "NO",
     base_url: baseUrl,
     computed_redirect_uri: redirectUri,
-    environment: env.NODE_ENV || "production",
+    environment: process.env.NODE_ENV || "production",
   };
   
   return NextResponse.json(diagnostics, { status: 200 });

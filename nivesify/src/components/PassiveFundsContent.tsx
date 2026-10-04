@@ -219,6 +219,8 @@ export default function PassiveFundsContent({
   manifest,
 }: PassiveFundsContentProps) {
 
+  const [contentView, setContentView] = useState<"benchmarks" | "picks" | "screener">("picks");
+
   // ── Benchmark table sort + filter ──
   const [bmFilter, setBmFilter] = useState("");
   const bmData = useMemo(() =>
@@ -270,10 +272,29 @@ export default function PassiveFundsContent({
 
   return (
     <>
+      <div className="segmented-nav" role="tablist" aria-label="Passive fund explorer views" style={{ marginBottom: "24px" }}>
+        {[
+          { key: "picks", label: "Top picks" },
+          { key: "benchmarks", label: "Benchmark data" },
+          { key: "screener", label: "Fund screener" },
+        ].map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={contentView === item.key}
+            className={contentView === item.key ? "is-active" : undefined}
+            onClick={() => setContentView(item.key as typeof contentView)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       {/* ══════════════════════════════════════
           SECTION 3 — BENCHMARK SCOREBOARD TABLE
       ══════════════════════════════════════ */}
-
+      {contentView === "benchmarks" &&
       <div style={{ background: "white", border: "1.5px solid #E2E8F0", borderRadius: "20px", overflow: "hidden", marginBottom: "20px" }}>
         <div style={{ padding: "14px 20px 12px", borderBottom: "1.5px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
           <div>
@@ -343,13 +364,13 @@ export default function PassiveFundsContent({
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* ══════════════════════════════════════
           SECTION 4 — TOP PICKS
       ══════════════════════════════════════ */}
 
-      <div id="top-picks" style={{ marginTop: "56px", scrollMarginTop: "80px" }}>
+      {contentView === "picks" && <div id="top-picks" style={{ scrollMarginTop: "80px" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(8,145,178,0.08)", border: "1px solid rgba(8,145,178,0.2)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#0891B2", letterSpacing: "0.09em", textTransform: "uppercase" }}>Section 4 · Top Picks</span>
         </div>
@@ -400,13 +421,13 @@ export default function PassiveFundsContent({
         <div style={{ fontSize: "10px", color: "#CBD5E1" }}>
           Data as of {manifest?.reportDate ?? "latest"}. Top 2 per benchmark by lowest absolute TD 3Y.
         </div>
-      </div>
+      </div>}
 
       {/* ══════════════════════════════════════
           SECTION 5 — FULL SCREENER
       ══════════════════════════════════════ */}
 
-      <div id="screener" style={{ marginTop: "56px", scrollMarginTop: "80px" }}>
+      {contentView === "screener" && <div id="screener" style={{ scrollMarginTop: "80px" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(15,23,42,0.06)", border: "1px solid rgba(15,23,42,0.12)", borderRadius: "100px", padding: "4px 13px", marginBottom: "10px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "#334155", letterSpacing: "0.09em", textTransform: "uppercase" }}>Section 5 · Fund Screener</span>
         </div>
@@ -544,7 +565,7 @@ export default function PassiveFundsContent({
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ══════════════════════════════════════
           FUND DETAIL MODAL

@@ -6,7 +6,9 @@
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
-		"lint": "next lint",
+		"lint": "eslint src next.config.ts open-next.config.ts drizzle.config.ts",
+		"test": "vitest run",
+		"check": "npm run lint && tsc --noEmit --pretty false && npm run test",
 		"deploy": "npx opennextjs-cloudflare build && npx wrangler deploy",
 		"deploy:staging": "npx opennextjs-cloudflare build && npx wrangler deploy -c wrangler.staging.jsonc",
 		"upload": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare upload",
@@ -46,6 +48,7 @@
 		"eslint-config-next": "15.4.6",
 		"tailwindcss": "^4",
 		"typescript": "^5.7.4",
+		"vitest": "^3.2.4",
 		"wrangler": "^4.63.0"
 	}
 }

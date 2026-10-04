@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     
     // Exchange Code
     const tokens: any = await google.validateAuthorizationCode(code, storedVerifier);
-    let rawToken = typeof tokens.accessToken === 'function' ? tokens.accessToken() : tokens.accessToken;
+    const rawToken = typeof tokens.accessToken === 'function' ? tokens.accessToken() : tokens.accessToken;
     const cleanToken = String(rawToken).trim();
 
     // Get User
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const db = getDb();
     const existingUser = await db.select().from(users).where(eq(users.email, googleUser.email)).get();
     
-    let finalUserId = existingUser ? existingUser.id : googleUser.id;
+    const finalUserId = existingUser ? existingUser.id : googleUser.id;
 
     if (!existingUser) {
       await db.insert(users).values({

@@ -355,6 +355,9 @@ function buildBox(
 ): BoxResult {
   return selectFundsForGoal(row, col, cellFunds, fundAnalytics, etfAnalytics, insights);
 
+  /* Legacy inlined implementation retained temporarily for reference. The shared
+     fund-selection engine above is the only executable implementation.
+
   if (cellFunds.length === 0) return { empty: true, leadingSubCategory: null, allConsideredSubCategories: [], candidateSubCategories: [] };
 
   const allConsideredSubCategories = new Set<string>();
@@ -425,7 +428,7 @@ function buildBox(
     aum: 'Current_AUM' in bestFund ? (bestFund as FundAnalytics).Current_AUM : (bestFund as ETFAnalytics).Fund_AUM
   } : undefined;
 
-  return { empty: false, leadingSubCategory: leadingSubCat.subCategoryName, allConsideredSubCategories: Array.from(allConsideredSubCategories), candidateSubCategories: subCategoryPerformances, decision, selectedFund: bestFund, fundStats };
+  return { empty: false, leadingSubCategory: leadingSubCat.subCategoryName, allConsideredSubCategories: Array.from(allConsideredSubCategories), candidateSubCategories: subCategoryPerformances, decision, selectedFund: bestFund, fundStats }; */
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1134,8 +1137,8 @@ export default function QuickFundPicksPage() {
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
 
   const [showFunds, setShowFunds] = useState(true);
-  const [showAllocation, setShowAllocation] = useState(true);
-  const [showHowItWorks, setShowHowItWorks] = useState(true);
+  const [showAllocation, setShowAllocation] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1168,8 +1171,8 @@ export default function QuickFundPicksPage() {
     setPlan(null);
     setResolvedFunds([]);
     setShowFunds(true);
-    setShowAllocation(true);
-    setShowHowItWorks(true);
+    setShowAllocation(false);
+    setShowHowItWorks(false);
 
     setTimeout(() => {
       const horizon = parseInt(horizonYears);
@@ -1203,6 +1206,22 @@ export default function QuickFundPicksPage() {
 
       {/* FORM */}
       <div style={{ maxWidth: '820px', margin: '0 auto', padding: 'clamp(24px,4vw,44px) clamp(12px,3vw,24px)' }}>
+
+        <div aria-label="Plan steps" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '14px' }}>
+          {[
+            { n: '1', title: 'Define goal', text: 'Amount and timeline' },
+            { n: '2', title: 'Set comfort', text: 'Choose your risk' },
+            { n: '3', title: 'Get plan', text: 'SIP, allocation and funds' },
+          ].map((step, index) => (
+            <div key={step.n} style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0, padding: '10px', background: index === 0 && !plan ? '#ECFDF5' : 'white', border: `1px solid ${index === 0 && !plan ? '#A7F3D0' : '#E2E8F0'}`, borderRadius: '12px' }}>
+              <span style={{ width: '24px', height: '24px', flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: plan ? '#059669' : index === 0 ? '#059669' : '#E2E8F0', color: plan || index === 0 ? 'white' : '#64748B', fontSize: '10px', fontWeight: 800 }}>{plan ? '✓' : step.n}</span>
+              <span style={{ minWidth: 0 }}>
+                <strong style={{ display: 'block', color: '#0F172A', fontSize: '11px', lineHeight: 1.2 }}>{step.title}</strong>
+                <small style={{ display: 'block', overflow: 'hidden', color: '#94A3B8', fontSize: '9px', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{step.text}</small>
+              </span>
+            </div>
+          ))}
+        </div>
 
         {/* Preset chips */}
         <div style={{ background: 'white', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 1px 6px rgba(0,0,0,0.04)', padding: 'clamp(16px,3vw,22px)', marginBottom: '14px' }}>

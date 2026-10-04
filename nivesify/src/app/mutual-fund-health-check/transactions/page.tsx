@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
-import { InvestmentsData } from "@/lib/mutual-fund-health-check/types";
+import { InvestmentsData, Transaction } from "@/lib/mutual-fund-health-check/types";
 import { fetchNavHistoryForSchemes, fetchNavHistory, getNavHistoryMap } from "@/lib/mutual-fund-health-check/nav";
 import { buildManualTransactions } from "@/lib/mutual-fund-health-check/manual";
 import { formatCurrency } from "@/lib/mutual-fund-health-check/format";
@@ -17,7 +17,7 @@ export default function MutualFundTransactionsPage() {
   const [data, setData] = useState<InvestmentsData | null>(null);
   const [filter, setFilter] = useState("");
   const [showAllColumns, setShowAllColumns] = useState(false);
-  const [combinedTransactions, setCombinedTransactions] = useState<InvestmentsData["transactions"]>([]);
+  const [combinedTransactions, setCombinedTransactions] = useState<Transaction[]>([]);
   const [schemeLookup, setSchemeLookup] = useState<Map<number, any>>(new Map());
   const disclaimerText =
     "All financial decisions involve risk and past performance is no guarantee of future results. You should consult with a qualified advisor and review all relevant disclosure documents before acting on any information provided.";
@@ -75,10 +75,11 @@ export default function MutualFundTransactionsPage() {
   useEffect(() => {
     if (!data?.transactions?.length) return;
     const run = async () => {
+      const baseTransactions = data.transactions ?? [];
       const manualInvestments = data.manualInvestments || [];
       const sipPlans = data.sipPlans || [];
       const schemeCodes = new Set<number>();
-      data.transactions?.forEach((txn) => {
+      baseTransactions.forEach((txn) => {
         const code = txn.matchingScheme?.schemeCode;
         if (Number.isFinite(code)) schemeCodes.add(code as number);
       });
@@ -86,10 +87,10 @@ export default function MutualFundTransactionsPage() {
       sipPlans.forEach((plan) => schemeCodes.add(plan.schemeCode));
 
       await fetchNavHistoryForSchemes(Array.from(schemeCodes));
-      await fetchNavHistory(data.transactions);
+      await fetchNavHistory(baseTransactions);
       const navMap = await getNavHistoryMap(Array.from(schemeCodes));
       const manualTransactions = buildManualTransactions(manualInvestments, sipPlans, navMap, schemeLookup);
-      const combined = [...(data.transactions || []), ...manualTransactions];
+      const combined = [...baseTransactions, ...manualTransactions];
       setCombinedTransactions(combined);
     };
     run();

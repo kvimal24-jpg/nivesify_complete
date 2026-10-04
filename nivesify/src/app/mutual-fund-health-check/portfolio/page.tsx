@@ -10,6 +10,7 @@ import { buildCashflows } from "@/lib/mutual-fund-health-check/cashflows";
 import { xirr } from "@/lib/mutual-fund-health-check/xirr";
 import { formatCurrency } from "@/lib/mutual-fund-health-check/format";
 import { buildManualTransactions } from "@/lib/mutual-fund-health-check/manual";
+import PortfolioLookThrough from "@/components/PortfolioLookThrough";
 
 const formatUnits = (units: number) =>
   new Intl.NumberFormat("en-IN", { maximumFractionDigits: 3 }).format(units);
@@ -61,11 +62,12 @@ export default function MutualFundPortfolioPage() {
   useEffect(() => {
     if (!data?.transactions?.length) return;
     const run = async () => {
+      const baseTransactions = data.transactions ?? [];
       setLoadingPortfolio(true);
       const manualInvestments = data.manualInvestments || [];
       const sipPlans = data.sipPlans || [];
       const schemeCodes = new Set<number>();
-      data.transactions?.forEach((txn) => {
+      baseTransactions.forEach((txn) => {
         const code = txn.matchingScheme?.schemeCode;
         if (Number.isFinite(code)) schemeCodes.add(code as number);
       });
@@ -73,10 +75,10 @@ export default function MutualFundPortfolioPage() {
       sipPlans.forEach((plan) => schemeCodes.add(plan.schemeCode));
 
       await fetchNavHistoryForSchemes(Array.from(schemeCodes));
-      await fetchNavHistory(data.transactions);
+      await fetchNavHistory(baseTransactions);
       const navMap = await getNavHistoryMap(Array.from(schemeCodes));
       const manualTransactions = buildManualTransactions(manualInvestments, sipPlans, navMap, schemeLookup);
-      const combined = [...(data.transactions || []), ...manualTransactions];
+      const combined = [...baseTransactions, ...manualTransactions];
       setCombinedTransactions(combined);
 
       const portfolioData = await getPortfolio(combined);
@@ -141,7 +143,7 @@ export default function MutualFundPortfolioPage() {
   );
 
   const renderXirr = (row: Portfolio[number]) => {
-    const txns = row.allTransactions.map((txn) => ({
+    const txns: Array<{ amount: number; date: Date; type: "buy" | "sell" }> = row.allTransactions.map((txn) => ({
       amount: txn.amount,
       date: new Date(txn.date),
       type: txn.type === "Investment" ? "buy" : "sell",
@@ -213,6 +215,8 @@ export default function MutualFundPortfolioPage() {
             </button>
           </div>
         </div>
+
+        <PortfolioLookThrough portfolio={portfolio} />
 
         <div className="overflow-x-auto rounded-3xl border border-[#DDE6F3] bg-white shadow-[0_18px_40px_-30px_rgba(31,41,55,0.25)]">
           <table className="min-w-full text-sm">

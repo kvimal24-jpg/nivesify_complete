@@ -6,6 +6,8 @@ import { computeAmfiAggregates, type AmfiRawRecord } from "@/lib/amfi-aggregates
 import type { CategoryInsights, FundAnalytics, Manifest } from "@/lib/fund-types";
 import { fetchCachedJson } from "@/lib/client-data";
 
+type ActiveView = "verdict" | "learn" | "explore";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ export default function ActiveFundsPage() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [amfiRaw, setAmfiRaw] = useState<AmfiRawRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<ActiveView>("verdict");
 
   useEffect(() => {
     Promise.all([
@@ -212,20 +215,20 @@ export default function ActiveFundsPage() {
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px" }}>
               {[
-                { label: "📘 Active vs Index",     href: "#active-vs-index", desc: "What's the difference?" },
-                { label: "🏆 Where Active Wins",   href: "#where-wins",      desc: "Categories worth picking" },
-                { label: "📊 Category Scoreboard", href: "#scoreboard",      desc: "Returns vs benchmark" },
-                { label: "🔍 Top Fund Picks",      href: "#top-picks",       desc: "Best funds by skill" },
-                { label: "🧮 Fund Screener",       href: "#screener",        desc: "Filter every active fund" },
-              ].map((a) => (
-                <a
-                  key={a.href}
-                  href={a.href}
-                  style={{ textDecoration: "none", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: "12px", padding: "10px 12px", display: "flex", flexDirection: "column" as const, gap: "2px", minHeight: "52px", justifyContent: "center" }}
+                { label: "🏆 The Verdict", key: "verdict" as const, desc: "Where active wins" },
+                { label: "📘 Learn", key: "learn" as const, desc: "Active vs index" },
+                { label: "🔍 Explore Funds", key: "explore" as const, desc: "Picks, data & screener" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setView(item.key)}
+                  aria-pressed={view === item.key}
+                  style={{ textAlign: "left", textDecoration: "none", background: view === item.key ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.07)", border: view === item.key ? "1px solid rgba(110,231,183,0.55)" : "1px solid rgba(255,255,255,0.14)", borderRadius: "12px", padding: "10px 12px", display: "flex", flexDirection: "column" as const, gap: "2px", minHeight: "52px", justifyContent: "center" }}
                 >
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>{a.label}</span>
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)" }}>{a.desc}</span>
-                </a>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>{item.label}</span>
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>{item.desc}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -250,7 +253,7 @@ export default function ActiveFundsPage() {
       {/* ═══════════════════════════════════════
           SECTION 1 — ACTIVE vs INDEX
       ═══════════════════════════════════════ */}
-      <section
+      {view === "learn" && <section
         id="active-vs-index"
         style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(32px,5vw,56px) clamp(16px,4vw,28px) 0" }}
       >
@@ -344,12 +347,12 @@ export default function ActiveFundsPage() {
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════
           SECTION 2 — WHERE ACTIVE WINS
       ═══════════════════════════════════════ */}
-      <section
+      {view === "verdict" && <section
         id="where-wins"
         style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,5vw,64px) clamp(16px,4vw,28px) 0" }}
       >
@@ -523,13 +526,13 @@ export default function ActiveFundsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#64748B" }}><div style={{ width: "16px", height: "8px", background: "linear-gradient(90deg,#EF4444,#DC2626)", borderRadius: "100px" }} />Negative alpha</div>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════
           SECTION 3 — CATEGORY SCOREBOARD
           (client component handles tables)
       ═══════════════════════════════════════ */}
-      <section
+      {view === "explore" && <section
         id="scoreboard"
         style={{ maxWidth: "1100px", margin: "0 auto", padding: "clamp(40px,5vw,64px) clamp(16px,4vw,28px) 0" }}
       >
@@ -571,7 +574,7 @@ export default function ActiveFundsPage() {
             manifest={manifest}
           />
         )}
-      </section>
+      </section>}
 
       {/* ═══════════════════════════════════════
           FOOTER — Disclaimer + CTAs
