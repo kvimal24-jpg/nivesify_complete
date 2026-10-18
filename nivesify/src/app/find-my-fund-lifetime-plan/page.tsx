@@ -427,9 +427,6 @@ function buildBox(
 ): BoxResult {
   return selectFundsForGoal(row, col, cellFunds, fundAnalytics, etfAnalytics, insights);
 
-  /* Legacy inlined implementation retained temporarily for reference. The shared
-     fund-selection engine above is the only executable implementation.
-
   if (cellFunds.length === 0) return { empty: true, leadingSubCategory: null, allConsideredSubCategories: [], candidateSubCategories: [] };
   const allConsideredSubCategories = new Set<string>();
   const subCategoryGroups: Record<string, AMFIFund[]> = {};
@@ -491,7 +488,7 @@ function buildBox(
     rank: bestRank,
     aum: 'Current_AUM' in bestFund ? (bestFund as FundAnalytics).Current_AUM : (bestFund as ETFAnalytics).Fund_AUM,
   } : undefined;
-  return { empty: false, leadingSubCategory: leadingSubCat.subCategoryName, allConsideredSubCategories: Array.from(allConsideredSubCategories), candidateSubCategories: subCategoryPerformances, decision, selectedFund: bestFund, fundStats }; */
+  return { empty: false, leadingSubCategory: leadingSubCat.subCategoryName, allConsideredSubCategories: Array.from(allConsideredSubCategories), candidateSubCategories: subCategoryPerformances, decision, selectedFund: bestFund, fundStats };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1463,7 +1460,6 @@ export default function LifetimePlanPage() {
   const [generating, setGenerating] = useState(false);
   const [selectedPhaseIdx, setSelectedPhaseIdx] = useState(0);
   const [selectedFundSlot, setSelectedFundSlot] = useState<ResolvedFundSlot | null>(null);
-  const [resultView, setResultView] = useState<"phase" | "projection" | "timeline" | "method">("phase");
   const resultRef = useRef<HTMLDivElement>(null);
   const phaseDetailRef = useRef<HTMLDivElement>(null);
 
@@ -1488,7 +1484,7 @@ export default function LifetimePlanPage() {
 
   function generate() {
     if(goals.length===0) return;
-    setGenerating(true); setLifetimePlan(null); setSelectedPhaseIdx(0); setResultView("phase");
+    setGenerating(true); setLifetimePlan(null); setSelectedPhaseIdx(0);
     setTimeout(()=>{
       const plan=buildLifetimePlan(goals,amfiRaw,fundAnalytics,etfAnalytics,insights);
       const pts = buildProjectionPoints(plan);
@@ -1635,31 +1631,18 @@ export default function LifetimePlanPage() {
               <TimelineVisual plan={lifetimePlan} goals={goals} selectedPhaseIdx={selectedPhaseIdx} onSelectPhase={setSelectedPhaseIdx} />
             </div>
 
-            <div className="segmented-nav" role="tablist" aria-label="Lifetime plan result views" style={{ width:'100%' }}>
-              {[
-                { key:'phase', label:'Current phase & funds' },
-                { key:'projection', label:'Growth projection' },
-                { key:'timeline', label:'All phases' },
-                { key:'method', label:'How it works' },
-              ].map(item=>(
-                <button key={item.key} type="button" role="tab" aria-selected={resultView===item.key} className={resultView===item.key?'is-active':undefined} onClick={()=>setResultView(item.key as typeof resultView)}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
             {/* Growth trajectory chart */}
-            {resultView==='projection'&&<GrowthTrajectoryChart plan={lifetimePlan} goals={goals} points={projectionPoints} />}
+            <GrowthTrajectoryChart plan={lifetimePlan} goals={goals} points={projectionPoints} />
 
             {/* Phase detail */}
-            {resultView==='phase'&&selectedPhase&&(
+            {selectedPhase&&(
               <div ref={phaseDetailRef}>
                 <PhaseDetailPanel phase={selectedPhase} resolvedFunds={selectedFunds} onFundDetail={setSelectedFundSlot} />
               </div>
             )}
 
             {/* All phases table */}
-            {resultView==='timeline'&&<div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', overflow:'hidden' }}>
+            <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', overflow:'hidden' }}>
               <div style={{ padding:'16px 18px', borderBottom:'1px solid #F1F5F9', display:'flex', alignItems:'center', gap:'10px' }}>
                 <span style={{ fontSize:'16px' }}>🗂️</span>
                 <div>
@@ -1710,10 +1693,10 @@ export default function LifetimePlanPage() {
                   </tbody>
                 </table>
               </div>
-            </div>}
+            </div>
 
             {/* How it works */}
-            {resultView==='method'&&<div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', padding:'18px 20px' }}>
+            <div style={{ background:'white', borderRadius:'16px', border:'1px solid #E2E8F0', padding:'18px 20px' }}>
               <div style={{ fontSize:'14px', fontWeight:800, color:'#0F172A', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px' }}>
                 <span>🧠</span> How we built this plan — in plain English
               </div>
@@ -1739,7 +1722,7 @@ export default function LifetimePlanPage() {
               <div style={{ marginTop:'14px', background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:'12px', padding:'12px 16px', fontSize:'12px', color:'#92400E', lineHeight:1.6 }}>
                 <strong>Disclaimer:</strong> All projections are based on historical performance and are not a guarantee of future returns. Please consult a SEBI-registered investment advisor before making investment decisions.
               </div>
-            </div>}
+            </div>
 
             {/* CTA to quick picks */}
             <div style={{ background:'linear-gradient(135deg,#EFF6FF,#F0FDF4)', border:'1px solid #BFDBFE', borderRadius:'16px', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'16px' }}>
